@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { dueCards } from "../srs";
+import { loadMistakes, loadVocab } from "../storage";
 import { colors } from "../theme";
 import { CurriculumModule, Profile, Track } from "../types";
 
@@ -14,6 +16,8 @@ interface Props {
   profile: Profile;
   onOpenModule: (module: CurriculumModule) => void;
   onFreeChat: () => void;
+  onOpenReview: () => void;
+  onOpenMistakes: () => void;
   onReset: () => void;
 }
 
@@ -22,9 +26,28 @@ const TRACK_META: Record<Track, { title: string; subtitle: string }> = {
   okuma: { title: "📖 Okuma — Fusha", subtitle: "Profesyonel okuma ve anlama" },
 };
 
-export default function DashboardScreen({ profile, onOpenModule, onFreeChat, onReset }: Props) {
+export default function DashboardScreen({
+  profile,
+  onOpenModule,
+  onFreeChat,
+  onOpenReview,
+  onOpenMistakes,
+  onReset,
+}: Props) {
   const { assessment, curriculum, completedModuleIds } = profile;
   const tracks: Track[] = ["konusma", "okuma"];
+  const [vocabTotal, setVocabTotal] = useState(0);
+  const [vocabDue, setVocabDue] = useState(0);
+  const [mistakeCount, setMistakeCount] = useState(0);
+
+  useEffect(() => {
+    void (async () => {
+      const [cards, mistakes] = await Promise.all([loadVocab(), loadMistakes()]);
+      setVocabTotal(cards.length);
+      setVocabDue(dueCards(cards).length);
+      setMistakeCount(mistakes.length);
+    })();
+  }, []);
 
   const confirmReset = () => {
     Alert.alert("Sıfırla", "Tüm ilerleme ve ayarlar silinecek. Emin misin?", [
@@ -58,6 +81,26 @@ export default function DashboardScreen({ profile, onOpenModule, onFreeChat, onR
       <TouchableOpacity style={styles.chatButton} onPress={onFreeChat}>
         <Text style={styles.chatButtonText}>💬 Üstaz ile Serbest Sohbet</Text>
       </TouchableOpacity>
+
+      <View style={styles.toolsRow}>
+        <TouchableOpacity style={styles.toolCard} onPress={onOpenReview}>
+          <Text style={styles.toolEmoji}>📇</Text>
+          <Text style={styles.toolTitle}>Kelime Defteri</Text>
+          <Text style={styles.toolMeta}>
+            {vocabTotal} kelime{vocabDue > 0 ? ` · ${vocabDue} tekrar bekliyor` : ""}
+          </Text>
+          {vocabDue > 0 && (
+            <View style={styles.dueBadge}>
+              <Text style={styles.dueBadgeText}>{vocabDue}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolCard} onPress={onOpenMistakes}>
+          <Text style={styles.toolEmoji}>📒</Text>
+          <Text style={styles.toolTitle}>Hata Defteri</Text>
+          <Text style={styles.toolMeta}>{mistakeCount} kayıt</Text>
+        </TouchableOpacity>
+      </View>
 
       {tracks.map((track) => {
         const modules = curriculum?.modules.filter((m) => m.track === track) ?? [];
@@ -126,6 +169,31 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   chatButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  toolsRow: { flexDirection: "row", gap: 10, marginBottom: 24 },
+  toolCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+  },
+  toolEmoji: { fontSize: 22, marginBottom: 6 },
+  toolTitle: { fontSize: 14, fontWeight: "700", color: colors.ink },
+  toolMeta: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
+  dueBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: colors.danger,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+  },
+  dueBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   trackSection: { marginBottom: 24 },
   trackTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
   trackSubtitle: { fontSize: 13, color: colors.inkSoft, marginBottom: 12, marginTop: 2 },

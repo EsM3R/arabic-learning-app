@@ -1,4 +1,4 @@
-import { Assessment, CurriculumModule, Profile } from "./types";
+import { Assessment, CurriculumModule, MistakeEntry, Profile, TeacherNote } from "./types";
 
 /**
  * Tüm öğretmen kişiliğinin temeli. Her sistem promptunun başına eklenir.
@@ -51,6 +51,34 @@ Kurallar:
 - objectives: her modül için 3-5 somut öğrenme hedefi (Türkçe).`;
 }
 
+/** Üstaz'ın araçlarını nasıl kullanacağını anlatan ortak bölüm. */
+const AGENT_TOOLS_GUIDE = `Araçların var ve bunları kimseye sormadan, kendi kararınla kullanırsın:
+- kelime_kaydet: Öğrencinin bilmediği veya yeni öğrendiği her önemli kelimeyi/kalıbı deftere ekle. Ders başına genelde 3-8 kelime doğaldır.
+- hata_kaydet: Anlamlı ve öğretici hataları kaydet (özellikle tekrarlananları). Önemsiz yazım sürçmelerini kaydetme.
+- not_yaz: Ders biterken veya önemli bir gözlemde kendine kısa not al: öğrenci nerede kaldı, neyi sevdi, sıradaki adım ne.
+- seviye_guncelle: Performansa bakarak seviyenin gerçekten değiştiğine ikna olursan güncelle; aceleci davranma.
+- modul_ekle: Öğrencinin ihtiyaç duyduğu ama müfredatta olmayan bir konu görürsen modül ekle.
+- modul_tamamla: Ders hedeflerine ulaşıldığında modülü kendin kapat.
+Araç kullanımını öğrenciye ilan etme; doğal sohbete devam et (uygulama zaten küçük bir rozet gösterir).`;
+
+/** Hafıza bağlamı: son hatalar ve öğretmen notları sisteme beslenir. */
+export function memoryContext(mistakes: MistakeEntry[], notes: TeacherNote[]): string {
+  const parts: string[] = [];
+  if (notes.length > 0) {
+    const recent = notes.slice(-5).map((n) => `- ${n.note}`);
+    parts.push(`Önceki derslerden kendi notların:\n${recent.join("\n")}`);
+  }
+  if (mistakes.length > 0) {
+    const recent = mistakes
+      .slice(-10)
+      .map((m) => `- "${m.mistake}" → doğrusu "${m.correction}" (${m.topic})`);
+    parts.push(
+      `Öğrencinin hata defteri (son kayıtlar — bu konuları fırsat buldukça tekrar ettir):\n${recent.join("\n")}`
+    );
+  }
+  return parts.length > 0 ? `\n\nHAFIZA:\n${parts.join("\n\n")}` : "";
+}
+
 export function lessonSystem(profile: Profile, module: CurriculumModule): string {
   const a = profile.assessment;
   const trackDesc =
@@ -61,19 +89,23 @@ export function lessonSystem(profile: Profile, module: CurriculumModule): string
 
 Şu an görev: DERS ANLATIMI. Öğrencinin adı ${profile.name}. Seviyesi: konuşma ${a?.speakingLevel ?? "?"}, okuma ${a?.readingLevel ?? "?"}. Zayıf yönleri: ${a?.weaknesses.join("; ") ?? "bilinmiyor"}.
 
-Bugünkü modül: "${module.title}" (${module.level})
+Bugünkü modül: "${module.title}" (id: ${module.id}, seviye: ${module.level})
 Açıklama: ${module.description}
 Hedefler: ${module.objectives.join("; ")}
 ${trackDesc}
 
-Dersi etkileşimli işle: kısa bir konu anlatımı yap, örnekler ver, sonra öğrenciye alıştırma sorusu sor ve cevabını bekle. Cevaba göre düzelt ve ilerle. Ders hedeflere ulaşınca öğrenciye modülü tamamladığını söyle ve "Dersi Tamamla" düğmesine basmasını hatırlat.`;
+Dersi etkileşimli işle: kısa bir konu anlatımı yap, örnekler ver, sonra öğrenciye alıştırma sorusu sor ve cevabını bekle. Cevaba göre düzelt ve ilerle. Ders hedeflere ulaşınca modul_tamamla aracıyla modülü kendin kapat ve öğrenciyi tebrik et.
+
+${AGENT_TOOLS_GUIDE}`;
 }
 
 export function freeChatSystem(profile: Profile): string {
   const a = profile.assessment;
   return `${BASE}
 
-Şu an görev: SERBEST SOHBET. Öğrencinin adı ${profile.name}. Seviyesi: konuşma ${a?.speakingLevel ?? "?"}. Suriyeli bir arkadaş gibi Şami ammicesiyle sohbet et — günlük konular, hal hatır, hayat. Öğrenci Türkçe yazarsa cevabı yine ammice ver ve nasıl söyleyeceğini göster. Hatalarını sohbeti bölmeden, kısa notlarla düzelt.`;
+Şu an görev: SERBEST SOHBET. Öğrencinin adı ${profile.name}. Seviyesi: konuşma ${a?.speakingLevel ?? "?"}. Suriyeli bir arkadaş gibi Şami ammicesiyle sohbet et — günlük konular, hal hatır, hayat. Öğrenci Türkçe yazarsa cevabı yine ammice ver ve nasıl söyleyeceğini göster. Hatalarını sohbeti bölmeden, kısa notlarla düzelt.
+
+${AGENT_TOOLS_GUIDE}`;
 }
 
 /** Öğretmenin ilk mesajı atması için görünmez tetikleyici kullanıcı mesajı. */

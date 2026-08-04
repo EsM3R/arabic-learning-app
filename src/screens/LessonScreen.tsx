@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
-import { chatReply } from "../claude";
+import { agenticChat } from "../claude";
 import {
   freeChatSystem,
   KICKOFF_FREECHAT,
   KICKOFF_LESSON,
   lessonSystem,
+  memoryContext,
 } from "../prompts";
-import { loadChat, saveChat } from "../storage";
+import { loadChat, loadMistakes, loadNotes, saveChat } from "../storage";
 import { colors } from "../theme";
 import { ChatMessage, CurriculumModule, Profile } from "../types";
 
@@ -18,25 +20,44 @@ interface Props {
   module: CurriculumModule | null;
   onBack: () => void;
   onCompleteModule: (moduleId: string) => void;
+  /** Üstaz araçlarıyla profili değiştirdiğinde (seviye, müfredat, modül tamamlama) çağrılır. */
+  onProfileChange: (profile: Profile) => void;
 }
 
-export default function LessonScreen({ profile, module, onBack, onCompleteModule }: Props) {
+export default function LessonScreen({
+  profile,
+  module,
+  onBack,
+  onCompleteModule,
+  onProfileChange,
+}: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
+  const [memory, setMemory] = useState("");
   const started = useRef(false);
 
   const chatId = module ? `module.${module.id}` : "freechat";
-  const system = module ? lessonSystem(profile, module) : freeChatSystem(profile);
+  const baseSystem = module ? lessonSystem(profile, module) : freeChatSystem(profile);
+  const system = baseSystem + memory;
   const kickoff = module ? KICKOFF_LESSON : KICKOFF_FREECHAT;
   const isDone = module ? profile.completedModuleIds.includes(module.id) : false;
 
-  const runTurn = async (history: ChatMessage[]) => {
+  const runTurn = async (history: ChatMessage[], systemPrompt: string) => {
     setSending(true);
+    const ctx: AgentContext = {
+      profile,
+      profileChanged: false,
+      currentModuleId: module?.id,
+    };
     try {
-      const reply = await chatReply(profile.apiKey, system, history);
-      const updated: ChatMessage[] = [...history, { role: "assistant", content: reply }];
+      const reply = await agenticChat(systemPrompt, history, ctx);
+      const updated: ChatMessage[] = [
+        ...history,
+        { role: "assistant", content: reply.text, actions: reply.actions },
+      ];
       setMessages(updated);
       await saveChat(chatId, updated);
+      if (ctx.profileChanged) onProfileChange(ctx.profile);
     } catch (e) {
       Alert.alert("Bağlantı hatası", e instanceof Error ? e.message : String(e));
       setMessages(history);
@@ -49,14 +70,20 @@ export default function LessonScreen({ profile, module, onBack, onCompleteModule
     if (started.current) return;
     started.current = true;
     void (async () => {
-      const saved = await loadChat(chatId);
+      const [mistakes, notes, saved] = await Promise.all([
+        loadMistakes(),
+        loadNotes(),
+        loadChat(chatId),
+      ]);
+      const mem = memoryContext(mistakes, notes);
+      setMemory(mem);
       if (saved.length > 0) {
         setMessages(saved);
         return;
       }
       const initial: ChatMessage[] = [{ role: "user", content: kickoff }];
       setMessages(initial);
-      await runTurn(initial);
+      await runTurn(initial, baseSystem + mem);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -65,7 +92,7 @@ export default function LessonScreen({ profile, module, onBack, onCompleteModule
     const history: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(history);
     void saveChat(chatId, history);
-    void runTurn(history);
+    void runTurn(history, system);
   };
 
   const complete = () => {

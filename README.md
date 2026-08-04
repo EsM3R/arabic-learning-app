@@ -8,6 +8,13 @@ Kişisel yapay zekâ destekli Arapça öğrenme uygulaması (Expo / React Native
 - 📊 Sohbet tabanlı seviye tespiti (CEFR: A0–C2, konuşma ve okuma ayrı)
 - 🗺️ Seviyene ve zayıf yönlerine göre üretilen kişisel müfredat
 - 💬 Serbest sohbet modu (ammice pratik, anında hata düzeltme)
+- 🤖 **Uçtan uca agentic:** Üstaz derste kendi kararıyla araç kullanır —
+  - 📇 bilmediğin kelimeleri **kelime defterine** ekler (SRS / aralıklı tekrar)
+  - 📒 anlamlı hatalarını **hata defterine** işler ve sonraki derslerde tekrar ettirir
+  - 🗒️ ders sonunda **kendine not alır** (kalıcı hafıza — sonraki derslere beslenir)
+  - 📈 ilerleyince **seviyeni kendisi günceller**
+  - 🗺️ ihtiyaç görürse **müfredata modül ekler**
+  - ✅ hedeflere ulaşınca **modülü kendisi tamamlar**
 
 ## Kurulum
 
@@ -50,7 +57,8 @@ Anahtar yalnızca kendi cihazında saklanır; istekler doğrudan cihazından Ant
 
 ## Yol haritası (sonraki sürümler)
 
-- [ ] Kelime kartları (SRS / aralıklı tekrar) — sohbetlerde geçen kelimeler otomatik kart olur
-- [ ] Hata defteri — yapılan hatalar kalıcı hafızaya alınıp sonraki derslere beslenir
+- [x] Kelime kartları (SRS / aralıklı tekrar) — Üstaz sohbetlerde geçen kelimeleri otomatik kart yapar
+- [x] Hata defteri — hatalar kalıcı hafızaya alınıp sonraki derslere beslenir
+- [x] Öğretmen hafızası ve otomatik seviye/müfredat güncelleme
 - [ ] Dinleme/telaffuz pratiği (ses)
-- [ ] İlerledikçe müfredatın otomatik güncellenmesi
+- [ ] Günlük hedefler ve seri (streak) takibi

@@ -4,6 +4,8 @@ import { ActivityIndicator, View } from "react-native";
 import AssessmentScreen from "./src/screens/AssessmentScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import LessonScreen from "./src/screens/LessonScreen";
+import MistakesScreen from "./src/screens/MistakesScreen";
+import ReviewScreen from "./src/screens/ReviewScreen";
 import SetupScreen from "./src/screens/SetupScreen";
 import { loadProfile, resetAll, saveProfile } from "./src/storage";
 import { colors } from "./src/theme";
@@ -14,7 +16,9 @@ type Screen =
   | { name: "setup" }
   | { name: "assessment" }
   | { name: "dashboard" }
-  | { name: "lesson"; module: CurriculumModule | null };
+  | { name: "lesson"; module: CurriculumModule | null }
+  | { name: "review" }
+  | { name: "mistakes" };
 
 export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -86,6 +90,8 @@ export default function App() {
           profile={profile}
           onOpenModule={(module) => setScreen({ name: "lesson", module })}
           onFreeChat={() => setScreen({ name: "lesson", module: null })}
+          onOpenReview={() => setScreen({ name: "review" })}
+          onOpenMistakes={() => setScreen({ name: "mistakes" })}
           onReset={onReset}
         />
       )}
@@ -95,7 +101,14 @@ export default function App() {
           module={screen.module}
           onBack={() => setScreen({ name: "dashboard" })}
           onCompleteModule={onCompleteModule}
+          onProfileChange={(next) => void persist(next)}
         />
+      )}
+      {screen.name === "review" && (
+        <ReviewScreen onBack={() => setScreen({ name: "dashboard" })} />
+      )}
+      {screen.name === "mistakes" && (
+        <MistakesScreen onBack={() => setScreen({ name: "dashboard" })} />
       )}
     </View>
   );

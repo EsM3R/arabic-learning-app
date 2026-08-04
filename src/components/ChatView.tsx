@@ -44,15 +44,26 @@ export default function ChatView({ messages, sending, onSend, placeholder }: Pro
         contentContainerStyle={styles.list}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => (
-          <View
-            style={[
-              styles.bubble,
-              item.role === "user" ? styles.userBubble : styles.assistantBubble,
-            ]}
-          >
-            <Text style={item.role === "user" ? styles.userText : styles.assistantText}>
-              {item.content}
-            </Text>
+          <View>
+            <View
+              style={[
+                styles.bubble,
+                item.role === "user" ? styles.userBubble : styles.assistantBubble,
+              ]}
+            >
+              <Text style={item.role === "user" ? styles.userText : styles.assistantText}>
+                {item.content}
+              </Text>
+            </View>
+            {item.actions && item.actions.length > 0 && (
+              <View style={styles.actionsWrap}>
+                {item.actions.map((action, i) => (
+                  <View key={i} style={styles.actionChip}>
+                    <Text style={styles.actionText}>{action}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       />
@@ -105,6 +116,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  actionsWrap: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 10,
+    marginTop: -4,
+  },
+  actionChip: {
+    backgroundColor: colors.goldSoft,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  actionText: { color: colors.gold, fontSize: 12, fontWeight: "600" },
   userText: { color: "#FFFFFF", fontSize: 16, lineHeight: 23 },
   assistantText: { color: colors.ink, fontSize: 16, lineHeight: 24 },
   typing: {

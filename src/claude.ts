@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
 import { ASSESSMENT_ANALYSIS_SYSTEM, curriculumSystem } from "./prompts";
 import { Assessment, ChatMessage, Curriculum, CurriculumModule } from "./types";
 
@@ -39,6 +40,85 @@ export async function chatReply(
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });
   return extractText(response);
+}
+
+export interface AgenticReply {
+  text: string;
+  /** Üstaz'ın bu turda yaptığı eylemlerin UI özetleri. */
+  actions: string[];
+}
+
+/**
+ * Agentic sohbet turu: Üstaz cevap verirken araçlarını (kelime_kaydet,
+ * hata_kaydet, not_yaz, seviye_guncelle, modul_ekle, modul_tamamla)
+ * kendi kararıyla kullanır. Araç çağrıları burada çalıştırılıp sonuçları
+ * modele geri beslenir; model araç istemeyi bırakana kadar döngü sürer.
+ */
+export async function agenticChat(
+  system: string,
+  messages: ChatMessage[],
+  ctx: AgentContext
+): Promise<AgenticReply> {
+  const anthropic = client(ctx.profile.apiKey);
+  const history: Anthropic.MessageParam[] = messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  const actions: string[] = [];
+
+  for (let turn = 0; turn < 8; turn++) {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      thinking: { type: "adaptive" },
+      system,
+      tools: TEACHER_TOOLS,
+      messages: history,
+    });
+
+    if (response.stop_reason === "refusal") {
+      throw new Error(
+        "Model bu isteği güvenlik nedeniyle yanıtlamadı. Lütfen mesajı değiştirip tekrar deneyin."
+      );
+    }
+
+    // Sunucu tarafı araç döngüsü duraklarsa aynı geçmişle devam et
+    if (response.stop_reason === "pause_turn") {
+      history.push({ role: "assistant", content: response.content });
+      continue;
+    }
+
+    if (response.stop_reason !== "tool_use") {
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+      if (!text) throw new Error("Modelden boş yanıt geldi, lütfen tekrar deneyin.");
+      return { text, actions };
+    }
+
+    // Araç çağrılarını çalıştır; thinking blokları dahil içeriği aynen geri ver
+    history.push({ role: "assistant", content: response.content });
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    for (const block of response.content) {
+      if (block.type !== "tool_use") continue;
+      const outcome = await executeTool(
+        block.name,
+        block.input as Record<string, unknown>,
+        ctx
+      );
+      if (outcome.summary) actions.push(outcome.summary);
+      toolResults.push({
+        type: "tool_result",
+        tool_use_id: block.id,
+        content: outcome.result,
+      });
+    }
+    history.push({ role: "user", content: toolResults });
+  }
+
+  throw new Error("Araç döngüsü beklenenden uzun sürdü, lütfen tekrar deneyin.");
 }
 
 const ASSESSMENT_SCHEMA = {
