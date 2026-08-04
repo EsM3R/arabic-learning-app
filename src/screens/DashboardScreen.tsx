@@ -18,6 +18,7 @@ interface Props {
   onFreeChat: () => void;
   onOpenReview: () => void;
   onOpenMistakes: () => void;
+  onOpenPronunciation: () => void;
   onReset: () => void;
 }
 
@@ -32,6 +33,7 @@ export default function DashboardScreen({
   onFreeChat,
   onOpenReview,
   onOpenMistakes,
+  onOpenPronunciation,
   onReset,
 }: Props) {
   const { assessment, curriculum, completedModuleIds } = profile;
@@ -102,6 +104,17 @@ export default function DashboardScreen({
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity style={styles.pronunciationCard} onPress={onOpenPronunciation}>
+        <Text style={styles.toolEmoji}>🎙️</Text>
+        <View style={styles.pronunciationBody}>
+          <Text style={styles.toolTitle}>Telaffuz Stüdyosu</Text>
+          <Text style={styles.toolMeta}>
+            Dinle, kaydet, karşılaştır — ع، ح، خ gibi zor sesler için ipuçları
+          </Text>
+        </View>
+        <Text style={styles.pronunciationArrow}>›</Text>
+      </TouchableOpacity>
+
       {tracks.map((track) => {
         const modules = curriculum?.modules.filter((m) => m.track === track) ?? [];
         return (
@@ -169,7 +182,20 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   chatButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  toolsRow: { flexDirection: "row", gap: 10, marginBottom: 24 },
+  toolsRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  pronunciationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 24,
+    gap: 12,
+  },
+  pronunciationBody: { flex: 1 },
+  pronunciationArrow: { fontSize: 22, color: colors.inkSoft },
   toolCard: {
     flex: 1,
     backgroundColor: colors.card,

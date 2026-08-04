@@ -74,3 +74,17 @@ export interface TeacherNote {
   note: string;
   createdAt: string;
 }
+
+/** Telaffuz pratiği öğesi — Üstaz seviyeye ve kelime defterine göre üretir. */
+export interface PronunciationItem {
+  arabic: string;
+  transliteration: string;
+  turkish: string;
+  /** Türk öğrenciye özel telaffuz ipucu (örn. ع sesi nasıl çıkarılır). */
+  tip: string;
+}
+
+export interface PronunciationSet {
+  items: PronunciationItem[];
+  createdAt: string;
+}

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { extractArabic, speakArabic } from "../speech";
 import { colors } from "../theme";
 import { ChatMessage } from "../types";
 
@@ -54,6 +55,14 @@ export default function ChatView({ messages, sending, onSend, placeholder }: Pro
               <Text style={item.role === "user" ? styles.userText : styles.assistantText}>
                 {item.content}
               </Text>
+              {item.role === "assistant" && extractArabic(item.content).length > 0 && (
+                <TouchableOpacity
+                  style={styles.speakButton}
+                  onPress={() => speakArabic(item.content)}
+                >
+                  <Text style={styles.speakText}>🔊 Arapçayı dinle</Text>
+                </TouchableOpacity>
+              )}
             </View>
             {item.actions && item.actions.length > 0 && (
               <View style={styles.actionsWrap}>
@@ -131,6 +140,15 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   actionText: { color: colors.gold, fontSize: 12, fontWeight: "600" },
+  speakButton: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    backgroundColor: colors.accentSoft,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  speakText: { color: colors.accent, fontSize: 12, fontWeight: "600" },
   userText: { color: "#FFFFFF", fontSize: 16, lineHeight: 23 },
   assistantText: { color: colors.ink, fontSize: 16, lineHeight: 24 },
   typing: {

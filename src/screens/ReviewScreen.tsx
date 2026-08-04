@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { speakArabic } from "../speech";
 import { dueCards, gradeCard } from "../srs";
 import { loadVocab, saveVocab } from "../storage";
 import { colors } from "../theme";
@@ -74,6 +75,20 @@ export default function ReviewScreen({ onBack }: Props) {
         <View style={styles.cardArea}>
           <View style={styles.card}>
             <Text style={styles.arabic}>{current.arabic}</Text>
+            <View style={styles.listenRow}>
+              <TouchableOpacity
+                style={styles.listenChip}
+                onPress={() => speakArabic(current.arabic)}
+              >
+                <Text style={styles.listenChipText}>🔊 Dinle</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.listenChip}
+                onPress={() => speakArabic(current.arabic, true)}
+              >
+                <Text style={styles.listenChipText}>🐢 Yavaş</Text>
+              </TouchableOpacity>
+            </View>
             {revealed ? (
               <>
                 <Text style={styles.translit}>{current.transliteration}</Text>
@@ -161,7 +176,15 @@ const styles = StyleSheet.create({
     minHeight: 260,
     justifyContent: "center",
   },
-  arabic: { fontSize: 40, color: colors.ink, textAlign: "center", marginBottom: 16 },
+  arabic: { fontSize: 40, color: colors.ink, textAlign: "center", marginBottom: 12 },
+  listenRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  listenChip: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  listenChipText: { color: colors.accent, fontSize: 13, fontWeight: "700" },
   prompt: { fontSize: 14, color: colors.inkSoft },
   translit: { fontSize: 18, color: colors.accent, fontWeight: "600", marginBottom: 8 },
   turkish: { fontSize: 22, color: colors.ink, fontWeight: "700", marginBottom: 8 },

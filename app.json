@@ -20,6 +20,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Telaffuz pratiği için mikrofon erişimi gerekiyor."
+        }
+      ]
+    ]
   }
 }

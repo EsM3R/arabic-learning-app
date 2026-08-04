@@ -108,6 +108,21 @@ export function freeChatSystem(profile: Profile): string {
 ${AGENT_TOOLS_GUIDE}`;
 }
 
+export function pronunciationSystem(name: string, a: Assessment | undefined, vocabWords: string[]): string {
+  const vocabPart =
+    vocabWords.length > 0
+      ? `Öğrencinin kelime defterinden örnekler (bunlardan birkaçını sete dahil et): ${vocabWords.slice(0, 20).join("، ")}`
+      : "Öğrencinin kelime defteri henüz boş; seviyeye uygun temel kelime ve kalıplar seç.";
+  return `Sen Türk öğrencilere Arapça telaffuz öğreten bir uzmansın. Öğrencinin adı ${name}, konuşma (Şami ammicesi) seviyesi ${a?.speakingLevel ?? "A0"}.
+
+12 öğelik bir telaffuz pratik seti hazırla. Kurallar:
+- Öğeler kısa olsun: tek kelime veya 2-5 kelimelik günlük kalıplar (Şami ammicesi).
+- Kolaydan zora sırala. Türklerin zorlandığı sesleri (ع، ح، خ، غ، ق، ض، ظ، ص) içeren öğelere ağırlık ver.
+- ${vocabPart}
+- transliteration: Türkçe okunuşa yakın Latin transkripsiyon.
+- tip: Türk öğrenciye özel, 1-2 cümlelik SOMUT telaffuz ipucu. Türkçedeki benzer seslerden yola çık (örn. "ع boğazın sıkışmasıyla çıkar; 'a' derken boğazını hafifçe sık", "خ Türkçedeki 'h'den sert, hırıltılı — 'Ahmet' derkenki h'yi boğazdan hırlat").`;
+}
+
 /** Öğretmenin ilk mesajı atması için görünmez tetikleyici kullanıcı mesajı. */
 export const KICKOFF_ASSESSMENT = "Merhaba hocam! Seviye tespitine hazırım, başlayalım.";
 export const KICKOFF_LESSON = "Merhaba hocam! Derse başlamaya hazırım.";

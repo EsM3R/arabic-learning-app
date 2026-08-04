@@ -5,6 +5,7 @@ import AssessmentScreen from "./src/screens/AssessmentScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import LessonScreen from "./src/screens/LessonScreen";
 import MistakesScreen from "./src/screens/MistakesScreen";
+import PronunciationScreen from "./src/screens/PronunciationScreen";
 import ReviewScreen from "./src/screens/ReviewScreen";
 import SetupScreen from "./src/screens/SetupScreen";
 import { loadProfile, resetAll, saveProfile } from "./src/storage";
@@ -18,7 +19,8 @@ type Screen =
   | { name: "dashboard" }
   | { name: "lesson"; module: CurriculumModule | null }
   | { name: "review" }
-  | { name: "mistakes" };
+  | { name: "mistakes" }
+  | { name: "pronunciation" };
 
 export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -92,6 +94,7 @@ export default function App() {
           onFreeChat={() => setScreen({ name: "lesson", module: null })}
           onOpenReview={() => setScreen({ name: "review" })}
           onOpenMistakes={() => setScreen({ name: "mistakes" })}
+          onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
           onReset={onReset}
         />
       )}
@@ -109,6 +112,9 @@ export default function App() {
       )}
       {screen.name === "mistakes" && (
         <MistakesScreen onBack={() => setScreen({ name: "dashboard" })} />
+      )}
+      {screen.name === "pronunciation" && profile && (
+        <PronunciationScreen profile={profile} onBack={() => setScreen({ name: "dashboard" })} />
       )}
     </View>
   );

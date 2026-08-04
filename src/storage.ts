@@ -1,10 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ChatMessage, MistakeEntry, Profile, TeacherNote, VocabCard } from "./types";
+import {
+  ChatMessage,
+  MistakeEntry,
+  Profile,
+  PronunciationSet,
+  TeacherNote,
+  VocabCard,
+} from "./types";
 
 const PROFILE_KEY = "profile.v1";
 const VOCAB_KEY = "vocab.v1";
 const MISTAKES_KEY = "mistakes.v1";
 const NOTES_KEY = "notes.v1";
+const PRONUNCIATION_KEY = "pronunciation.v1";
 const chatKey = (id: string) => `chat.v1.${id}`;
 
 async function loadList<T>(key: string): Promise<T[]> {
@@ -22,6 +30,15 @@ export const loadMistakes = () => loadList<MistakeEntry>(MISTAKES_KEY);
 export const saveMistakes = (entries: MistakeEntry[]) => saveList(MISTAKES_KEY, entries);
 export const loadNotes = () => loadList<TeacherNote>(NOTES_KEY);
 export const saveNotes = (notes: TeacherNote[]) => saveList(NOTES_KEY, notes);
+
+export async function loadPronunciationSet(): Promise<PronunciationSet | null> {
+  const raw = await AsyncStorage.getItem(PRONUNCIATION_KEY);
+  return raw ? (JSON.parse(raw) as PronunciationSet) : null;
+}
+
+export async function savePronunciationSet(set: PronunciationSet): Promise<void> {
+  await AsyncStorage.setItem(PRONUNCIATION_KEY, JSON.stringify(set));
+}
 
 export async function loadProfile(): Promise<Profile | null> {
   const raw = await AsyncStorage.getItem(PROFILE_KEY);

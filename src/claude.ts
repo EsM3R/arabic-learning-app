@@ -1,7 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
-import { ASSESSMENT_ANALYSIS_SYSTEM, curriculumSystem } from "./prompts";
-import { Assessment, ChatMessage, Curriculum, CurriculumModule } from "./types";
+import { ASSESSMENT_ANALYSIS_SYSTEM, curriculumSystem, pronunciationSystem } from "./prompts";
+import {
+  Assessment,
+  ChatMessage,
+  Curriculum,
+  CurriculumModule,
+  PronunciationItem,
+  PronunciationSet,
+} from "./types";
 
 const MODEL = "claude-opus-5";
 
@@ -193,4 +200,45 @@ export async function generateCurriculum(
   });
   const parsed = JSON.parse(extractText(response)) as { modules: CurriculumModule[] };
   return { modules: parsed.modules, generatedAt: new Date().toISOString() };
+}
+
+const PRONUNCIATION_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          arabic: { type: "string" },
+          transliteration: { type: "string" },
+          turkish: { type: "string" },
+          tip: { type: "string" },
+        },
+        required: ["arabic", "transliteration", "turkish", "tip"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["items"],
+  additionalProperties: false,
+} as const;
+
+/** Seviyeye ve kelime defterine göre telaffuz pratik seti üretir. */
+export async function generatePronunciationSet(
+  apiKey: string,
+  name: string,
+  assessment: Assessment | undefined,
+  vocabWords: string[]
+): Promise<PronunciationSet> {
+  const response = await client(apiKey).messages.create({
+    model: MODEL,
+    max_tokens: 16000,
+    thinking: { type: "adaptive" },
+    system: pronunciationSystem(name, assessment, vocabWords),
+    output_config: { format: { type: "json_schema", schema: PRONUNCIATION_SCHEMA } },
+    messages: [{ role: "user", content: "Telaffuz pratik setimi hazırla lütfen." }],
+  });
+  const parsed = JSON.parse(extractText(response)) as { items: PronunciationItem[] };
+  return { items: parsed.items, createdAt: new Date().toISOString() };
 }
