@@ -60,5 +60,5 @@ Anahtar yalnızca kendi cihazında saklanır; istekler doğrudan cihazından Ant
 - [x] Kelime kartları (SRS / aralıklı tekrar) — Üstaz sohbetlerde geçen kelimeleri otomatik kart yapar
 - [x] Hata defteri — hatalar kalıcı hafızaya alınıp sonraki derslere beslenir
 - [x] Öğretmen hafızası ve otomatik seviye/müfredat güncelleme
-- [ ] Dinleme/telaffuz pratiği (ses)
+- [x] Dinleme/telaffuz pratiği — 🎙️ Telaffuz Stüdyosu: dinle, kaydet, karşılaştır; sohbette ve kelime kartlarında sesli okuma
 - [ ] Günlük hedefler ve seri (streak) takibi
