@@ -36,6 +36,10 @@ Kişisel yapay zekâ destekli Arapça öğrenme uygulaması (Expo / React Native
 
 5. Terminalde çıkan QR kodu telefonundan Expo Go ile okut. Uygulama telefonunda açılır.
 
+> **Sürüm notu:** Proje **Expo SDK 54** kullanır. Telefondaki Expo Go'nun da SDK 54
+> sürümü olmalı (Expo Go → Settings → sürüm numarası). "Project is incompatible with
+> this version of Expo Go" hatası alırsan sürümler uyuşmuyordur.
+
 ## API Anahtarı
 
 Uygulama, öğretmen olarak Claude'u kullanır. Bunun için bir Anthropic API anahtarı gerekir:
