@@ -7,32 +7,52 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AgentContext, ASSESSMENT_TOOLS } from "../agent";
 import ChatView from "../components/ChatView";
-import { analyzeAssessment, chatReply, generateCurriculum } from "../claude";
+import { agenticChat, analyzeAssessment, generateCurriculum } from "../claude";
 import { assessmentSystem, KICKOFF_ASSESSMENT } from "../prompts";
 import { colors } from "../theme";
-import { Assessment, ChatMessage, Curriculum } from "../types";
+import { Assessment, ChatMessage, Curriculum, Profile } from "../types";
 
 interface Props {
-  name: string;
-  apiKey: string;
+  profile: Profile;
   onComplete: (assessment: Assessment, curriculum: Curriculum) => void;
 }
 
-export default function AssessmentScreen({ name, apiKey, onComplete }: Props) {
+export default function AssessmentScreen({ profile, onComplete }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [finishStage, setFinishStage] = useState<"idle" | "analyzing" | "planning">("idle");
   const started = useRef(false);
+  const profileRef = useRef(profile);
 
-  const system = assessmentSystem(name);
+  const system = assessmentSystem(profile.name);
+
+  /** Seviye raporu hazır → müfredatı üret ve panele geç. */
+  const buildCurriculum = async (assessment: Assessment) => {
+    setFinishStage("planning");
+    const curriculum = await generateCurriculum(profile.apiKey, profile.name, assessment);
+    onComplete(assessment, curriculum);
+  };
 
   const runTurn = async (history: ChatMessage[]) => {
     setSending(true);
+    const ctx: AgentContext = { profile: profileRef.current, profileChanged: false };
     try {
-      const reply = await chatReply(apiKey, system, history);
-      setMessages([...history, { role: "assistant", content: reply }]);
+      const reply = await agenticChat(system, history, ctx, ASSESSMENT_TOOLS);
+      const updated: ChatMessage[] = [
+        ...history,
+        { role: "assistant", content: reply.text, actions: reply.actions },
+      ];
+      setMessages(updated);
+      if (ctx.profileChanged) profileRef.current = ctx.profile;
+
+      // Üstaz değerlendirmeyi kendisi bitirdiyse müfredata geç.
+      if (ctx.assessmentResult) {
+        await buildCurriculum(ctx.assessmentResult);
+      }
     } catch (e) {
+      setFinishStage("idle");
       Alert.alert("Bağlantı hatası", e instanceof Error ? e.message : String(e));
       setMessages(history);
     } finally {
@@ -55,7 +75,8 @@ export default function AssessmentScreen({ name, apiKey, onComplete }: Props) {
     void runTurn(history);
   };
 
-  const finish = async () => {
+  /** Kullanıcı yedek yolu: Üstaz beklerken öğrenci bitirmek isterse. */
+  const finishManually = async () => {
     if (messages.filter((m) => m.role === "user").length < 3) {
       Alert.alert(
         "Biraz erken",
@@ -65,10 +86,8 @@ export default function AssessmentScreen({ name, apiKey, onComplete }: Props) {
     }
     try {
       setFinishStage("analyzing");
-      const assessment = await analyzeAssessment(apiKey, messages);
-      setFinishStage("planning");
-      const curriculum = await generateCurriculum(apiKey, name, assessment);
-      onComplete(assessment, curriculum);
+      const assessment = await analyzeAssessment(profile.apiKey, messages);
+      await buildCurriculum(assessment);
     } catch (e) {
       setFinishStage("idle");
       Alert.alert("Hata", e instanceof Error ? e.message : String(e));
@@ -95,7 +114,11 @@ export default function AssessmentScreen({ name, apiKey, onComplete }: Props) {
           <Text style={styles.headerTitle}>Seviye Tespiti</Text>
           <Text style={styles.headerSub}>Üstaz ile tanışma sohbeti</Text>
         </View>
-        <TouchableOpacity style={styles.finishButton} onPress={finish} disabled={sending}>
+        <TouchableOpacity
+          style={styles.finishButton}
+          onPress={() => void finishManually()}
+          disabled={sending}
+        >
           <Text style={styles.finishText}>Değerlendirmeyi Bitir</Text>
         </TouchableOpacity>
       </View>

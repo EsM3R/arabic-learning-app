@@ -33,38 +33,29 @@ function extractText(response: Anthropic.Message): string {
   return text;
 }
 
-/** Sohbet turu: sistem promptu + geçmiş → öğretmenin cevabı. */
-export async function chatReply(
-  apiKey: string,
-  system: string,
-  messages: ChatMessage[]
-): Promise<string> {
-  const response = await client(apiKey).messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    system,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
-  });
-  return extractText(response);
-}
-
 export interface AgenticReply {
   text: string;
   /** Üstaz'ın bu turda yaptığı eylemlerin UI özetleri. */
   actions: string[];
 }
 
+const MAX_TOOL_ROUNDS = 12;
+/** Bu kadar tur kalınca modele "toparla" uyarısı iletilir. */
+const WRAP_UP_AT = 3;
+
 /**
- * Agentic sohbet turu: Üstaz cevap verirken araçlarını (kelime_kaydet,
- * hata_kaydet, not_yaz, seviye_guncelle, modul_ekle, modul_tamamla)
- * kendi kararıyla kullanır. Araç çağrıları burada çalıştırılıp sonuçları
- * modele geri beslenir; model araç istemeyi bırakana kadar döngü sürer.
+ * Agentic sohbet turu: Üstaz cevap verirken araçlarını kendi kararıyla kullanır —
+ * önce okuma araçlarıyla (tekrar_durumu, kelime_ara, hafiza_oku, mufredat_oku)
+ * duruma bakar, sonra yazma ve inisiyatif araçlarını çağırır. Araç çağrıları
+ * burada çalıştırılıp sonuçları modele geri beslenir; model araç istemeyi
+ * bırakana kadar döngü sürer. Bütçe dolarsa tur çöpe atılmaz: modelin o ana
+ * kadar yazdığı metin döndürülür (araç etkileri zaten diske işlenmiştir).
  */
 export async function agenticChat(
   system: string,
   messages: ChatMessage[],
-  ctx: AgentContext
+  ctx: AgentContext,
+  tools: Anthropic.Tool[] = TEACHER_TOOLS
 ): Promise<AgenticReply> {
   const anthropic = client(ctx.profile.apiKey);
   const history: Anthropic.MessageParam[] = messages.map((m) => ({
@@ -72,14 +63,15 @@ export async function agenticChat(
     content: m.content,
   }));
   const actions: string[] = [];
+  let lastText = "";
 
-  for (let turn = 0; turn < 8; turn++) {
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: "adaptive" },
       system,
-      tools: TEACHER_TOOLS,
+      tools,
       messages: history,
     });
 
@@ -89,6 +81,13 @@ export async function agenticChat(
       );
     }
 
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
+    if (text) lastText = text;
+
     // Sunucu tarafı araç döngüsü duraklarsa aynı geçmişle devam et
     if (response.stop_reason === "pause_turn") {
       history.push({ role: "assistant", content: response.content });
@@ -96,18 +95,13 @@ export async function agenticChat(
     }
 
     if (response.stop_reason !== "tool_use") {
-      const text = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
       if (!text) throw new Error("Modelden boş yanıt geldi, lütfen tekrar deneyin.");
       return { text, actions };
     }
 
     // Araç çağrılarını çalıştır; thinking blokları dahil içeriği aynen geri ver
     history.push({ role: "assistant", content: response.content });
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    const toolResults: Anthropic.ContentBlockParam[] = [];
     for (const block of response.content) {
       if (block.type !== "tool_use") continue;
       const outcome = await executeTool(
@@ -122,10 +116,27 @@ export async function agenticChat(
         content: outcome.result,
       });
     }
+
+    // Bütçe tükenmek üzereyse modeli kendi turunu kapatmaya yönlendir —
+    // sert kesip turu çöpe atmak yerine düzgün bitirmesini sağlar.
+    const remaining = MAX_TOOL_ROUNDS - round - 1;
+    if (remaining <= WRAP_UP_AT) {
+      toolResults.push({
+        type: "text",
+        text: `[Sistem: bu tur için ${remaining} araç turun kaldı. Kalan araç çağrılarını en gerekliyle sınırla ve öğrenciye dönük cevabını şimdi yaz.]`,
+      });
+    }
+
     history.push({ role: "user", content: toolResults });
   }
 
-  throw new Error("Araç döngüsü beklenenden uzun sürdü, lütfen tekrar deneyin.");
+  // Bütçe bitti: turu çöpe atma. Ne yazdıysa onu döndür, eylemler zaten kaydedildi.
+  return {
+    text:
+      lastText ||
+      "Bu turda çok fazla işlem yaptım ve cevabımı yetiştiremedim. Kaldığımız yerden devam edelim — tekrar yazar mısın?",
+    actions,
+  };
 }
 
 const ASSESSMENT_SCHEMA = {

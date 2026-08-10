@@ -53,6 +53,10 @@ export interface VocabCard {
   intervalDays: number;
   ease: number;
   reps: number;
+  /** Kaç kez "Bilemedim" denildi. Eski kayıtlarda olmayabilir. */
+  lapses?: number;
+  /** Son tekrarın zamanı (ISO). Eski kayıtlarda olmayabilir. */
+  lastReviewedAt?: string;
 }
 
 /** Tekrar notu: 0 = bilemedim, 1 = zor, 2 = bildim, 3 = çok kolay */
@@ -66,6 +70,11 @@ export interface MistakeEntry {
   explanation: string;
   topic: string;
   createdAt: string;
+  /** Hangi parkurda yapıldı — hafıza filtrelemesi için. Eski kayıtlarda olmayabilir. */
+  track?: Track;
+  /** Üstaz "artık bu hatayı yapmıyor" dediğinde işaretlenir; hafızadan düşer. */
+  resolved?: boolean;
+  resolvedAt?: string;
 }
 
 /** Üstaz'ın kendine yazdığı ders notu — sonraki derslere hafıza olarak beslenir. */
@@ -87,4 +96,20 @@ export interface PronunciationItem {
 export interface PronunciationSet {
   items: PronunciationItem[];
   createdAt: string;
+}
+
+/** Üstaz'ın ekrana_git aracıyla önerdiği yönlendirme (zorlamaz, öneri çipi olarak gösterilir). */
+export interface NavigationSuggestion {
+  screen: "dashboard" | "review" | "pronunciation" | "mistakes" | "module";
+  moduleId?: string;
+  label: string;
+}
+
+/** Üstaz'ın kendi kurduğu hatırlatıcı. */
+export interface Reminder {
+  id: string;
+  message: string;
+  fireAt: string;
+  createdAt: string;
+  notificationId?: string;
 }

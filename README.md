@@ -8,13 +8,27 @@ Kişisel yapay zekâ destekli Arapça öğrenme uygulaması (Expo / React Native
 - 📊 Sohbet tabanlı seviye tespiti (CEFR: A0–C2, konuşma ve okuma ayrı)
 - 🗺️ Seviyene ve zayıf yönlerine göre üretilen kişisel müfredat
 - 💬 Serbest sohbet modu (ammice pratik, anında hata düzeltme)
-- 🤖 **Uçtan uca agentic:** Üstaz derste kendi kararıyla araç kullanır —
-  - 📇 bilmediğin kelimeleri **kelime defterine** ekler (SRS / aralıklı tekrar)
-  - 📒 anlamlı hatalarını **hata defterine** işler ve sonraki derslerde tekrar ettirir
-  - 🗒️ ders sonunda **kendine not alır** (kalıcı hafıza — sonraki derslere beslenir)
-  - 📈 ilerleyince **seviyeni kendisi günceller**
-  - 🗺️ ihtiyaç görürse **müfredata modül ekler**
-  - ✅ hedeflere ulaşınca **modülü kendisi tamamlar**
+- 🤖 **Agentic öğretmen:** Üstaz'ın 17 aracı var ve hepsini kendi kararıyla, izin sormadan kullanır.
+
+  **Önce bakar (okuma araçları):**
+  - 📊 `tekrar_durumu` — hangi kelimeleri unuttuğunu, kaç tekrarın biriktiğini görür
+  - 🔍 `kelime_ara` — bir kelimeyi daha önce öğretip öğretmediğini kontrol eder
+  - 📚 `hafiza_oku` — hata defterini ve geçmiş notlarını konuya göre arar
+  - 🗺️ `mufredat_oku` — modülleri ve tamamlanma durumunu okur
+
+  **Sonra yazar / düzeltir:**
+  - 📇 `kelime_kaydet` (zorluk derecesiyle), `kelime_duzelt`, `kelime_sil`
+  - 📒 `hata_kaydet`, `hata_cozuldu` (öğrendiğin konuyu defterden düşürür)
+  - 🗒️ `not_yaz`, `not_sil` — kalıcı hafızası
+  - 📈 `seviye_guncelle` — seviyeni **ve** zayıf yönlerini birlikte günceller
+  - 🏗️ `modul_ekle`, `modul_tamamla`
+
+  **İnisiyatif alır:**
+  - ➡️ `ekrana_git` — sıradaki adımı önerir (tıklanabilir öneri şeridi)
+  - ⏰ `hatirlatici_kur` — telefonuna ders hatırlatıcısı kurar
+
+  Seviye tespitini de Üstaz yönetir: ne zaman yeterli kanıt topladığına kendisi karar verip
+  `degerlendirmeyi_bitir` ile kapatır.
 
 ## Kurulum
 
@@ -65,4 +79,7 @@ Anahtar yalnızca kendi cihazında saklanır; istekler doğrudan cihazından Ant
 - [x] Hata defteri — hatalar kalıcı hafızaya alınıp sonraki derslere beslenir
 - [x] Öğretmen hafızası ve otomatik seviye/müfredat güncelleme
 - [x] Dinleme/telaffuz pratiği — 🎙️ Telaffuz Stüdyosu: dinle, kaydet, karşılaştır; sohbette ve kelime kartlarında sesli okuma
+- [x] Okuma araçları + SRS görünürlüğü — Üstaz artık yazdığı veriyi görebiliyor
+- [x] Agentic seviye tespiti, düzeltme fiilleri, hatırlatıcılar ve yönlendirme önerileri
 - [ ] Günlük hedefler ve seri (streak) takibi
+- [ ] Öğrencinin ses kaydını Üstaz'ın dinleyip telaffuz puanlaması

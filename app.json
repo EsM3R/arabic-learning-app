@@ -27,7 +27,8 @@
         {
           "microphonePermission": "Telaffuz pratiği için mikrofon erişimi gerekiyor."
         }
-      ]
+      ],
+      "expo-notifications"
     ]
   }
 }

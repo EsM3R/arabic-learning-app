@@ -9,10 +9,11 @@ import {
   KICKOFF_LESSON,
   lessonSystem,
   memoryContext,
+  retentionDigest,
 } from "../prompts";
-import { loadChat, loadMistakes, loadNotes, saveChat } from "../storage";
+import { loadChat, loadMistakes, loadNotes, loadVocab, saveChat } from "../storage";
 import { colors } from "../theme";
-import { ChatMessage, CurriculumModule, Profile } from "../types";
+import { ChatMessage, CurriculumModule, NavigationSuggestion, Profile } from "../types";
 
 interface Props {
   profile: Profile;
@@ -22,6 +23,8 @@ interface Props {
   onCompleteModule: (moduleId: string) => void;
   /** Üstaz araçlarıyla profili değiştirdiğinde (seviye, müfredat, modül tamamlama) çağrılır. */
   onProfileChange: (profile: Profile) => void;
+  /** Üstaz'ın ekrana_git önerisini öğrenci onaylarsa çağrılır. */
+  onNavigate: (suggestion: NavigationSuggestion) => void;
 }
 
 export default function LessonScreen({
@@ -30,38 +33,64 @@ export default function LessonScreen({
   onBack,
   onCompleteModule,
   onProfileChange,
+  onNavigate,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
-  const [memory, setMemory] = useState("");
+  const [suggestion, setSuggestion] = useState<NavigationSuggestion | null>(null);
   const started = useRef(false);
+  /** Turlar arası en güncel profil — React state'inin gecikmesine takılmamak için. */
+  const profileRef = useRef(profile);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   const chatId = module ? `module.${module.id}` : "freechat";
-  const baseSystem = module ? lessonSystem(profile, module) : freeChatSystem(profile);
-  const system = baseSystem + memory;
   const kickoff = module ? KICKOFF_LESSON : KICKOFF_FREECHAT;
   const isDone = module ? profile.completedModuleIds.includes(module.id) : false;
 
-  const runTurn = async (history: ChatMessage[], systemPrompt: string) => {
+  /** Sistem promptunu HER TURDA taze hafıza ve tekrar verisiyle kurar. */
+  const buildSystem = async (current: Profile): Promise<string> => {
+    const [mistakes, notes, vocab] = await Promise.all([
+      loadMistakes(),
+      loadNotes(),
+      loadVocab(),
+    ]);
+    const base = module ? lessonSystem(current, module) : freeChatSystem(current);
+    return base + memoryContext(mistakes, notes, module?.track) + retentionDigest(vocab);
+  };
+
+  const runTurn = async (history: ChatMessage[]) => {
     setSending(true);
+    setSuggestion(null);
     const ctx: AgentContext = {
-      profile,
+      profile: profileRef.current,
       profileChanged: false,
       currentModuleId: module?.id,
+      currentTrack: module?.track,
     };
     try {
-      const reply = await agenticChat(systemPrompt, history, ctx);
+      const system = await buildSystem(ctx.profile);
+      const reply = await agenticChat(system, history, ctx);
       const updated: ChatMessage[] = [
         ...history,
         { role: "assistant", content: reply.text, actions: reply.actions },
       ];
       setMessages(updated);
       await saveChat(chatId, updated);
-      if (ctx.profileChanged) onProfileChange(ctx.profile);
+      if (ctx.pendingNavigation) setSuggestion(ctx.pendingNavigation);
     } catch (e) {
       Alert.alert("Bağlantı hatası", e instanceof Error ? e.message : String(e));
       setMessages(history);
     } finally {
+      // Araçlar profili zaten diske yazdı; burada UI durumunu senkronlıyoruz.
+      // finally içinde olması, tur hata alsa bile seviye/modül değişikliğinin
+      // ekrana yansımasını garanti eder.
+      if (ctx.profileChanged) {
+        profileRef.current = ctx.profile;
+        onProfileChange(ctx.profile);
+      }
       setSending(false);
     }
   };
@@ -70,20 +99,14 @@ export default function LessonScreen({
     if (started.current) return;
     started.current = true;
     void (async () => {
-      const [mistakes, notes, saved] = await Promise.all([
-        loadMistakes(),
-        loadNotes(),
-        loadChat(chatId),
-      ]);
-      const mem = memoryContext(mistakes, notes);
-      setMemory(mem);
+      const saved = await loadChat(chatId);
       if (saved.length > 0) {
         setMessages(saved);
         return;
       }
       const initial: ChatMessage[] = [{ role: "user", content: kickoff }];
       setMessages(initial);
-      await runTurn(initial, baseSystem + mem);
+      await runTurn(initial);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -92,7 +115,7 @@ export default function LessonScreen({
     const history: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(history);
     void saveChat(chatId, history);
-    void runTurn(history, system);
+    void runTurn(history);
   };
 
   const complete = () => {
@@ -134,6 +157,10 @@ export default function LessonScreen({
         sending={sending}
         onSend={onSend}
         placeholder={module ? "Cevabını yaz…" : "اكتب هون… (buraya yaz)"}
+        suggestion={suggestion}
+        onSuggestionPress={() => {
+          if (suggestion) onNavigate(suggestion);
+        }}
       />
     </View>
   );

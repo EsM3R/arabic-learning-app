@@ -48,8 +48,11 @@ export default function MistakesScreen({ onBack }: Props) {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.topic}>{item.topic}</Text>
+            <View style={[styles.card, item.resolved && styles.cardResolved]}>
+              <View style={styles.topicRow}>
+                <Text style={styles.topic}>{item.topic}</Text>
+                {item.resolved && <Text style={styles.resolvedBadge}>✓ ÇÖZÜLDÜ</Text>}
+              </View>
               <Text style={styles.mistake}>✗ {item.mistake}</Text>
               <Text style={styles.correction}>✓ {item.correction}</Text>
               <Text style={styles.explanation}>{item.explanation}</Text>
@@ -93,13 +96,22 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
   },
+  cardResolved: { opacity: 0.6, borderColor: colors.accent },
+  topicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 8,
+  },
   topic: {
     fontSize: 11,
     fontWeight: "700",
     color: colors.gold,
     textTransform: "uppercase",
-    marginBottom: 6,
+    flex: 1,
   },
+  resolvedBadge: { fontSize: 10, fontWeight: "800", color: colors.accent },
   mistake: { fontSize: 15, color: colors.danger, marginBottom: 4 },
   correction: { fontSize: 15, color: colors.accent, fontWeight: "600", marginBottom: 6 },
   explanation: { fontSize: 13, color: colors.inkSoft, lineHeight: 19 },

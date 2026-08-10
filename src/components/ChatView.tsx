@@ -12,16 +12,26 @@ import {
 } from "react-native";
 import { extractArabic, speakArabic } from "../speech";
 import { colors } from "../theme";
-import { ChatMessage } from "../types";
+import { ChatMessage, NavigationSuggestion } from "../types";
 
 interface Props {
   messages: ChatMessage[];
   sending: boolean;
   onSend: (text: string) => void;
   placeholder?: string;
+  /** Üstaz'ın ekrana_git önerisi — zorlamaz, tıklanabilir bir şerit olarak çıkar. */
+  suggestion?: NavigationSuggestion | null;
+  onSuggestionPress?: () => void;
 }
 
-export default function ChatView({ messages, sending, onSend, placeholder }: Props) {
+export default function ChatView({
+  messages,
+  sending,
+  onSend,
+  placeholder,
+  suggestion,
+  onSuggestionPress,
+}: Props) {
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -81,6 +91,12 @@ export default function ChatView({ messages, sending, onSend, placeholder }: Pro
           <ActivityIndicator size="small" color={colors.accent} />
           <Text style={styles.typingText}>Üstaz yazıyor…</Text>
         </View>
+      )}
+      {suggestion && !sending && (
+        <TouchableOpacity style={styles.suggestion} onPress={onSuggestionPress}>
+          <Text style={styles.suggestionText}>{suggestion.label}</Text>
+          <Text style={styles.suggestionArrow}>›</Text>
+        </TouchableOpacity>
       )}
       <View style={styles.inputRow}>
         <TextInput
@@ -159,6 +175,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   typingText: { color: colors.inkSoft, fontSize: 13 },
+  suggestion: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    gap: 8,
+  },
+  suggestionText: { flex: 1, color: colors.accent, fontSize: 14, fontWeight: "700" },
+  suggestionArrow: { color: colors.accent, fontSize: 20, fontWeight: "700" },
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",

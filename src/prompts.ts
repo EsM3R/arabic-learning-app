@@ -1,4 +1,13 @@
-import { Assessment, CurriculumModule, MistakeEntry, Profile, TeacherNote } from "./types";
+import { deckStats, strugglingCards } from "./srs";
+import {
+  Assessment,
+  CurriculumModule,
+  MistakeEntry,
+  Profile,
+  TeacherNote,
+  Track,
+  VocabCard,
+} from "./types";
 
 /**
  * Tüm öğretmen kişiliğinin temeli. Her sistem promptunun başına eklenir.
@@ -25,8 +34,12 @@ export function assessmentSystem(name: string): string {
 
 Kurallar:
 - Her mesajında EN FAZLA bir-iki soru sor; sınav havası verme, sohbet gibi aksın.
-- Toplam 6-8 mesaj alışverişinden sonra yeterli veri toplamış olursun. O noktada öğrenciye teşekkür et ve "Değerlendirmeyi Bitir" düğmesine basmasını söyle.
-- Öğrenci hiç bilmiyorsa bile moral ver; sıfırdan başlamak da bir seviyedir.`;
+- Öğrenci hiç bilmiyorsa bile moral ver; sıfırdan başlamak da bir seviyedir.
+
+Araçların:
+- hata_kaydet: Değerlendirme sırasında gördüğün anlamlı hataları KAYDET. Bu sohbet, öğrenciyi tanıyacağın en zengin an — burada gördüklerin kaydedilmezse kaybolur.
+- not_yaz: Dikkatini çeken gözlemleri (öz güveni, ilgi alanları, öğrenme tarzı) not al.
+- degerlendirmeyi_bitir: Ne zaman yeterli kanıt topladığına SEN karar verirsin. Genelde 6-8 mesaj alışverişi yeter. Çağırdığın anda uygulama müfredat hazırlamaya geçer; emin olmadan çağırma, emin olunca da bekletme. Çağırmadan önce hem konuşma hem okuma hakkında fikrin oluşmuş olmalı — biri eksikse önce onu yokla.`;
 }
 
 export const ASSESSMENT_ANALYSIS_SYSTEM = `Sen bir Arapça seviye değerlendirme uzmanısın. Sana bir Türk öğrenci ile öğretmen arasında geçen seviye tespit sohbetinin dökümü verilecek. Öğrencinin seviyesini iki ayrı alanda CEFR ölçeğiyle (A0, A1, A2, B1, B2, C1, C2) belirle:
@@ -52,30 +65,91 @@ Kurallar:
 }
 
 /** Üstaz'ın araçlarını nasıl kullanacağını anlatan ortak bölüm. */
-const AGENT_TOOLS_GUIDE = `Araçların var ve bunları kimseye sormadan, kendi kararınla kullanırsın:
-- kelime_kaydet: Öğrencinin bilmediği veya yeni öğrendiği her önemli kelimeyi/kalıbı deftere ekle. Ders başına genelde 3-8 kelime doğaldır.
-- hata_kaydet: Anlamlı ve öğretici hataları kaydet (özellikle tekrarlananları). Önemsiz yazım sürçmelerini kaydetme.
-- not_yaz: Ders biterken veya önemli bir gözlemde kendine kısa not al: öğrenci nerede kaldı, neyi sevdi, sıradaki adım ne.
-- seviye_guncelle: Performansa bakarak seviyenin gerçekten değiştiğine ikna olursan güncelle; aceleci davranma.
-- modul_ekle: Öğrencinin ihtiyaç duyduğu ama müfredatta olmayan bir konu görürsen modül ekle.
-- modul_tamamla: Ders hedeflerine ulaşıldığında modülü kendin kapat.
+const AGENT_TOOLS_GUIDE = `Araçların var ve bunları kimseye sormadan, kendi kararınla kullanırsın.
+
+ÖNCE BAK, SONRA YAZ — araçlarının bir kısmı okuma araçlarıdır, veriyi görmek için onları kullan:
+- tekrar_durumu: Öğrencinin kelime tekrar performansı. Derse başlarken ve seviye_guncelle'den ÖNCE bak; hangi kelimeleri unuttuğunu ancak böyle bilebilirsin.
+- kelime_ara: Bir kelimeyi daha önce öğretmiş miyim? Defterdeki kelimelerle alıştırma kurayım mı?
+- hafiza_oku: Sana aşağıda sadece son kayıtlar veriliyor; daha eskiye veya belirli bir konuya bakmak için çağır.
+- mufredat_oku: Modül id'lerini ve tamamlanma durumunu görür. modul_tamamla/modul_ekle'den ÖNCE çağır — id tahmin etme.
+
+Yazma ve düzeltme:
+- kelime_kaydet: Öğrencinin bilmediği veya yeni öğrendiği her önemli kelimeyi ekle (ders başına 3-8 doğaldır). Zorluğunu da belirt.
+- kelime_duzelt / kelime_sil: Yanlış girdiğin bir kaydı düzelt veya kaldır. Defterin doğruluğu senin sorumluluğun.
+- hata_kaydet: Anlamlı, öğretici hataları kaydet. Önemsiz yazım sürçmelerini kaydetme.
+- hata_cozuldu: Öğrenci bir konuyu birkaç kez doğru kullandıysa o hatayı kapat — yoksa çözülmüş konuyu boşuna tekrar ettirirsin.
+- not_yaz / not_sil: Sonraki derslere hafıza notu bırak; geçerliliğini yitireni sil.
+- seviye_guncelle: Seviyeyi yükseltirken zayıf yönleri de güncelle. Güncellemezsen dersler sonsuza dek eski zayıf yönlere göre şekillenir.
+- modul_ekle / modul_tamamla: Müfredatı sen yönetirsin.
+
+İnisiyatif — bunlar senin öğretmenlik sorumluluğun:
+- ekrana_git: Sıradaki adımı öner (tekrarı gelen kelime varsa kelime defteri, sıradaki modül, telaffuz stüdyosu). Öğrenciye tıklanabilir bir düğme olarak çıkar.
+- hatirlatici_kur: Ders sonunda veya öğrenci ara vereceğini söylediğinde hatırlatıcı kur. Dil öğreniminde süreklilik her şeydir; sen hatırlatmazsan kimse hatırlatmaz.
+
 Araç kullanımını öğrenciye ilan etme; doğal sohbete devam et (uygulama zaten küçük bir rozet gösterir).`;
 
-/** Hafıza bağlamı: son hatalar ve öğretmen notları sisteme beslenir. */
-export function memoryContext(mistakes: MistakeEntry[], notes: TeacherNote[]): string {
+/** Kelime tekrar performansı özeti — Üstaz'ın objektif hatırlama verisini görmesi için. */
+export function retentionDigest(cards: VocabCard[]): string {
+  if (cards.length === 0) return "";
+  const s = deckStats(cards);
+  const hard = strugglingCards(cards, 6);
+  const lines = [
+    `Kelime defteri: ${s.total} kelime | tekrarı gelen: ${s.due} | hiç çalışılmamış: ${s.neverReviewed} | ezberlenmiş: ${s.mastered}`,
+  ];
+  if (hard.length > 0) {
+    lines.push(
+      `Sürekli zorlandığı kelimeler: ${hard
+        .map((c) => `${c.arabic} (${c.turkish}, ${c.lapses ?? 0} kez unuttu)`)
+        .join("، ")}`
+    );
+    lines.push("Bu kelimeleri derse doğal biçimde serpiştir ve kullandır.");
+  }
+  if (s.due > 0) {
+    lines.push(`${s.due} kelimenin tekrarı gelmiş — uygun bir anda kelime defterine yönlendir.`);
+  }
+  return `\n\nKELİME TEKRAR DURUMU:\n${lines.join("\n")}`;
+}
+
+/**
+ * Hafıza bağlamı: çözülmemiş hatalar ve öğretmen notları sisteme beslenir.
+ * Aktif parkur verilirse hatalar ona göre önceliklenir (ammice dersinde fusha
+ * hatalarıyla boğulmasın).
+ */
+export function memoryContext(
+  mistakes: MistakeEntry[],
+  notes: TeacherNote[],
+  track?: Track
+): string {
   const parts: string[] = [];
+
   if (notes.length > 0) {
-    const recent = notes.slice(-5).map((n) => `- ${n.note}`);
+    const recent = notes.slice(-6).map((n) => `- ${n.note}`);
     parts.push(`Önceki derslerden kendi notların:\n${recent.join("\n")}`);
   }
-  if (mistakes.length > 0) {
-    const recent = mistakes
-      .slice(-10)
-      .map((m) => `- "${m.mistake}" → doğrusu "${m.correction}" (${m.topic})`);
+
+  const open = mistakes.filter((m) => !m.resolved);
+  if (open.length > 0) {
+    // Aktif parkurun hataları önce, sonra parkuru bilinmeyenler, sonra diğerleri.
+    const rank = (m: MistakeEntry) => (m.track === track ? 0 : m.track ? 2 : 1);
+    const ordered = [...open].sort((a, b) => {
+      const byTrack = rank(a) - rank(b);
+      if (byTrack !== 0) return byTrack;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    const shown = ordered.slice(0, 10);
     parts.push(
-      `Öğrencinin hata defteri (son kayıtlar — bu konuları fırsat buldukça tekrar ettir):\n${recent.join("\n")}`
+      `Öğrencinin AÇIK hataları (${open.length} kayıt, en ilgili ${shown.length} tanesi — fırsat buldukça bu konuları tekrar ettir; düzeldiyse hata_cozuldu ile kapat):\n${shown
+        .map(
+          (m) =>
+            `- id=${m.id} [${m.topic}] "${m.mistake}" → "${m.correction}" — ${m.explanation}`
+        )
+        .join("\n")}`
     );
+    if (open.length > shown.length) {
+      parts.push(`(Kalan ${open.length - shown.length} hataya hafiza_oku ile bakabilirsin.)`);
+    }
   }
+
   return parts.length > 0 ? `\n\nHAFIZA:\n${parts.join("\n\n")}` : "";
 }
 
@@ -94,7 +168,7 @@ Açıklama: ${module.description}
 Hedefler: ${module.objectives.join("; ")}
 ${trackDesc}
 
-Dersi etkileşimli işle: kısa bir konu anlatımı yap, örnekler ver, sonra öğrenciye alıştırma sorusu sor ve cevabını bekle. Cevaba göre düzelt ve ilerle. Ders hedeflere ulaşınca modul_tamamla aracıyla modülü kendin kapat ve öğrenciyi tebrik et.
+Dersi etkileşimli işle: kısa bir konu anlatımı yap, örnekler ver, sonra öğrenciye alıştırma sorusu sor ve cevabını bekle. Cevaba göre düzelt ve ilerle. Ders hedeflere ulaşınca modul_tamamla aracıyla modülü kendin kapat, öğrenciyi tebrik et, ekrana_git ile sıradaki adımı öner ve uygun bir hatırlatıcı kur.
 
 ${AGENT_TOOLS_GUIDE}`;
 }
