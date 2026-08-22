@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   Alert,
@@ -8,8 +9,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
-import { colors } from "../theme";
+import { colors, radius, shadowLift } from "../theme";
 
 interface Props {
   onDone: (name: string, apiKey: string) => void;
@@ -39,42 +41,66 @@ export default function SetupScreen({ onDone }: Props) {
       style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.logo}>مرحبا</Text>
-        <Text style={styles.title}>Arapça Hoca</Text>
-        <Text style={styles.subtitle}>
-          Şami ammicesiyle konuş, fusha ile oku. Kişisel yapay zekâ öğretmenin Üstaz seni
-          sıfırdan uzmanlığa taşıyacak.
-        </Text>
+      <ScrollView style={styles.container} bounces={false}>
+        <LinearGradient
+          colors={[colors.deep, colors.deepAlt]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hero}
+        >
+          <Text style={styles.heroArabic}>مرحبا</Text>
+          <Text style={styles.heroTitle}>Arapça Hoca</Text>
+          <Text style={styles.heroSub}>
+            Şami ammicesiyle konuş, fusha ile oku.{"\n"}Kişisel yapay zekâ öğretmenin Üstaz,
+            seni sıfırdan uzmanlığa taşıyacak.
+          </Text>
+          <View style={styles.heroBadges}>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>🗣️ Konuşma · Ammice</Text>
+            </View>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>📖 Okuma · Fusha</Text>
+            </View>
+          </View>
+        </LinearGradient>
 
-        <Text style={styles.label}>Adın</Text>
-        <TextInput
-          style={styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="örn. Mehmet"
-          placeholderTextColor={colors.inkSoft}
-        />
+        <View style={styles.form}>
+          <Text style={styles.label}>Adın</Text>
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="örn. Mehmet"
+            placeholderTextColor={colors.inkFaint}
+          />
 
-        <Text style={styles.label}>Anthropic API Anahtarı</Text>
-        <TextInput
-          style={styles.input}
-          value={apiKey}
-          onChangeText={setApiKey}
-          placeholder="sk-ant-…"
-          placeholderTextColor={colors.inkSoft}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-        />
-        <Text style={styles.hint}>
-          Anahtar almak için: console.anthropic.com → hesap aç → "API Keys" → "Create Key".
-          Anahtar sadece bu cihazda saklanır, istekler doğrudan Anthropic'e gider.
-        </Text>
+          <Text style={styles.label}>Anthropic API Anahtarı</Text>
+          <TextInput
+            style={styles.input}
+            value={apiKey}
+            onChangeText={setApiKey}
+            placeholder="sk-ant-…"
+            placeholderTextColor={colors.inkFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+          />
+          <Text style={styles.hint}>
+            Anahtar almak için: console.anthropic.com → hesap aç → "API Keys" → "Create Key".
+            Anahtar sadece bu cihazda saklanır; istekler doğrudan Anthropic'e gider.
+          </Text>
 
-        <TouchableOpacity style={styles.button} onPress={submit}>
-          <Text style={styles.buttonText}>Başlayalım → يلا</Text>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={submit} activeOpacity={0.85}>
+            <LinearGradient
+              colors={[colors.accent, colors.accentDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.button}
+            >
+              <Text style={styles.buttonText}>Başlayalım → يلا</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -83,40 +109,51 @@ export default function SetupScreen({ onDone }: Props) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: 24, paddingTop: 80 },
-  logo: { fontSize: 56, textAlign: "center", color: colors.accent, marginBottom: 4 },
-  title: {
-    fontSize: 30,
-    fontWeight: "700",
-    textAlign: "center",
-    color: colors.ink,
-    marginBottom: 10,
+  hero: {
+    paddingTop: 96,
+    paddingBottom: 40,
+    paddingHorizontal: 28,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
   },
-  subtitle: {
-    fontSize: 15,
-    textAlign: "center",
-    color: colors.inkSoft,
-    lineHeight: 22,
-    marginBottom: 32,
+  heroArabic: { fontSize: 64, lineHeight: 84, color: colors.goldDeep, fontWeight: "700" },
+  heroTitle: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: colors.onDeep,
+    letterSpacing: -0.5,
+    marginTop: 2,
   },
-  label: { fontSize: 14, fontWeight: "600", color: colors.ink, marginBottom: 6 },
+  heroSub: { fontSize: 14.5, color: colors.onDeepSoft, lineHeight: 22, marginTop: 12 },
+  heroBadges: { flexDirection: "row", gap: 8, marginTop: 18 },
+  heroBadge: {
+    backgroundColor: "rgba(243,239,228,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: "rgba(243,239,228,0.22)",
+  },
+  heroBadgeText: { color: colors.onDeep, fontSize: 12.5, fontWeight: "700" },
+  form: { padding: 24, paddingTop: 28 },
+  label: { fontSize: 13, fontWeight: "800", color: colors.ink, marginBottom: 7 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: radius.md,
     backgroundColor: colors.card,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+    fontSize: 15.5,
     color: colors.ink,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   hint: { fontSize: 12, color: colors.inkSoft, lineHeight: 18, marginBottom: 28 },
   button: {
-    backgroundColor: colors.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: radius.lg,
+    paddingVertical: 17,
     alignItems: "center",
+    ...shadowLift,
   },
-  buttonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
+  buttonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
 });

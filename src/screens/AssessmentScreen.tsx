@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { AgentContext, TEACHER_TOOLS, ASSESSMENT_TOOLS } from "../agent";
 import ChatView from "../components/ChatView";
+import Header from "../components/Header";
 import { agenticChat, analyzeAssessment, generateCurriculum } from "../claude";
 import {
   assessmentSystem,
@@ -142,19 +143,19 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Seviye Tespiti</Text>
-          <Text style={styles.headerSub}>Üstaz ile tanışma sohbeti</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.finishButton}
-          onPress={() => void finishManually()}
-          disabled={sending}
-        >
-          <Text style={styles.finishText}>Değerlendirmeyi Bitir</Text>
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Seviye Tespiti"
+        subtitle="Üstaz ile tanışma sohbeti"
+        right={
+          <TouchableOpacity
+            style={styles.finishButton}
+            onPress={() => void finishManually()}
+            disabled={sending}
+          >
+            <Text style={styles.finishText}>Değerlendirmeyi Bitir</Text>
+          </TouchableOpacity>
+        }
+      />
       <ChatView messages={messages} sending={sending} onSend={onSend} />
     </View>
   );
@@ -162,27 +163,13 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 56,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
-  headerSub: { fontSize: 12, color: colors.inkSoft, marginTop: 2 },
   finishButton: {
     backgroundColor: colors.goldSoft,
-    borderRadius: 10,
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  finishText: { color: colors.gold, fontWeight: "700", fontSize: 13 },
+  finishText: { color: colors.gold, fontWeight: "800", fontSize: 12.5 },
   loading: {
     flex: 1,
     alignItems: "center",

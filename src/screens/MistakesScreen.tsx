@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import Header from "../components/Header";
 import { loadMistakes } from "../storage";
-import { colors } from "../theme";
+import { colors, radius, shadow } from "../theme";
 import { MistakeEntry } from "../types";
 
 interface Props {
@@ -22,16 +23,7 @@ export default function MistakesScreen({ onBack }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Geri</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Hata Defteri</Text>
-          <Text style={styles.headerSub}>{mistakes.length} kayıt</Text>
-        </View>
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header title="Hata Defteri" subtitle={`${mistakes.length} kayıt`} onBack={onBack} />
 
       {loaded && mistakes.length === 0 ? (
         <View style={styles.empty}>
@@ -66,23 +58,6 @@ export default function MistakesScreen({ onBack }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingTop: 56,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 8,
-  },
-  backButton: { paddingVertical: 4, paddingHorizontal: 4 },
-  backText: { color: colors.accent, fontSize: 16, fontWeight: "700" },
-  headerCenter: { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: colors.ink },
-  headerSub: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
-  headerSpacer: { minWidth: 40 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
   emptyEmoji: { fontSize: 48 },
   emptyTitle: { fontSize: 20, fontWeight: "700", color: colors.ink },
@@ -90,13 +65,16 @@ const styles = StyleSheet.create({
   list: { padding: 16 },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 14,
+    borderRadius: radius.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.danger,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
-    marginBottom: 10,
+    padding: 15,
+    marginBottom: 11,
+    ...shadow,
   },
-  cardResolved: { opacity: 0.6, borderColor: colors.accent },
+  cardResolved: { opacity: 0.65, borderLeftColor: colors.accent },
   topicRow: {
     flexDirection: "row",
     alignItems: "center",

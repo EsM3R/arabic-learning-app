@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
+import Header from "../components/Header";
 import { agenticChat } from "../claude";
 import {
   freeChatSystem,
@@ -191,32 +192,28 @@ export default function LessonScreen({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Geri</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {quiz ? "Üstaz'la Tekrar" : module ? module.title : "Serbest Sohbet"}
-          </Text>
-          <Text style={styles.headerSub}>
-            {quiz
-              ? "Sözlü kelime sınavı — takvimi Üstaz kurar"
-              : module
-                ? `${module.track === "konusma" ? "Ammice" : "Fusha"} · ${module.level}`
-                : "Şami ammicesiyle pratik"}
-          </Text>
-        </View>
-        {module && !isDone ? (
-          <TouchableOpacity style={styles.completeButton} onPress={complete}>
-            <Text style={styles.completeText}>Dersi Tamamla</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.headerSpacer}>
-            {isDone ? <Text style={styles.doneBadge}>✓ Bitti</Text> : null}
-          </View>
-        )}
-      </View>
+      <Header
+        title={quiz ? "Üstaz'la Tekrar" : module ? module.title : "Serbest Sohbet"}
+        subtitle={
+          quiz
+            ? "Sözlü kelime sınavı — takvimi Üstaz kurar"
+            : module
+              ? `${module.track === "konusma" ? "Ammice" : "Fusha"} · ${module.level}`
+              : "Şami ammicesiyle pratik"
+        }
+        onBack={onBack}
+        right={
+          module && !isDone ? (
+            <TouchableOpacity style={styles.completeButton} onPress={complete}>
+              <Text style={styles.completeText}>Dersi Tamamla</Text>
+            </TouchableOpacity>
+          ) : isDone ? (
+            <View style={styles.doneBadgeWrap}>
+              <Text style={styles.doneBadge}>✓ Bitti</Text>
+            </View>
+          ) : null
+        }
+      />
       <ChatView
         messages={messages}
         sending={sending}
@@ -233,29 +230,18 @@ export default function LessonScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingTop: 56,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 8,
-  },
-  backButton: { paddingVertical: 4, paddingHorizontal: 4 },
-  backText: { color: colors.accent, fontSize: 16, fontWeight: "700" },
-  headerCenter: { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: colors.ink },
-  headerSub: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
   completeButton: {
     backgroundColor: colors.goldSoft,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  completeText: { color: colors.gold, fontWeight: "700", fontSize: 12 },
-  headerSpacer: { minWidth: 40, alignItems: "flex-end" },
-  doneBadge: { color: colors.accent, fontWeight: "700", fontSize: 12 },
+  completeText: { color: colors.gold, fontWeight: "800", fontSize: 12 },
+  doneBadgeWrap: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  doneBadge: { color: colors.accentDark, fontWeight: "800", fontSize: 12 },
 });

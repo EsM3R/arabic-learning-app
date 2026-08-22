@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import Header from "../components/Header";
 import { speakArabic } from "../speech";
 import { dueCards, gradeCard } from "../srs";
 import { loadVocab, saveVocab, touchLastActivity } from "../storage";
-import { colors } from "../theme";
+import { colors, radius, shadow, shadowLift } from "../theme";
 import { ReviewGrade, VocabCard } from "../types";
 
 interface Props {
@@ -45,18 +46,11 @@ export default function ReviewScreen({ onBack }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Geri</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Kelime Defteri</Text>
-          <Text style={styles.headerSub}>
-            {allCards.length} kelime · bugün {queue.length} tekrar
-          </Text>
-        </View>
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header
+        title="Kelime Defteri"
+        subtitle={`${allCards.length} kelime · bugün ${queue.length} tekrar`}
+        onBack={onBack}
+      />
 
       {!loaded ? null : !current ? (
         <View style={styles.empty}>
@@ -144,23 +138,6 @@ export default function ReviewScreen({ onBack }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingTop: 56,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 8,
-  },
-  backButton: { paddingVertical: 4, paddingHorizontal: 4 },
-  backText: { color: colors.accent, fontSize: 16, fontWeight: "700" },
-  headerCenter: { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: colors.ink },
-  headerSub: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
-  headerSpacer: { minWidth: 40 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
   emptyEmoji: { fontSize: 48 },
   emptyTitle: { fontSize: 20, fontWeight: "700", color: colors.ink },
@@ -168,14 +145,15 @@ const styles = StyleSheet.create({
   cardArea: { flex: 1, padding: 20, justifyContent: "center" },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 20,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 32,
     alignItems: "center",
     marginBottom: 24,
-    minHeight: 260,
+    minHeight: 280,
     justifyContent: "center",
+    ...shadowLift,
   },
   arabic: { fontSize: 40, color: colors.ink, textAlign: "center", marginBottom: 12 },
   listenRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
@@ -193,17 +171,19 @@ const styles = StyleSheet.create({
   trackTag: { fontSize: 12, color: colors.inkSoft, marginTop: 12 },
   revealButton: {
     backgroundColor: colors.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: radius.lg,
+    paddingVertical: 17,
     alignItems: "center",
+    ...shadow,
   },
   revealText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
   gradeRow: { flexDirection: "row", gap: 8 },
   gradeButton: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: radius.md,
+    paddingVertical: 15,
     alignItems: "center",
+    ...shadow,
   },
   gradeText: { fontSize: 13, fontWeight: "700" },
 });

@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -20,7 +21,7 @@ import {
   loadWakeCheck,
   saveWakeCheck,
 } from "../storage";
-import { colors } from "../theme";
+import { colors, radius, shadow, shadowLift } from "../theme";
 import { CurriculumModule, NavigationSuggestion, Profile, Track } from "../types";
 
 interface Props {
@@ -34,9 +35,17 @@ interface Props {
   onReset: () => void;
 }
 
-const TRACK_META: Record<Track, { title: string; subtitle: string }> = {
-  konusma: { title: "🗣️ Konuşma — Şami Ammicesi", subtitle: "Suriyeli arkadaşlarınla akıcı sohbet" },
-  okuma: { title: "📖 Okuma — Fusha", subtitle: "Profesyonel okuma ve anlama" },
+const TRACK_META: Record<Track, { title: string; subtitle: string; icon: string }> = {
+  konusma: {
+    title: "Konuşma — Şami Ammicesi",
+    subtitle: "Suriyeli arkadaşlarınla akıcı sohbet",
+    icon: "🗣️",
+  },
+  okuma: {
+    title: "Okuma — Fusha",
+    subtitle: "Profesyonel okuma ve anlama",
+    icon: "📖",
+  },
 };
 
 export default function DashboardScreen({
@@ -57,6 +66,11 @@ export default function DashboardScreen({
   const [teacherNote, setTeacherNote] = useState<string | null>(null);
   const [teacherSuggestion, setTeacherSuggestion] = useState<NavigationSuggestion | null>(null);
   const wakeStarted = React.useRef(false);
+
+  const totalModules = curriculum?.modules.length ?? 0;
+  const doneModules =
+    curriculum?.modules.filter((m) => completedModuleIds.includes(m.id)).length ?? 0;
+  const progress = totalModules > 0 ? doneModules / totalModules : 0;
 
   useEffect(() => {
     void (async () => {
@@ -142,247 +156,430 @@ export default function DashboardScreen({
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.headerRow}>
-        <Text style={styles.greeting}>Merhaba {profile.name} 👋</Text>
-        <TouchableOpacity onPress={confirmReset}>
-          <Text style={styles.resetText}>Sıfırla</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.levelCard}>
-        <View style={styles.levelBox}>
-          <Text style={styles.levelValue}>{assessment?.speakingLevel ?? "-"}</Text>
-          <Text style={styles.levelLabel}>Konuşma (Ammice)</Text>
-        </View>
-        <View style={styles.levelDivider} />
-        <View style={styles.levelBox}>
-          <Text style={styles.levelValue}>{assessment?.readingLevel ?? "-"}</Text>
-          <Text style={styles.levelLabel}>Okuma (Fusha)</Text>
-        </View>
-      </View>
-      {assessment?.summary ? <Text style={styles.summary}>{assessment.summary}</Text> : null}
-
-      {teacherNote && (
-        <View style={styles.teacherNoteCard}>
-          <Text style={styles.teacherNoteTitle}>🧑‍🏫 Üstaz'dan not</Text>
-          <Text style={styles.teacherNoteText}>{teacherNote}</Text>
-          {teacherSuggestion && (
-            <TouchableOpacity style={styles.teacherNoteButton} onPress={onSuggestionPress}>
-              <Text style={styles.teacherNoteButtonText}>{teacherSuggestion.label} ›</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      <TouchableOpacity style={styles.chatButton} onPress={onFreeChat}>
-        <Text style={styles.chatButtonText}>💬 Üstaz ile Serbest Sohbet</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.quizCard} onPress={onQuiz}>
-        <Text style={styles.toolEmoji}>🧠</Text>
-        <View style={styles.pronunciationBody}>
-          <Text style={styles.toolTitle}>Üstaz'la Tekrar</Text>
-          <Text style={styles.toolMeta}>
-            Sözlü kelime sınavı — Üstaz sorar, puanlar, takvimini kurar
-            {vocabDue > 0 ? ` · ${vocabDue} kelime hazır` : ""}
-          </Text>
-        </View>
-        <Text style={styles.pronunciationArrow}>›</Text>
-      </TouchableOpacity>
-
-      <View style={styles.toolsRow}>
-        <TouchableOpacity style={styles.toolCard} onPress={onOpenReview}>
-          <Text style={styles.toolEmoji}>📇</Text>
-          <Text style={styles.toolTitle}>Kelime Defteri</Text>
-          <Text style={styles.toolMeta}>
-            {vocabTotal} kelime{vocabDue > 0 ? ` · ${vocabDue} tekrar bekliyor` : ""}
-          </Text>
-          {vocabDue > 0 && (
-            <View style={styles.dueBadge}>
-              <Text style={styles.dueBadgeText}>{vocabDue}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolCard} onPress={onOpenMistakes}>
-          <Text style={styles.toolEmoji}>📒</Text>
-          <Text style={styles.toolTitle}>Hata Defteri</Text>
-          <Text style={styles.toolMeta}>{mistakeCount} kayıt</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={styles.pronunciationCard} onPress={onOpenPronunciation}>
-        <Text style={styles.toolEmoji}>🎙️</Text>
-        <View style={styles.pronunciationBody}>
-          <Text style={styles.toolTitle}>Telaffuz Stüdyosu</Text>
-          <Text style={styles.toolMeta}>
-            Dinle, kaydet, karşılaştır — ع، ح، خ gibi zor sesler için ipuçları
-          </Text>
-        </View>
-        <Text style={styles.pronunciationArrow}>›</Text>
-      </TouchableOpacity>
-
-      {tracks.map((track) => {
-        const modules = curriculum?.modules.filter((m) => m.track === track) ?? [];
-        return (
-          <View key={track} style={styles.trackSection}>
-            <Text style={styles.trackTitle}>{TRACK_META[track].title}</Text>
-            <Text style={styles.trackSubtitle}>{TRACK_META[track].subtitle}</Text>
-            {modules.map((module, index) => {
-              const done = completedModuleIds.includes(module.id);
-              return (
-                <TouchableOpacity
-                  key={module.id}
-                  style={[styles.moduleCard, done && styles.moduleDone]}
-                  onPress={() => onOpenModule(module)}
-                >
-                  <View style={styles.moduleBadge}>
-                    <Text style={styles.moduleBadgeText}>{done ? "✓" : index + 1}</Text>
-                  </View>
-                  <View style={styles.moduleBody}>
-                    <Text style={styles.moduleTitle}>{module.title}</Text>
-                    <Text style={styles.moduleDesc} numberOfLines={2}>
-                      {module.description}
-                    </Text>
-                  </View>
-                  <Text style={styles.moduleLevel}>{module.level}</Text>
-                </TouchableOpacity>
-              );
-            })}
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} bounces={false}>
+      <LinearGradient
+        colors={[colors.deep, colors.deepAlt]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroSalam}>مرحبا</Text>
+            <Text style={styles.heroName}>{profile.name}</Text>
           </View>
-        );
-      })}
+          <TouchableOpacity onPress={confirmReset} style={styles.resetButton} hitSlop={8}>
+            <Text style={styles.resetText}>⋯</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.levelRow}>
+          <View style={styles.levelChip}>
+            <Text style={styles.levelChipLabel}>🗣️ Konuşma</Text>
+            <Text style={styles.levelChipValue}>{assessment?.speakingLevel ?? "-"}</Text>
+          </View>
+          <View style={styles.levelChip}>
+            <Text style={styles.levelChipLabel}>📖 Okuma</Text>
+            <Text style={styles.levelChipValue}>{assessment?.readingLevel ?? "-"}</Text>
+          </View>
+        </View>
+
+        <View style={styles.progressBlock}>
+          <View style={styles.progressLabelRow}>
+            <Text style={styles.progressLabel}>Müfredat ilerlemesi</Text>
+            <Text style={styles.progressValue}>
+              {doneModules}/{totalModules} modül
+            </Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.max(progress * 100, 2)}%` }]} />
+          </View>
+        </View>
+      </LinearGradient>
+
+      <View style={styles.body}>
+        {teacherNote && (
+          <View style={styles.teacherNoteCard}>
+            <View style={styles.teacherNoteHeader}>
+              <View style={styles.teacherAvatar}>
+                <Text style={styles.teacherAvatarText}>أ</Text>
+              </View>
+              <Text style={styles.teacherNoteTitle}>Üstaz'dan not</Text>
+            </View>
+            <Text style={styles.teacherNoteText}>{teacherNote}</Text>
+            {teacherSuggestion && (
+              <TouchableOpacity style={styles.teacherNoteButton} onPress={onSuggestionPress}>
+                <Text style={styles.teacherNoteButtonText}>{teacherSuggestion.label} ›</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        <View style={styles.statsRow}>
+          <View style={styles.statTile}>
+            <Text style={styles.statValue}>{vocabTotal}</Text>
+            <Text style={styles.statLabel}>kelime</Text>
+          </View>
+          <View style={styles.statTile}>
+            <Text style={[styles.statValue, vocabDue > 0 && { color: colors.danger }]}>
+              {vocabDue}
+            </Text>
+            <Text style={styles.statLabel}>tekrar bekliyor</Text>
+          </View>
+          <View style={styles.statTile}>
+            <Text style={styles.statValue}>{mistakeCount}</Text>
+            <Text style={styles.statLabel}>açık hata</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity onPress={onFreeChat} activeOpacity={0.85}>
+          <LinearGradient
+            colors={[colors.accent, colors.accentDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.chatButton}
+          >
+            <Text style={styles.chatButtonEmoji}>💬</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.chatButtonTitle}>Üstaz ile Serbest Sohbet</Text>
+              <Text style={styles.chatButtonSub}>Şami ammicesiyle günlük pratik</Text>
+            </View>
+            <Text style={styles.chatButtonArrow}>›</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.quizCard} onPress={onQuiz} activeOpacity={0.85}>
+          <View style={[styles.iconSquare, { backgroundColor: colors.goldSoft }]}>
+            <Text style={styles.iconSquareText}>🧠</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Üstaz'la Tekrar</Text>
+            <Text style={styles.cardMeta}>Sözlü sınav — Üstaz sorar, puanlar, takvimini kurar</Text>
+          </View>
+          {vocabDue > 0 ? (
+            <View style={styles.readyPill}>
+              <Text style={styles.readyPillText}>{vocabDue} hazır</Text>
+            </View>
+          ) : (
+            <Text style={styles.cardArrow}>›</Text>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.toolsRow}>
+          <TouchableOpacity style={styles.toolCard} onPress={onOpenReview} activeOpacity={0.85}>
+            <View style={[styles.iconSquare, { backgroundColor: colors.accentSoft }]}>
+              <Text style={styles.iconSquareText}>📇</Text>
+            </View>
+            <Text style={styles.cardTitle}>Kelime Defteri</Text>
+            <Text style={styles.cardMeta}>{vocabTotal} kelime</Text>
+            {vocabDue > 0 && (
+              <View style={styles.dueBadge}>
+                <Text style={styles.dueBadgeText}>{vocabDue}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolCard} onPress={onOpenMistakes} activeOpacity={0.85}>
+            <View style={[styles.iconSquare, { backgroundColor: colors.dangerSoft }]}>
+              <Text style={styles.iconSquareText}>📒</Text>
+            </View>
+            <Text style={styles.cardTitle}>Hata Defteri</Text>
+            <Text style={styles.cardMeta}>{mistakeCount} açık kayıt</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.pronunciationCard}
+          onPress={onOpenPronunciation}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconSquare, { backgroundColor: colors.accentSoft }]}>
+            <Text style={styles.iconSquareText}>🎙️</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Telaffuz Stüdyosu</Text>
+            <Text style={styles.cardMeta}>Dinle, kaydet, karşılaştır — ع، ح، خ ipuçlarıyla</Text>
+          </View>
+          <Text style={styles.cardArrow}>›</Text>
+        </TouchableOpacity>
+
+        {tracks.map((track) => {
+          const modules = curriculum?.modules.filter((m) => m.track === track) ?? [];
+          const trackDone = modules.filter((m) => completedModuleIds.includes(m.id)).length;
+          return (
+            <View key={track} style={styles.trackSection}>
+              <View style={styles.trackHeader}>
+                <Text style={styles.trackIcon}>{TRACK_META[track].icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.trackTitle}>{TRACK_META[track].title}</Text>
+                  <Text style={styles.trackSubtitle}>{TRACK_META[track].subtitle}</Text>
+                </View>
+                <View style={styles.trackCount}>
+                  <Text style={styles.trackCountText}>
+                    {trackDone}/{modules.length}
+                  </Text>
+                </View>
+              </View>
+              {modules.map((module, index) => {
+                const done = completedModuleIds.includes(module.id);
+                return (
+                  <TouchableOpacity
+                    key={module.id}
+                    style={[styles.moduleCard, done && styles.moduleDone]}
+                    onPress={() => onOpenModule(module)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={[styles.moduleBadge, done && styles.moduleBadgeDone]}>
+                      <Text style={[styles.moduleBadgeText, done && styles.moduleBadgeTextDone]}>
+                        {done ? "✓" : index + 1}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.moduleTitle}>{module.title}</Text>
+                      <Text style={styles.moduleDesc} numberOfLines={2}>
+                        {module.description}
+                      </Text>
+                    </View>
+                    <View style={styles.levelPill}>
+                      <Text style={styles.levelPillText}>{module.level}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: 20, paddingTop: 64, paddingBottom: 40 },
-  headerRow: {
+  content: { paddingBottom: 44 },
+  hero: {
+    paddingTop: 66,
+    paddingHorizontal: 22,
+    paddingBottom: 46,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+  },
+  heroTopRow: { flexDirection: "row", alignItems: "flex-start" },
+  heroSalam: { fontSize: 15, color: colors.goldDeep, fontWeight: "700", marginBottom: 2 },
+  heroName: { fontSize: 30, fontWeight: "800", color: colors.onDeep, letterSpacing: -0.5 },
+  resetButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(243,239,228,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resetText: { color: colors.onDeep, fontSize: 18, fontWeight: "800", marginTop: -6 },
+  levelRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+  levelChip: {
+    flex: 1,
+    backgroundColor: "rgba(243,239,228,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(243,239,228,0.18)",
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  levelChipLabel: { color: colors.onDeepSoft, fontSize: 12.5, fontWeight: "700" },
+  levelChipValue: { color: colors.goldDeep, fontSize: 18, fontWeight: "800" },
+  progressBlock: { marginTop: 18 },
+  progressLabelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 7,
   },
-  greeting: { fontSize: 24, fontWeight: "700", color: colors.ink },
-  resetText: { color: colors.danger, fontSize: 13, fontWeight: "600" },
-  levelCard: {
-    flexDirection: "row",
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 18,
-    marginBottom: 12,
+  progressLabel: { color: colors.onDeepSoft, fontSize: 12 },
+  progressValue: { color: colors.onDeep, fontSize: 12, fontWeight: "800" },
+  progressTrack: {
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "rgba(243,239,228,0.15)",
+    overflow: "hidden",
   },
-  levelBox: { flex: 1, alignItems: "center" },
-  levelDivider: { width: 1, backgroundColor: colors.border },
-  levelValue: { fontSize: 28, fontWeight: "800", color: colors.accent },
-  levelLabel: { fontSize: 12, color: colors.inkSoft, marginTop: 4 },
-  summary: { fontSize: 14, color: colors.inkSoft, lineHeight: 21, marginBottom: 16 },
+  progressFill: { height: "100%", borderRadius: 4, backgroundColor: colors.goldDeep },
+  body: { paddingHorizontal: 18, marginTop: -24 },
   teacherNoteCard: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.gold,
-    padding: 14,
-    marginBottom: 16,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.goldDeep,
+    padding: 16,
+    marginBottom: 14,
+    ...shadowLift,
   },
-  teacherNoteTitle: { fontSize: 12, fontWeight: "800", color: colors.gold, marginBottom: 6 },
-  teacherNoteText: { fontSize: 14, color: colors.ink, lineHeight: 21 },
+  teacherNoteHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  teacherAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.deep,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  teacherAvatarText: { color: colors.goldDeep, fontSize: 13, fontWeight: "700" },
+  teacherNoteTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.gold,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  teacherNoteText: { fontSize: 14.5, color: colors.ink, lineHeight: 22 },
   teacherNoteButton: {
-    marginTop: 10,
+    marginTop: 12,
     alignSelf: "flex-start",
     backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
-  teacherNoteButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
-  chatButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 14,
-    paddingVertical: 15,
+  teacherNoteButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
+  statsRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
+  statTile: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 13,
     alignItems: "center",
-    marginBottom: 24,
+    ...shadow,
   },
-  chatButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  toolsRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  statValue: { fontSize: 20, fontWeight: "800", color: colors.ink },
+  statLabel: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
+  chatButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: radius.lg,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    gap: 12,
+    marginBottom: 12,
+    ...shadowLift,
+  },
+  chatButtonEmoji: { fontSize: 24 },
+  chatButtonTitle: { color: "#FFFFFF", fontSize: 16.5, fontWeight: "800" },
+  chatButtonSub: { color: "rgba(255,255,255,0.75)", fontSize: 12.5, marginTop: 1 },
+  chatButtonArrow: { color: "rgba(255,255,255,0.8)", fontSize: 24, fontWeight: "700" },
   quizCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    padding: 14,
-    marginBottom: 10,
-    gap: 12,
-  },
-  pronunciationCard: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: colors.card,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
-    marginBottom: 24,
     gap: 12,
+    marginBottom: 12,
+    ...shadow,
   },
-  pronunciationBody: { flex: 1 },
-  pronunciationArrow: { fontSize: 22, color: colors.inkSoft },
+  iconSquare: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconSquareText: { fontSize: 20 },
+  cardTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
+  cardMeta: { fontSize: 12, color: colors.inkSoft, marginTop: 2, lineHeight: 17 },
+  cardArrow: { fontSize: 22, color: colors.inkFaint, fontWeight: "700" },
+  readyPill: {
+    backgroundColor: colors.goldSoft,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  readyPillText: { color: colors.gold, fontSize: 12, fontWeight: "800" },
+  toolsRow: { flexDirection: "row", gap: 12, marginBottom: 12 },
   toolCard: {
     flex: 1,
     backgroundColor: colors.card,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
+    gap: 8,
+    ...shadow,
   },
-  toolEmoji: { fontSize: 22, marginBottom: 6 },
-  toolTitle: { fontSize: 14, fontWeight: "700", color: colors.ink },
-  toolMeta: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
   dueBadge: {
     position: "absolute",
     top: 10,
     right: 10,
     backgroundColor: colors.danger,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 11,
+    minWidth: 22,
+    height: 22,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
   },
   dueBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  pronunciationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 12,
+    marginBottom: 26,
+    ...shadow,
+  },
   trackSection: { marginBottom: 24 },
-  trackTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
-  trackSubtitle: { fontSize: 13, color: colors.inkSoft, marginBottom: 12, marginTop: 2 },
+  trackHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  trackIcon: { fontSize: 22 },
+  trackTitle: { fontSize: 16.5, fontWeight: "800", color: colors.ink, letterSpacing: -0.2 },
+  trackSubtitle: { fontSize: 12, color: colors.inkSoft, marginTop: 1 },
+  trackCount: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  trackCountText: { color: colors.accentDark, fontSize: 12, fontWeight: "800" },
   moduleCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.card,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
-    marginBottom: 10,
+    padding: 13,
+    marginBottom: 9,
     gap: 12,
+    ...shadow,
   },
-  moduleDone: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  moduleDone: { backgroundColor: "#F0F7F4", borderColor: "#CBE3DB" },
   moduleBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.goldSoft,
     alignItems: "center",
     justifyContent: "center",
   },
+  moduleBadgeDone: { backgroundColor: colors.accent },
   moduleBadgeText: { color: colors.gold, fontWeight: "800", fontSize: 14 },
-  moduleBody: { flex: 1 },
-  moduleTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  moduleBadgeTextDone: { color: "#FFFFFF" },
+  moduleTitle: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
   moduleDesc: { fontSize: 12, color: colors.inkSoft, marginTop: 2, lineHeight: 17 },
-  moduleLevel: { fontSize: 12, fontWeight: "700", color: colors.accent },
+  levelPill: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  levelPillText: { fontSize: 11, fontWeight: "800", color: colors.accentDark },
 });

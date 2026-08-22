@@ -16,10 +16,11 @@ import {
   View,
 } from "react-native";
 import { generatePronunciationSet } from "../claude";
+import Header from "../components/Header";
 import { strugglingCards } from "../srs";
 import { speakArabic, stopSpeaking } from "../speech";
 import { loadPronunciationSet, loadVocab, savePronunciationSet } from "../storage";
-import { colors } from "../theme";
+import { colors, radius, shadow, shadowLift } from "../theme";
 import { Profile, PronunciationSet } from "../types";
 
 interface Props {
@@ -118,20 +119,16 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Geri</Text>
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Telaffuz Stüdyosu</Text>
-          <Text style={styles.headerSub}>
-            {set ? `${index + 1} / ${set.items.length}` : "hazırlanıyor…"}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={newSet} style={styles.newSetButton} disabled={loading}>
-          <Text style={styles.newSetText}>✨ Yeni Set</Text>
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Telaffuz Stüdyosu"
+        subtitle={set ? `${index + 1} / ${set.items.length}` : "hazırlanıyor…"}
+        onBack={onBack}
+        right={
+          <TouchableOpacity onPress={newSet} style={styles.newSetButton} disabled={loading}>
+            <Text style={styles.newSetText}>✨ Yeni Set</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {loading || !item ? (
         <View style={styles.loading}>
@@ -205,26 +202,10 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingTop: 56,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 8,
-  },
-  backButton: { paddingVertical: 4, paddingHorizontal: 4 },
-  backText: { color: colors.accent, fontSize: 16, fontWeight: "700" },
-  headerCenter: { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: colors.ink },
-  headerSub: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
   newSetButton: {
     backgroundColor: colors.goldSoft,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   newSetText: { color: colors.gold, fontWeight: "700", fontSize: 12 },
@@ -233,12 +214,13 @@ const styles = StyleSheet.create({
   body: { padding: 20, paddingBottom: 40 },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 20,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 28,
     alignItems: "center",
     marginBottom: 14,
+    ...shadowLift,
   },
   arabic: { fontSize: 42, color: colors.ink, textAlign: "center", marginBottom: 12 },
   translit: { fontSize: 18, color: colors.accent, fontWeight: "600", marginBottom: 6 },
@@ -262,10 +244,11 @@ const styles = StyleSheet.create({
   listenText: { color: colors.accent, fontSize: 15, fontWeight: "700" },
   recordButton: {
     backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: radius.lg,
+    paddingVertical: 17,
     alignItems: "center",
     marginBottom: 10,
+    ...shadow,
   },
   recording: { backgroundColor: colors.danger },
   recordText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
