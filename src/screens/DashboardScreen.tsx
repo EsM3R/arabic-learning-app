@@ -101,10 +101,11 @@ export default function DashboardScreen({
         }; açık hata sayısı ${mistakes.filter((m) => !m.resolved).length}; kurulu hatırlatıcı ${reminders.length} adet.`;
 
         const ctx: AgentContext = { profile, profileChanged: false };
-        const system =
-          wakeCheckSystem(profile) + memoryContext(mistakes, notes) + retentionDigest(cards);
         const reply = await agenticChat(
-          system,
+          {
+            stable: wakeCheckSystem(profile),
+            dynamic: memoryContext(mistakes, notes) + retentionDigest(cards),
+          },
           [{ role: "user", content: wakeCheckEvent(digest) }],
           ctx,
           TEACHER_TOOLS,

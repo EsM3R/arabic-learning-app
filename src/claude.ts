@@ -39,6 +39,34 @@ export interface AgenticReply {
   actions: string[];
 }
 
+/**
+ * Sistem promptu iki parça: stable (ders boyunca değişmez → önbelleklenir)
+ * ve dynamic (hafıza/tekrar özeti — her turda tazelenir). Önbellek ön-ek
+ * eşleşmesiyle çalıştığı için değişken kısmı sona koymak, araç tanımları +
+ * sabit prompt maliyetini her çağrıda ~%90 düşürür. Kaliteye etkisi sıfırdır.
+ */
+export interface SystemPrompt {
+  stable: string;
+  dynamic?: string;
+}
+
+function systemBlocks(system: SystemPrompt): Anthropic.TextBlockParam[] {
+  const blocks: Anthropic.TextBlockParam[] = [
+    { type: "text", text: system.stable, cache_control: { type: "ephemeral" } },
+  ];
+  if (system.dynamic && system.dynamic.trim()) {
+    blocks.push({ type: "text", text: system.dynamic });
+  }
+  return blocks;
+}
+
+/** Araç listesinin son elemanına önbellek işareti koyar (araçlar sabittir). */
+function cachedTools(tools: Anthropic.Tool[]): Anthropic.Tool[] {
+  return tools.map((t, i) =>
+    i === tools.length - 1 ? { ...t, cache_control: { type: "ephemeral" as const } } : t
+  );
+}
+
 const MAX_TOOL_ROUNDS = 12;
 /** Bu kadar tur kalınca modele "toparla" uyarısı iletilir. */
 const WRAP_UP_AT = 3;
@@ -52,13 +80,15 @@ const WRAP_UP_AT = 3;
  * kadar yazdığı metin döndürülür (araç etkileri zaten diske işlenmiştir).
  */
 export async function agenticChat(
-  system: string,
+  system: string | SystemPrompt,
   messages: ChatMessage[],
   ctx: AgentContext,
   tools: Anthropic.Tool[] = TEACHER_TOOLS,
   maxRounds: number = MAX_TOOL_ROUNDS
 ): Promise<AgenticReply> {
   const anthropic = client(ctx.profile.apiKey);
+  const sys: SystemPrompt = typeof system === "string" ? { stable: system } : system;
+  const toolsWithCache = cachedTools(tools);
   const history: Anthropic.MessageParam[] = messages.map((m) => ({
     role: m.role,
     content: m.content,
@@ -71,8 +101,8 @@ export async function agenticChat(
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: "adaptive" },
-      system,
-      tools,
+      system: systemBlocks(sys),
+      tools: toolsWithCache,
       messages: history,
     });
 

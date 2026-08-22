@@ -97,19 +97,25 @@ export default function LessonScreen({
   const kickoff = quiz ? KICKOFF_QUIZ : module ? KICKOFF_LESSON : KICKOFF_FREECHAT;
   const isDone = module ? profile.completedModuleIds.includes(module.id) : false;
 
-  /** Sistem promptunu HER TURDA taze hafıza ve tekrar verisiyle kurar. */
-  const buildSystem = async (current: Profile): Promise<string> => {
+  /**
+   * Sistem promptunu HER TURDA taze hafıza ve tekrar verisiyle kurar.
+   * Sabit kısım (ders promptu) önbelleklenir; değişken kısım (hafıza) sona gider.
+   */
+  const buildSystem = async (current: Profile) => {
     const [mistakes, notes, vocab] = await Promise.all([
       loadMistakes(),
       loadNotes(),
       loadVocab(),
     ]);
-    const base = quiz
+    const stable = quiz
       ? quizSystem(current)
       : module
         ? lessonSystem(current, module)
         : freeChatSystem(current);
-    return base + memoryContext(mistakes, notes, module?.track) + retentionDigest(vocab);
+    return {
+      stable,
+      dynamic: memoryContext(mistakes, notes, module?.track) + retentionDigest(vocab),
+    };
   };
 
   const runTurn = async (history: ChatMessage[]) => {
