@@ -26,6 +26,10 @@ Kişisel yapay zekâ destekli Arapça öğrenme uygulaması (Expo / React Native
   **İnisiyatif alır:**
   - ➡️ `ekrana_git` — sıradaki adımı önerir (tıklanabilir öneri şeridi)
   - ⏰ `hatirlatici_kur` — telefonuna ders hatırlatıcısı kurar
+  - 🧠 `kelime_puanla` — "Üstaz'la Tekrar" sözlü sınavında cevabını puanlar,
+    tekrar takvimini kendisi kurar
+  - 👋 Uygulamayı açtığında duruma bakıp panele kişisel karşılama notu bırakır;
+    derste 4 dk sessiz kalırsan kendiliğinden yoklar
 
   Seviye tespitini de Üstaz yönetir: ne zaman yeterli kanıt topladığına kendisi karar verip
   `degerlendirmeyi_bitir` ile kapatır.
