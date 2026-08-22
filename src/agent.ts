@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { scheduleReminder } from "./notifications";
-import { deckStats, Difficulty, dueCards, newCard, strugglingCards } from "./srs";
+import { deckStats, Difficulty, dueCards, gradeCard, newCard, strugglingCards } from "./srs";
 import {
   loadMistakes,
   loadNotes,
@@ -172,6 +172,24 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "kelime_puanla",
+    description:
+      "Kelime sınavında (veya derste bir kelimeyi yokladığında) öğrencinin cevabına göre o kartın tekrar takvimini günceller — aralıklı tekrar sistemine SEN hükmedersin. Her sınav cevabından sonra dürüstçe çağır: takvimi bu belirler. id'yi tekrar_durumu veya kelime_ara çıktısındaki id alanından al.",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Kart id'si" },
+        sonuc: {
+          type: "string",
+          enum: ["bilemedi", "zor", "bildi", "cok_kolay"],
+          description:
+            "bilemedi = hatırlayamadı (kart başa döner), zor = zorlanarak bildi, bildi = normal bildi, cok_kolay = anında bildi",
+        },
+      },
+      required: ["id", "sonuc"],
+    },
+  },
+  {
     name: "hata_kaydet",
     description:
       "Öğrencinin anlamlı bir dil hatasını hata defterine kaydeder. Tekrarlanan veya öğretici hatalar için çağır. Önemsiz yazım sürçmelerini kaydetme.",
@@ -289,7 +307,7 @@ const INITIATIVE_TOOLS: Anthropic.Tool[] = [
       properties: {
         screen: {
           type: "string",
-          enum: ["dashboard", "review", "pronunciation", "mistakes", "module"],
+          enum: ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module"],
           description: "Hedef ekran. 'module' seçersen moduleId de ver.",
         },
         moduleId: { type: "string", description: "screen='module' ise açılacak modülün id'si" },
@@ -577,6 +595,38 @@ export async function executeTool(
       };
     }
 
+    case "kelime_puanla": {
+      const id = String(input.id ?? "");
+      const cards = await loadVocab();
+      const card = cards.find((c) => c.id === id);
+      if (!card) {
+        return { result: `Hata: '${id}' id'li kelime bulunamadı. tekrar_durumu veya kelime_ara ile doğru id'yi al.` };
+      }
+      const gradeMap: Record<string, 0 | 1 | 2 | 3> = {
+        bilemedi: 0,
+        zor: 1,
+        bildi: 2,
+        cok_kolay: 3,
+      };
+      const sonuc = String(input.sonuc ?? "");
+      const grade = gradeMap[sonuc];
+      if (grade === undefined) {
+        return { result: `Hata: geçersiz sonuç '${sonuc}'. bilemedi/zor/bildi/cok_kolay olmalı.` };
+      }
+      const updated = gradeCard(card, grade);
+      await saveVocab(cards.map((c) => (c.id === id ? updated : c)));
+      const when =
+        updated.intervalDays <= 0
+          ? "10 dakika sonra tekrar sorulacak"
+          : `${Math.round(updated.intervalDays)} gün sonra tekrar sorulacak`;
+      const label =
+        sonuc === "bilemedi" ? "bilemedi" : sonuc === "zor" ? "zorlandı" : sonuc === "bildi" ? "bildi" : "çok kolay geldi";
+      return {
+        result: `"${card.arabic}" puanlandı (${label}); ${when}.`,
+        summary: `🧠 ${card.arabic} → ${label}`,
+      };
+    }
+
     case "hata_kaydet": {
       const entries = await loadMistakes();
       const entry = {
@@ -732,7 +782,7 @@ export async function executeTool(
 
     case "ekrana_git": {
       const screen = String(input.screen ?? "");
-      const allowed = ["dashboard", "review", "pronunciation", "mistakes", "module"];
+      const allowed = ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module"];
       if (!allowed.includes(screen)) return { result: `Hata: geçersiz ekran '${screen}'.` };
       const moduleId = input.moduleId ? String(input.moduleId) : undefined;
       if (screen === "module") {

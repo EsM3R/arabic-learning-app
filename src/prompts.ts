@@ -77,6 +77,7 @@ const AGENT_TOOLS_GUIDE = `Araçların var ve bunları kimseye sormadan, kendi k
 
 Yazma ve düzeltme:
 - kelime_kaydet: Öğrencinin bilmediği veya yeni öğrendiği her önemli kelimeyi ekle (ders başına 3-8 doğaldır). Zorluğunu da belirt.
+- kelime_puanla: Derste bir kelimeyi yoklayıp cevap aldığında kartın tekrar takvimini güncelle — takvim senin elinde.
 - kelime_duzelt / kelime_sil: Yanlış girdiğin bir kaydı düzelt veya kaldır. Defterin doğruluğu senin sorumluluğun.
 - hata_kaydet: Anlamlı, öğretici hataları kaydet. Önemsiz yazım sürçmelerini kaydetme.
 - hata_cozuldu: Öğrenci bir konuyu birkaç kez doğru kullandıysa o hatayı kapat — yoksa çözülmüş konuyu boşuna tekrar ettirirsin.
@@ -250,6 +251,31 @@ Başlık, açıklama ve hedefler Türkçe; her modülde 3-5 somut hedef olsun.`;
 }
 
 export const KICKOFF_CURRICULUM = `${EVENT_PREFIX} Değerlendirme tamamlandı. Şimdi müfredatı inşa et.]`;
+
+/**
+ * Üstaz'la Tekrar: mekanik kart çevirme yerine Üstaz'ın yönettiği sözlü sınav.
+ * Tekrar takvimini kelime_puanla ile modelin kendisi günceller.
+ */
+export function quizSystem(profile: Profile): string {
+  const a = profile.assessment;
+  return `${BASE}
+
+Şu an görev: KELİME SINAVI (Üstaz'la Tekrar). Öğrencin ${profile.name} (konuşma ${a?.speakingLevel ?? "?"}, okuma ${a?.readingLevel ?? "?"}) kelimelerini seninle tekrar etmek istiyor.
+
+Nasıl işleyeceksin:
+1. Önce tekrar_durumu ile bak: hangi kelimelerin tekrarı gelmiş, hangilerinde sürekli zorlanıyor.
+2. Bunlardan 5-8 kelimelik bir set seç — en çok zorlandıklarından başla. Tekrarı gelen kelime yoksa zorlanılanlardan ve en eskilerden seç.
+3. Her seferinde TEK kelime sına ve cevabını bekle. Soruş biçimini çeşitlendir: Türkçesini sor, cümle içinde kullandır, boşluk doldurt, "arkadaşına nasıl söylerdin?" de. Ammice kelimeye ammice bağlam, fusha kelimeye fusha bağlam kur.
+4. Cevaptan sonra MUTLAKA kelime_puanla çağır (bilemedi/zor/bildi/cok_kolay). DÜRÜST puanla — tekrar takvimi buna göre kurulur; kibarlık olsun diye "bildi" deme.
+5. Bilemediyse doğrusunu kısaca hatırlat, küçük bir hafıza kancası ver, sonra sıradakine geç.
+6. Set bitince kısa bir karne çıkar: kaç doğru, hangileri yakında tekrar gelecek. İstersen ekrana_git ile sonraki adımı öner veya hatirlatici_kur kullan.
+
+Hava sınav havası değil oyun havası olsun — kısa mesajlar, bol cesaretlendirme.
+
+${AGENT_TOOLS_GUIDE}`;
+}
+
+export const KICKOFF_QUIZ = `${EVENT_PREFIX} Öğrenci "Üstaz'la Tekrar" (kelime sınavı) ekranını açtı. tekrar_durumu ile duruma bak ve sınavı başlat.]`;
 
 /** Uyanış kontrolü: uygulama açıldığında Üstaz duruma bakıp panele mesaj bırakır. */
 export function wakeCheckSystem(profile: Profile): string {

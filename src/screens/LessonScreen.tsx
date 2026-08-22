@@ -8,8 +8,10 @@ import {
   idleNudgeEvent,
   KICKOFF_FREECHAT,
   KICKOFF_LESSON,
+  KICKOFF_QUIZ,
   lessonSystem,
   memoryContext,
+  quizSystem,
   retentionDigest,
 } from "../prompts";
 import {
@@ -25,8 +27,10 @@ import { ChatMessage, CurriculumModule, NavigationSuggestion, Profile } from "..
 
 interface Props {
   profile: Profile;
-  /** null → serbest sohbet modu */
+  /** null → serbest sohbet (veya quiz=true ise kelime sınavı) modu */
   module: CurriculumModule | null;
+  /** true → Üstaz'la Tekrar: sözlü kelime sınavı, her açılışta taze başlar. */
+  quiz?: boolean;
   onBack: () => void;
   onCompleteModule: (moduleId: string) => void;
   /** Üstaz araçlarıyla profili değiştirdiğinde (seviye, müfredat, modül tamamlama) çağrılır. */
@@ -38,6 +42,7 @@ interface Props {
 export default function LessonScreen({
   profile,
   module,
+  quiz = false,
   onBack,
   onCompleteModule,
   onProfileChange,
@@ -88,8 +93,8 @@ export default function LessonScreen({
     }, 4 * 60 * 1000);
   };
 
-  const chatId = module ? `module.${module.id}` : "freechat";
-  const kickoff = module ? KICKOFF_LESSON : KICKOFF_FREECHAT;
+  const chatId = quiz ? "quiz" : module ? `module.${module.id}` : "freechat";
+  const kickoff = quiz ? KICKOFF_QUIZ : module ? KICKOFF_LESSON : KICKOFF_FREECHAT;
   const isDone = module ? profile.completedModuleIds.includes(module.id) : false;
 
   /** Sistem promptunu HER TURDA taze hafıza ve tekrar verisiyle kurar. */
@@ -99,7 +104,11 @@ export default function LessonScreen({
       loadNotes(),
       loadVocab(),
     ]);
-    const base = module ? lessonSystem(current, module) : freeChatSystem(current);
+    const base = quiz
+      ? quizSystem(current)
+      : module
+        ? lessonSystem(current, module)
+        : freeChatSystem(current);
     return base + memoryContext(mistakes, notes, module?.track) + retentionDigest(vocab);
   };
 
@@ -144,7 +153,8 @@ export default function LessonScreen({
     if (started.current) return;
     started.current = true;
     void (async () => {
-      const saved = await loadChat(chatId);
+      // Sınav her açılışta taze başlar; ders ve sohbet kaldığı yerden sürer.
+      const saved = quiz ? [] : await loadChat(chatId);
       if (saved.length > 0) {
         setMessages(saved);
         return;
@@ -181,12 +191,14 @@ export default function LessonScreen({
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {module ? module.title : "Serbest Sohbet"}
+            {quiz ? "Üstaz'la Tekrar" : module ? module.title : "Serbest Sohbet"}
           </Text>
           <Text style={styles.headerSub}>
-            {module
-              ? `${module.track === "konusma" ? "Ammice" : "Fusha"} · ${module.level}`
-              : "Şami ammicesiyle pratik"}
+            {quiz
+              ? "Sözlü kelime sınavı — takvimi Üstaz kurar"
+              : module
+                ? `${module.track === "konusma" ? "Ammice" : "Fusha"} · ${module.level}`
+                : "Şami ammicesiyle pratik"}
           </Text>
         </View>
         {module && !isDone ? (

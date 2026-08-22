@@ -27,6 +27,7 @@ interface Props {
   profile: Profile;
   onOpenModule: (module: CurriculumModule) => void;
   onFreeChat: () => void;
+  onQuiz: () => void;
   onOpenReview: () => void;
   onOpenMistakes: () => void;
   onOpenPronunciation: () => void;
@@ -42,6 +43,7 @@ export default function DashboardScreen({
   profile,
   onOpenModule,
   onFreeChat,
+  onQuiz,
   onOpenReview,
   onOpenMistakes,
   onOpenPronunciation,
@@ -122,6 +124,7 @@ export default function DashboardScreen({
     const s = teacherSuggestion;
     if (!s) return;
     if (s.screen === "review") onOpenReview();
+    else if (s.screen === "quiz") onQuiz();
     else if (s.screen === "pronunciation") onOpenPronunciation();
     else if (s.screen === "mistakes") onOpenMistakes();
     else if (s.screen === "module") {
@@ -173,6 +176,18 @@ export default function DashboardScreen({
 
       <TouchableOpacity style={styles.chatButton} onPress={onFreeChat}>
         <Text style={styles.chatButtonText}>💬 Üstaz ile Serbest Sohbet</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.quizCard} onPress={onQuiz}>
+        <Text style={styles.toolEmoji}>🧠</Text>
+        <View style={styles.pronunciationBody}>
+          <Text style={styles.toolTitle}>Üstaz'la Tekrar</Text>
+          <Text style={styles.toolMeta}>
+            Sözlü kelime sınavı — Üstaz sorar, puanlar, takvimini kurar
+            {vocabDue > 0 ? ` · ${vocabDue} kelime hazır` : ""}
+          </Text>
+        </View>
+        <Text style={styles.pronunciationArrow}>›</Text>
       </TouchableOpacity>
 
       <View style={styles.toolsRow}>
@@ -293,6 +308,17 @@ const styles = StyleSheet.create({
   },
   chatButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
   toolsRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  quizCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    padding: 14,
+    marginBottom: 10,
+    gap: 12,
+  },
   pronunciationCard: {
     flexDirection: "row",
     alignItems: "center",

@@ -23,7 +23,7 @@ type Screen =
   | { name: "setup" }
   | { name: "assessment" }
   | { name: "dashboard" }
-  | { name: "lesson"; module: CurriculumModule | null }
+  | { name: "lesson"; module: CurriculumModule | null; quiz?: boolean }
   | { name: "review" }
   | { name: "mistakes" }
   | { name: "pronunciation" };
@@ -100,6 +100,9 @@ export default function App() {
       case "review":
         setScreen({ name: "review" });
         break;
+      case "quiz":
+        setScreen({ name: "lesson", module: null, quiz: true });
+        break;
       case "pronunciation":
         setScreen({ name: "pronunciation" });
         break;
@@ -140,6 +143,7 @@ export default function App() {
           profile={profile}
           onOpenModule={(module) => setScreen({ name: "lesson", module })}
           onFreeChat={() => setScreen({ name: "lesson", module: null })}
+          onQuiz={() => setScreen({ name: "lesson", module: null, quiz: true })}
           onOpenReview={() => setScreen({ name: "review" })}
           onOpenMistakes={() => setScreen({ name: "mistakes" })}
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
@@ -148,8 +152,10 @@ export default function App() {
       )}
       {screen.name === "lesson" && profile && (
         <LessonScreen
+          key={screen.quiz ? "quiz" : screen.module?.id ?? "freechat"}
           profile={profile}
           module={screen.module}
+          quiz={screen.quiz}
           onBack={() => setScreen({ name: "dashboard" })}
           onCompleteModule={onCompleteModule}
           onProfileChange={(next) => void persist(next)}

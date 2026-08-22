@@ -100,7 +100,7 @@ export interface PronunciationSet {
 
 /** Üstaz'ın ekrana_git aracıyla önerdiği yönlendirme (zorlamaz, öneri çipi olarak gösterilir). */
 export interface NavigationSuggestion {
-  screen: "dashboard" | "review" | "pronunciation" | "mistakes" | "module";
+  screen: "dashboard" | "review" | "quiz" | "pronunciation" | "mistakes" | "module";
   moduleId?: string;
   label: string;
 }
