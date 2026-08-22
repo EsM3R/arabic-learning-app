@@ -55,7 +55,8 @@ export async function agenticChat(
   system: string,
   messages: ChatMessage[],
   ctx: AgentContext,
-  tools: Anthropic.Tool[] = TEACHER_TOOLS
+  tools: Anthropic.Tool[] = TEACHER_TOOLS,
+  maxRounds: number = MAX_TOOL_ROUNDS
 ): Promise<AgenticReply> {
   const anthropic = client(ctx.profile.apiKey);
   const history: Anthropic.MessageParam[] = messages.map((m) => ({
@@ -65,7 +66,7 @@ export async function agenticChat(
   const actions: string[] = [];
   let lastText = "";
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+  for (let round = 0; round < maxRounds; round++) {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 16000,
@@ -119,7 +120,7 @@ export async function agenticChat(
 
     // Bütçe tükenmek üzereyse modeli kendi turunu kapatmaya yönlendir —
     // sert kesip turu çöpe atmak yerine düzgün bitirmesini sağlar.
-    const remaining = MAX_TOOL_ROUNDS - round - 1;
+    const remaining = maxRounds - round - 1;
     if (remaining <= WRAP_UP_AT) {
       toolResults.push({
         type: "text",
@@ -240,13 +241,14 @@ export async function generatePronunciationSet(
   apiKey: string,
   name: string,
   assessment: Assessment | undefined,
-  vocabWords: string[]
+  vocabWords: string[],
+  strugglingWords: string[] = []
 ): Promise<PronunciationSet> {
   const response = await client(apiKey).messages.create({
     model: MODEL,
     max_tokens: 16000,
     thinking: { type: "adaptive" },
-    system: pronunciationSystem(name, assessment, vocabWords),
+    system: pronunciationSystem(name, assessment, vocabWords, strugglingWords),
     output_config: { format: { type: "json_schema", schema: PRONUNCIATION_SCHEMA } },
     messages: [{ role: "user", content: "Telaffuz pratik setimi hazırla lütfen." }],
   });

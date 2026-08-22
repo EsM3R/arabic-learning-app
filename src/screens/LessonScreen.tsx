@@ -5,13 +5,21 @@ import ChatView from "../components/ChatView";
 import { agenticChat } from "../claude";
 import {
   freeChatSystem,
+  idleNudgeEvent,
   KICKOFF_FREECHAT,
   KICKOFF_LESSON,
   lessonSystem,
   memoryContext,
   retentionDigest,
 } from "../prompts";
-import { loadChat, loadMistakes, loadNotes, loadVocab, saveChat } from "../storage";
+import {
+  loadChat,
+  loadMistakes,
+  loadNotes,
+  loadVocab,
+  saveChat,
+  touchLastActivity,
+} from "../storage";
 import { colors } from "../theme";
 import { ChatMessage, CurriculumModule, NavigationSuggestion, Profile } from "../types";
 
@@ -41,10 +49,44 @@ export default function LessonScreen({
   const started = useRef(false);
   /** Turlar arası en güncel profil — React state'inin gecikmesine takılmamak için. */
   const profileRef = useRef(profile);
+  /** Sessizlik dürtmesi: oturum başına bir kez, öğrenci yazınca iptal. */
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nudgeUsed = useRef(false);
+  const messagesRef = useRef<ChatMessage[]>([]);
 
   useEffect(() => {
     profileRef.current = profile;
   }, [profile]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const clearIdleTimer = () => {
+    if (idleTimer.current) {
+      clearTimeout(idleTimer.current);
+      idleTimer.current = null;
+    }
+  };
+
+  useEffect(() => clearIdleTimer, []);
+
+  /** Üstaz cevap verdikten sonra kurulur: 4 dk sessizlik → kendiliğinden yoklar. */
+  const armIdleTimer = () => {
+    clearIdleTimer();
+    if (nudgeUsed.current) return;
+    idleTimer.current = setTimeout(() => {
+      if (nudgeUsed.current) return;
+      nudgeUsed.current = true;
+      const history: ChatMessage[] = [
+        ...messagesRef.current,
+        { role: "user", content: idleNudgeEvent(4) },
+      ];
+      setMessages(history);
+      void saveChat(chatId, history);
+      void runTurn(history);
+    }, 4 * 60 * 1000);
+  };
 
   const chatId = module ? `module.${module.id}` : "freechat";
   const kickoff = module ? KICKOFF_LESSON : KICKOFF_FREECHAT;
@@ -62,8 +104,10 @@ export default function LessonScreen({
   };
 
   const runTurn = async (history: ChatMessage[]) => {
+    clearIdleTimer();
     setSending(true);
     setSuggestion(null);
+    void touchLastActivity();
     const ctx: AgentContext = {
       profile: profileRef.current,
       profileChanged: false,
@@ -80,6 +124,7 @@ export default function LessonScreen({
       setMessages(updated);
       await saveChat(chatId, updated);
       if (ctx.pendingNavigation) setSuggestion(ctx.pendingNavigation);
+      armIdleTimer();
     } catch (e) {
       Alert.alert("Bağlantı hatası", e instanceof Error ? e.message : String(e));
       setMessages(history);
@@ -112,6 +157,8 @@ export default function LessonScreen({
   }, []);
 
   const onSend = (text: string) => {
+    clearIdleTimer();
+    nudgeUsed.current = false; // öğrenci yazdı → dürtme hakkı yenilenir
     const history: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(history);
     void saveChat(chatId, history);

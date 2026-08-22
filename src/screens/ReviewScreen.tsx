@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { speakArabic } from "../speech";
 import { dueCards, gradeCard } from "../srs";
-import { loadVocab, saveVocab } from "../storage";
+import { loadVocab, saveVocab, touchLastActivity } from "../storage";
 import { colors } from "../theme";
 import { ReviewGrade, VocabCard } from "../types";
 
@@ -30,6 +30,7 @@ export default function ReviewScreen({ onBack }: Props) {
 
   const grade = async (g: ReviewGrade) => {
     if (!current) return;
+    void touchLastActivity();
     const updated = gradeCard(current, g);
     const nextAll = allCards.map((c) => (c.id === updated.id ? updated : c));
     setAllCards(nextAll);

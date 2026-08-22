@@ -35,6 +35,32 @@ export const saveNotes = (notes: TeacherNote[]) => saveList(NOTES_KEY, notes);
 export const loadReminders = () => loadList<Reminder>(REMINDERS_KEY);
 export const saveReminders = (reminders: Reminder[]) => saveList(REMINDERS_KEY, reminders);
 
+const LAST_ACTIVITY_KEY = "lastActivity.v1";
+const WAKE_CHECK_KEY = "wakeCheck.v1";
+
+/** Öğrencinin son çalışma zamanı — uyanış kontrolü buna bakar. */
+export async function touchLastActivity(): Promise<void> {
+  await AsyncStorage.setItem(LAST_ACTIVITY_KEY, new Date().toISOString());
+}
+
+export async function loadLastActivity(): Promise<string | null> {
+  return AsyncStorage.getItem(LAST_ACTIVITY_KEY);
+}
+
+export interface WakeCheck {
+  at: string;
+  message: string;
+}
+
+export async function loadWakeCheck(): Promise<WakeCheck | null> {
+  const raw = await AsyncStorage.getItem(WAKE_CHECK_KEY);
+  return raw ? (JSON.parse(raw) as WakeCheck) : null;
+}
+
+export async function saveWakeCheck(check: WakeCheck): Promise<void> {
+  await AsyncStorage.setItem(WAKE_CHECK_KEY, JSON.stringify(check));
+}
+
 export async function loadPronunciationSet(): Promise<PronunciationSet | null> {
   const raw = await AsyncStorage.getItem(PRONUNCIATION_KEY);
   return raw ? (JSON.parse(raw) as PronunciationSet) : null;

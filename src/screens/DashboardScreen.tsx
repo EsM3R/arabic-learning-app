@@ -7,10 +7,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AgentContext, TEACHER_TOOLS } from "../agent";
+import { agenticChat } from "../claude";
+import { pendingReminders } from "../notifications";
+import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
 import { dueCards } from "../srs";
-import { loadMistakes, loadVocab } from "../storage";
+import {
+  loadLastActivity,
+  loadMistakes,
+  loadNotes,
+  loadVocab,
+  loadWakeCheck,
+  saveWakeCheck,
+} from "../storage";
 import { colors } from "../theme";
-import { CurriculumModule, Profile, Track } from "../types";
+import { CurriculumModule, NavigationSuggestion, Profile, Track } from "../types";
 
 interface Props {
   profile: Profile;
@@ -41,15 +52,83 @@ export default function DashboardScreen({
   const [vocabTotal, setVocabTotal] = useState(0);
   const [vocabDue, setVocabDue] = useState(0);
   const [mistakeCount, setMistakeCount] = useState(0);
+  const [teacherNote, setTeacherNote] = useState<string | null>(null);
+  const [teacherSuggestion, setTeacherSuggestion] = useState<NavigationSuggestion | null>(null);
+  const wakeStarted = React.useRef(false);
 
   useEffect(() => {
     void (async () => {
       const [cards, mistakes] = await Promise.all([loadVocab(), loadMistakes()]);
       setVocabTotal(cards.length);
       setVocabDue(dueCards(cards).length);
-      setMistakeCount(mistakes.length);
+      setMistakeCount(mistakes.filter((m) => !m.resolved).length);
     })();
   }, []);
+
+  /**
+   * Uyanış kontrolü: uygulama açıldığında Üstaz duruma bakar ve gerekirse
+   * panele kişisel bir karşılama notu bırakır. En fazla 12 saatte bir çalışır;
+   * tetik yoksa (tekrar birikmemiş, ara verilmemiş) API'ye hiç gitmez.
+   */
+  useEffect(() => {
+    if (wakeStarted.current || !curriculum) return;
+    wakeStarted.current = true;
+    void (async () => {
+      try {
+        const HOURS_12 = 12 * 3600 * 1000;
+        const previous = await loadWakeCheck();
+        if (previous && Date.now() - new Date(previous.at).getTime() < HOURS_12) {
+          setTeacherNote(previous.message);
+          return;
+        }
+        const [cards, mistakes, notes, lastActivity, reminders] = await Promise.all([
+          loadVocab(),
+          loadMistakes(),
+          loadNotes(),
+          loadLastActivity(),
+          pendingReminders(),
+        ]);
+        const due = dueCards(cards).length;
+        const daysSince = lastActivity
+          ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86_400_000)
+          : 0;
+        if (due < 5 && daysSince < 2) return; // dürtecek bir şey yok — sessiz kal
+
+        const digest = `${due} kelimenin tekrarı gelmiş; öğrenci ${
+          daysSince === 0 ? "bugün de çalışmış" : `${daysSince} gündür çalışmamış`
+        }; açık hata sayısı ${mistakes.filter((m) => !m.resolved).length}; kurulu hatırlatıcı ${reminders.length} adet.`;
+
+        const ctx: AgentContext = { profile, profileChanged: false };
+        const system =
+          wakeCheckSystem(profile) + memoryContext(mistakes, notes) + retentionDigest(cards);
+        const reply = await agenticChat(
+          system,
+          [{ role: "user", content: wakeCheckEvent(digest) }],
+          ctx,
+          TEACHER_TOOLS,
+          6
+        );
+        await saveWakeCheck({ at: new Date().toISOString(), message: reply.text });
+        setTeacherNote(reply.text);
+        if (ctx.pendingNavigation) setTeacherSuggestion(ctx.pendingNavigation);
+      } catch {
+        // Karşılama notu süs değil ama can damarı da değil — sessizce vazgeç.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onSuggestionPress = () => {
+    const s = teacherSuggestion;
+    if (!s) return;
+    if (s.screen === "review") onOpenReview();
+    else if (s.screen === "pronunciation") onOpenPronunciation();
+    else if (s.screen === "mistakes") onOpenMistakes();
+    else if (s.screen === "module") {
+      const target = curriculum?.modules.find((m) => m.id === s.moduleId);
+      if (target) onOpenModule(target);
+    }
+  };
 
   const confirmReset = () => {
     Alert.alert("Sıfırla", "Tüm ilerleme ve ayarlar silinecek. Emin misin?", [
@@ -79,6 +158,18 @@ export default function DashboardScreen({
         </View>
       </View>
       {assessment?.summary ? <Text style={styles.summary}>{assessment.summary}</Text> : null}
+
+      {teacherNote && (
+        <View style={styles.teacherNoteCard}>
+          <Text style={styles.teacherNoteTitle}>🧑‍🏫 Üstaz'dan not</Text>
+          <Text style={styles.teacherNoteText}>{teacherNote}</Text>
+          {teacherSuggestion && (
+            <TouchableOpacity style={styles.teacherNoteButton} onPress={onSuggestionPress}>
+              <Text style={styles.teacherNoteButtonText}>{teacherSuggestion.label} ›</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       <TouchableOpacity style={styles.chatButton} onPress={onFreeChat}>
         <Text style={styles.chatButtonText}>💬 Üstaz ile Serbest Sohbet</Text>
@@ -174,6 +265,25 @@ const styles = StyleSheet.create({
   levelValue: { fontSize: 28, fontWeight: "800", color: colors.accent },
   levelLabel: { fontSize: 12, color: colors.inkSoft, marginTop: 4 },
   summary: { fontSize: 14, color: colors.inkSoft, lineHeight: 21, marginBottom: 16 },
+  teacherNoteCard: {
+    backgroundColor: colors.goldSoft,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    padding: 14,
+    marginBottom: 16,
+  },
+  teacherNoteTitle: { fontSize: 12, fontWeight: "800", color: colors.gold, marginBottom: 6 },
+  teacherNoteText: { fontSize: 14, color: colors.ink, lineHeight: 21 },
+  teacherNoteButton: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    backgroundColor: colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  teacherNoteButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
   chatButton: {
     backgroundColor: colors.accent,
     borderRadius: 14,

@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { isEventMessage } from "../prompts";
 import { extractArabic, speakArabic } from "../speech";
 import { colors } from "../theme";
 import { ChatMessage, NavigationSuggestion } from "../types";
@@ -50,7 +51,7 @@ export default function ChatView({
     >
       <FlatList
         ref={listRef}
-        data={messages}
+        data={messages.filter((m) => !(m.role === "user" && isEventMessage(m.content)))}
         keyExtractor={(_, i) => String(i)}
         contentContainerStyle={styles.list}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}

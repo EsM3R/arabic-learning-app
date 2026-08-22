@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { generatePronunciationSet } from "../claude";
+import { strugglingCards } from "../srs";
 import { speakArabic, stopSpeaking } from "../speech";
 import { loadPronunciationSet, loadVocab, savePronunciationSet } from "../storage";
 import { colors } from "../theme";
@@ -43,7 +44,8 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
         profile.apiKey,
         profile.name,
         profile.assessment,
-        vocab.map((c) => c.arabic)
+        vocab.map((c) => c.arabic),
+        strugglingCards(vocab, 8).map((c) => c.arabic)
       );
       await savePronunciationSet(newSet);
       setSet(newSet);

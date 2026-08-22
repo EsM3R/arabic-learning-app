@@ -7,10 +7,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { AgentContext, ASSESSMENT_TOOLS } from "../agent";
+import { AgentContext, TEACHER_TOOLS, ASSESSMENT_TOOLS } from "../agent";
 import ChatView from "../components/ChatView";
 import { agenticChat, analyzeAssessment, generateCurriculum } from "../claude";
-import { assessmentSystem, KICKOFF_ASSESSMENT } from "../prompts";
+import {
+  assessmentSystem,
+  curriculumBuilderSystem,
+  KICKOFF_ASSESSMENT,
+  KICKOFF_CURRICULUM,
+} from "../prompts";
 import { colors } from "../theme";
 import { Assessment, ChatMessage, Curriculum, Profile } from "../types";
 
@@ -28,9 +33,37 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
 
   const system = assessmentSystem(profile.name);
 
-  /** Seviye raporu hazır → müfredatı üret ve panele geç. */
+  /**
+   * Seviye raporu hazır → müfredatı ÜSTAZ kendisi inşa eder: modul_ekle
+   * aracını çağıra çağıra, değerlendirmede kaydettiği hataları okuyarak.
+   * Yeterli modül kuramazsa tek atımlık üretime düşülür (yedek yol).
+   */
   const buildCurriculum = async (assessment: Assessment) => {
     setFinishStage("planning");
+    const ctx: AgentContext = {
+      profile: {
+        ...profileRef.current,
+        assessment,
+        curriculum: { modules: [], generatedAt: new Date().toISOString() },
+      },
+      profileChanged: false,
+    };
+    try {
+      await agenticChat(
+        curriculumBuilderSystem(profile.name, assessment),
+        [{ role: "user", content: KICKOFF_CURRICULUM }],
+        ctx,
+        TEACHER_TOOLS,
+        16
+      );
+    } catch {
+      // agentic kurulum başarısız olursa aşağıdaki yedek yol devreye girer
+    }
+    const built = ctx.profile.curriculum;
+    if (built && built.modules.length >= 6) {
+      onComplete(assessment, built);
+      return;
+    }
     const curriculum = await generateCurriculum(profile.apiKey, profile.name, assessment);
     onComplete(assessment, curriculum);
   };
