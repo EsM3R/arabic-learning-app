@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { getActivePack } from "../languages";
 import { isEventMessage } from "../prompts";
-import { extractArabic, speakArabic } from "../speech";
+import { extractArabic, speakTarget } from "../speech";
 import { colors, shadow } from "../theme";
 import { ChatMessage, NavigationSuggestion } from "../types";
 
@@ -35,6 +36,7 @@ export default function ChatView({
 }: Props) {
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const pack = getActivePack();
 
   const send = () => {
     const text = draft.trim();
@@ -60,7 +62,7 @@ export default function ChatView({
             <View style={item.role === "user" ? styles.userRow : styles.assistantRow}>
               {item.role === "assistant" && (
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>أ</Text>
+                  <Text style={styles.avatarText}>{pack.avatarLetter}</Text>
                 </View>
               )}
               <View
@@ -72,10 +74,12 @@ export default function ChatView({
                 <Text style={item.role === "user" ? styles.userText : styles.assistantText}>
                   {item.content}
                 </Text>
-                {item.role === "assistant" && extractArabic(item.content).length > 0 && (
+                {item.role === "assistant" &&
+                  pack.scriptExtract &&
+                  extractArabic(item.content).length > 0 && (
                   <TouchableOpacity
                     style={styles.speakButton}
-                    onPress={() => speakArabic(item.content)}
+                    onPress={() => speakTarget(item.content)}
                   >
                     <Text style={styles.speakText}>🔊 Dinle</Text>
                   </TouchableOpacity>
@@ -97,10 +101,10 @@ export default function ChatView({
       {sending && (
         <View style={styles.typing}>
           <View style={styles.avatarSmall}>
-            <Text style={styles.avatarSmallText}>أ</Text>
+            <Text style={styles.avatarSmallText}>{pack.avatarLetter}</Text>
           </View>
           <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={styles.typingText}>Üstaz yazıyor…</Text>
+          <Text style={styles.typingText}>{pack.teacherName} yazıyor…</Text>
         </View>
       )}
       {suggestion && !sending && (

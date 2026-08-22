@@ -35,6 +35,9 @@ export interface Curriculum {
 export interface Profile {
   name: string;
   apiKey: string;
+  /** Aktif dil paketi ("ar" | "en" | "es"). Eski kayıtlarda yoktur → "ar". */
+  activeLanguage?: string;
+  /** Aktif dilin ilerlemesi — dil değişince langprog deposuna taşınır. */
   assessment?: Assessment;
   curriculum?: Curriculum;
   completedModuleIds: string[];

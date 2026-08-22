@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { getActivePack } from "./languages";
 import { loadReminders, saveReminders } from "./storage";
 
 let handlerReady = false;
@@ -54,7 +55,10 @@ export async function scheduleReminder(
 
     const seconds = Math.round(hoursFromNow * 3600);
     const notificationId = await Notifications.scheduleNotificationAsync({
-      content: { title: "Arapça Hoca — Üstaz", body: message },
+      content: {
+        title: `Lisan Hocası — ${getActivePack().teacherName}`,
+        body: message,
+      },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds,

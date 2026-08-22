@@ -11,15 +11,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { LANGUAGE_LIST, LANGUAGE_PACKS, LanguageId } from "../languages";
 import { colors, radius, shadowLift } from "../theme";
 
 interface Props {
-  onDone: (name: string, apiKey: string) => void;
+  onDone: (name: string, apiKey: string, languageId: LanguageId) => void;
 }
 
 export default function SetupScreen({ onDone }: Props) {
   const [name, setName] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [languageId, setLanguageId] = useState<LanguageId>("ar");
+  const pack = LANGUAGE_PACKS[languageId];
 
   const submit = () => {
     if (!name.trim()) {
@@ -33,7 +36,7 @@ export default function SetupScreen({ onDone }: Props) {
       );
       return;
     }
-    onDone(name.trim(), apiKey.trim());
+    onDone(name.trim(), apiKey.trim(), languageId);
   };
 
   return (
@@ -48,23 +51,49 @@ export default function SetupScreen({ onDone }: Props) {
           end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
-          <Text style={styles.heroArabic}>مرحبا</Text>
-          <Text style={styles.heroTitle}>Arapça Hoca</Text>
+          <Text style={styles.heroGreeting}>{pack.greeting}</Text>
+          <Text style={styles.heroTitle}>Lisan Hocası</Text>
           <Text style={styles.heroSub}>
-            Şami ammicesiyle konuş, fusha ile oku.{"\n"}Kişisel yapay zekâ öğretmenin Üstaz,
-            seni sıfırdan uzmanlığa taşıyacak.
+            Kişisel yapay zekâ öğretmenin {pack.teacherName}, seni {pack.label.toLowerCase()}de
+            sıfırdan uzmanlığa taşıyacak — konuşma ve okuma odaklı, sana özel müfredatla.
           </Text>
           <View style={styles.heroBadges}>
             <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>🗣️ Konuşma · Ammice</Text>
+              <Text style={styles.heroBadgeText}>
+                {pack.tracks.konusma.icon} {pack.tracks.konusma.title}
+              </Text>
             </View>
             <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>📖 Okuma · Fusha</Text>
+              <Text style={styles.heroBadgeText}>
+                {pack.tracks.okuma.icon} {pack.tracks.okuma.title}
+              </Text>
             </View>
           </View>
         </LinearGradient>
 
         <View style={styles.form}>
+          <Text style={styles.label}>Hangi dili öğrenmek istiyorsun?</Text>
+          <View style={styles.langRow}>
+            {LANGUAGE_LIST.map((l) => (
+              <TouchableOpacity
+                key={l.id}
+                style={[styles.langChip, languageId === l.id && styles.langChipActive]}
+                onPress={() => setLanguageId(l.id)}
+              >
+                <Text style={styles.langFlag}>{l.flag}</Text>
+                <Text
+                  style={[styles.langLabel, languageId === l.id && styles.langLabelActive]}
+                >
+                  {l.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.hint}>
+            Diğer dilleri sonra panelden ekleyebilirsin — her dilin müfredatı ve kelime defteri
+            ayrı tutulur.
+          </Text>
+
           <Text style={styles.label}>Adın</Text>
           <TextInput
             style={styles.input}
@@ -97,7 +126,7 @@ export default function SetupScreen({ onDone }: Props) {
               end={{ x: 1, y: 0 }}
               style={styles.button}
             >
-              <Text style={styles.buttonText}>Başlayalım → يلا</Text>
+              <Text style={styles.buttonText}>Başlayalım {pack.flag}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -116,7 +145,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
   },
-  heroArabic: { fontSize: 64, lineHeight: 84, color: colors.goldDeep, fontWeight: "700" },
+  heroGreeting: { fontSize: 56, lineHeight: 76, color: colors.goldDeep, fontWeight: "700" },
   heroTitle: {
     fontSize: 34,
     fontWeight: "800",
@@ -125,7 +154,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   heroSub: { fontSize: 14.5, color: colors.onDeepSoft, lineHeight: 22, marginTop: 12 },
-  heroBadges: { flexDirection: "row", gap: 8, marginTop: 18 },
+  heroBadges: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 18 },
   heroBadge: {
     backgroundColor: "rgba(243,239,228,0.12)",
     borderRadius: 999,
@@ -137,6 +166,21 @@ const styles = StyleSheet.create({
   heroBadgeText: { color: colors.onDeep, fontSize: 12.5, fontWeight: "700" },
   form: { padding: 24, paddingTop: 28 },
   label: { fontSize: 13, fontWeight: "800", color: colors.ink, marginBottom: 7 },
+  langRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  langChip: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    paddingVertical: 12,
+  },
+  langChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  langFlag: { fontSize: 26 },
+  langLabel: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
+  langLabelActive: { color: colors.accent },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

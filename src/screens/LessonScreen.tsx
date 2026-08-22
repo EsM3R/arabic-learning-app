@@ -4,6 +4,7 @@ import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
 import Header from "../components/Header";
 import { agenticChat } from "../claude";
+import { getActivePack } from "../languages";
 import {
   freeChatSystem,
   idleNudgeEvent,
@@ -190,16 +191,18 @@ export default function LessonScreen({
     ]);
   };
 
+  const pack = getActivePack();
+
   return (
     <View style={styles.container}>
       <Header
-        title={quiz ? "Üstaz'la Tekrar" : module ? module.title : "Serbest Sohbet"}
+        title={quiz ? `${pack.teacherName} ile Tekrar` : module ? module.title : "Serbest Sohbet"}
         subtitle={
           quiz
-            ? "Sözlü kelime sınavı — takvimi Üstaz kurar"
+            ? "Sözlü kelime sınavı — takvimi hocan kurar"
             : module
-              ? `${module.track === "konusma" ? "Ammice" : "Fusha"} · ${module.level}`
-              : "Şami ammicesiyle pratik"
+              ? `${pack.tracks[module.track].short} · ${module.level}`
+              : `${pack.teacherName} ile ${pack.tracks.konusma.short.toLowerCase()} pratiği`
         }
         onBack={onBack}
         right={
@@ -218,7 +221,7 @@ export default function LessonScreen({
         messages={messages}
         sending={sending}
         onSend={onSend}
-        placeholder={module ? "Cevabını yaz…" : "اكتب هون… (buraya yaz)"}
+        placeholder={module || quiz ? "Cevabını yaz…" : pack.chatPlaceholderFree}
         suggestion={suggestion}
         onSuggestionPress={() => {
           if (suggestion) onNavigate(suggestion);

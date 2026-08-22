@@ -8,7 +8,8 @@ import MistakesScreen from "./src/screens/MistakesScreen";
 import PronunciationScreen from "./src/screens/PronunciationScreen";
 import ReviewScreen from "./src/screens/ReviewScreen";
 import SetupScreen from "./src/screens/SetupScreen";
-import { loadProfile, resetAll, saveProfile } from "./src/storage";
+import { getActiveLanguageId, LanguageId, setActiveLanguage } from "./src/languages";
+import { loadProfile, resetAll, saveProfile, switchLanguageProgress } from "./src/storage";
 import { colors } from "./src/theme";
 import {
   Assessment,
@@ -45,6 +46,8 @@ function mergeProfile(prev: Profile, next: Profile): Profile {
 export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
+  /** Aktif dil — ekran anahtarı olarak da kullanılır ki dil değişince ekranlar tazelensin. */
+  const [lang, setLang] = useState<LanguageId>("ar");
   /** En güncel profil — asenkron turların eski anlık görüntüyle yazmasını engeller. */
   const profileRef = useRef<Profile | null>(null);
 
@@ -54,6 +57,8 @@ export default function App() {
       if (!saved) {
         setScreen({ name: "setup" });
       } else {
+        setActiveLanguage(saved.activeLanguage);
+        setLang(getActiveLanguageId());
         profileRef.current = saved;
         setProfile(saved);
         setScreen(saved.curriculum ? { name: "dashboard" } : { name: "assessment" });
@@ -68,12 +73,31 @@ export default function App() {
     await saveProfile(merged);
   };
 
-  const onSetupDone = async (name: string, apiKey: string) => {
-    const fresh: Profile = { name, apiKey, completedModuleIds: [] };
+  const onSetupDone = async (name: string, apiKey: string, languageId: LanguageId) => {
+    setActiveLanguage(languageId);
+    setLang(getActiveLanguageId());
+    const fresh: Profile = {
+      name,
+      apiKey,
+      activeLanguage: languageId,
+      completedModuleIds: [],
+    };
     profileRef.current = fresh;
     setProfile(fresh);
     await saveProfile(fresh);
     setScreen({ name: "assessment" });
+  };
+
+  /** Panelden dil değiştirme: mevcut ilerleme saklanır, hedef dilinki yüklenir. */
+  const onSwitchLanguage = async (targetId: LanguageId) => {
+    const current = profileRef.current;
+    if (!current || targetId === getActiveLanguageId()) return;
+    const next = await switchLanguageProgress(current, targetId);
+    profileRef.current = next;
+    setProfile(next);
+    setLang(getActiveLanguageId());
+    // Hedef dilde henüz müfredat yoksa o dilin seviye tespitiyle başlanır.
+    setScreen(next.curriculum ? { name: "dashboard" } : { name: "assessment" });
   };
 
   const onAssessmentComplete = async (assessment: Assessment, curriculum: Curriculum) => {
@@ -121,6 +145,8 @@ export default function App() {
 
   const onReset = async () => {
     await resetAll();
+    setActiveLanguage("ar");
+    setLang("ar");
     profileRef.current = null;
     setProfile(null);
     setScreen({ name: "setup" });
@@ -136,10 +162,11 @@ export default function App() {
       )}
       {screen.name === "setup" && <SetupScreen onDone={onSetupDone} />}
       {screen.name === "assessment" && profile && (
-        <AssessmentScreen profile={profile} onComplete={onAssessmentComplete} />
+        <AssessmentScreen key={lang} profile={profile} onComplete={onAssessmentComplete} />
       )}
       {screen.name === "dashboard" && profile && (
         <DashboardScreen
+          key={lang}
           profile={profile}
           onOpenModule={(module) => setScreen({ name: "lesson", module })}
           onFreeChat={() => setScreen({ name: "lesson", module: null })}
@@ -147,12 +174,13 @@ export default function App() {
           onOpenReview={() => setScreen({ name: "review" })}
           onOpenMistakes={() => setScreen({ name: "mistakes" })}
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
+          onSwitchLanguage={(id) => void onSwitchLanguage(id)}
           onReset={onReset}
         />
       )}
       {screen.name === "lesson" && profile && (
         <LessonScreen
-          key={screen.quiz ? "quiz" : screen.module?.id ?? "freechat"}
+          key={`${lang}.${screen.quiz ? "quiz" : screen.module?.id ?? "freechat"}`}
           profile={profile}
           module={screen.module}
           quiz={screen.quiz}

@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
-import { ASSESSMENT_ANALYSIS_SYSTEM, curriculumSystem, pronunciationSystem } from "./prompts";
+import { assessmentAnalysisSystem, curriculumSystem, pronunciationSystem } from "./prompts";
 import {
   Assessment,
   ChatMessage,
@@ -195,7 +195,7 @@ export async function analyzeAssessment(
     model: MODEL,
     max_tokens: 16000,
     thinking: { type: "adaptive" },
-    system: ASSESSMENT_ANALYSIS_SYSTEM,
+    system: assessmentAnalysisSystem(),
     output_config: { format: { type: "json_schema", schema: ASSESSMENT_SCHEMA } },
     messages: [{ role: "user", content: `Sohbet dökümü:\n\n${transcriptText}` }],
   });

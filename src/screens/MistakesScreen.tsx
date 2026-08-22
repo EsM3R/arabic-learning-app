@@ -30,7 +30,7 @@ export default function MistakesScreen({ onBack }: Props) {
           <Text style={styles.emptyEmoji}>📒</Text>
           <Text style={styles.emptyTitle}>Defter tertemiz</Text>
           <Text style={styles.emptyText}>
-            Derslerde anlamlı bir hata yaptığında Üstaz buraya kendisi kaydedecek ve sonraki
+            Derslerde anlamlı bir hata yaptığında hocan buraya kendisi kaydedecek ve sonraki
             derslerde üzerinden geçecek.
           </Text>
         </View>

@@ -1,20 +1,31 @@
-# Arapça Hoca — أستاذ العربية
+# Lisan Hocası — أستاذ اللسان
 
-Kişisel yapay zekâ destekli Arapça öğrenme uygulaması (Expo / React Native).
+Kişisel yapay zekâ destekli dil öğrenme uygulaması (Expo / React Native).
+Aynı motor üç dili destekler — her dilin kendi hocası, müfredatı, kelime defteri ve hafızası ayrıdır:
 
-- 🗣️ **Konuşma parkuru:** Şami (Suriye) ammicesi — Suriyeli arkadaşlarınla akıcı sohbet
-- 📖 **Okuma parkuru:** Fusha (Modern Standart Arapça) — profesyonel okuma
-- 🧑‍🏫 **Üstaz:** Claude destekli, Türkçe açıklama yapan kişisel öğretmen
+| Dil | Hoca | Konuşma parkuru | Okuma parkuru |
+|---|---|---|---|
+| 🇸🇾 Arapça | Üstaz | Şami (Suriye) ammicesi | Fusha (Modern Standart Arapça) |
+| 🇬🇧 İngilizce | Mr. Oliver | Doğal günlük/iş İngilizcesi | Haber, makale, iş metinleri |
+| 🇪🇸 İspanyolca | Profesora Lucía | Doğal günlük İspanyolca | Haber ve günlük metinler |
+
+Dili ilk kurulumda seçersin; sonra panelin sağ üstündeki bayrak düğmesinden istediğin an
+değiştirirsin. Yeni bir dile geçtiğinde o dilin seviye tespiti yapılır ve ayrı müfredat kurulur;
+geri döndüğünde eski ilerlemen aynen yerindedir.
+
+- 🧑‍🏫 **Hoca:** Claude destekli, Türkçe açıklama yapan kişisel öğretmen
 - 📊 Sohbet tabanlı seviye tespiti (CEFR: A0–C2, konuşma ve okuma ayrı)
 - 🗺️ Seviyene ve zayıf yönlerine göre üretilen kişisel müfredat
-- 💬 Serbest sohbet modu (ammice pratik, anında hata düzeltme)
-- 🤖 **Agentic öğretmen:** Üstaz'ın 17 aracı var ve hepsini kendi kararıyla, izin sormadan kullanır.
+- 💬 Serbest sohbet modu (hedef dilde pratik, anında hata düzeltme)
+- 🤖 **Agentic öğretmen:** hocanın 17 aracı var ve hepsini kendi kararıyla, izin sormadan kullanır.
 
   **Önce bakar (okuma araçları):**
   - 📊 `tekrar_durumu` — hangi kelimeleri unuttuğunu, kaç tekrarın biriktiğini görür
   - 🔍 `kelime_ara` — bir kelimeyi daha önce öğretip öğretmediğini kontrol eder
   - 📚 `hafiza_oku` — hata defterini ve geçmiş notlarını konuya göre arar
   - 🗺️ `mufredat_oku` — modülleri ve tamamlanma durumunu okur
+
+  Aşağıda "Üstaz" diye anılan her şey seçili dilin hocası için geçerlidir.
 
   **Sonra yazar / düzeltir:**
   - 📇 `kelime_kaydet` (zorluk derecesiyle), `kelime_duzelt`, `kelime_sil`
@@ -71,11 +82,12 @@ Anahtar yalnızca kendi cihazında saklanır; istekler doğrudan cihazından Ant
 
 ## Nasıl çalışır?
 
-1. **Kurulum ekranı:** Adını ve API anahtarını girersin.
-2. **Seviye tespiti:** Üstaz seninle kısa bir tanışma sohbeti yapar; konuşma (ammice) ve okuma (fusha) seviyeni ayrı ayrı ölçer.
+1. **Kurulum ekranı:** Dilini, adını ve API anahtarını girersin.
+2. **Seviye tespiti:** Hocan seninle kısa bir tanışma sohbeti yapar; konuşma ve okuma seviyeni ayrı ayrı ölçer.
 3. **Müfredat:** Seviyene ve zayıf yönlerine göre iki parkurlu kişisel ders planı üretilir.
 4. **Dersler:** Her modül sohbet biçiminde, etkileşimli işlenir — anlatım, örnek, alıştırma, düzeltme.
-5. **Serbest sohbet:** İstediğin zaman Üstaz ile ammice pratik yaparsın.
+5. **Serbest sohbet:** İstediğin zaman hocanla hedef dilde pratik yaparsın.
+6. **Dil değiştirme:** Panelden bayrak düğmesiyle dili değiştirirsin; her dilin ilerlemesi ayrı saklanır.
 
 ## Yol haritası (sonraki sürümler)
 
@@ -85,5 +97,6 @@ Anahtar yalnızca kendi cihazında saklanır; istekler doğrudan cihazından Ant
 - [x] Dinleme/telaffuz pratiği — 🎙️ Telaffuz Stüdyosu: dinle, kaydet, karşılaştır; sohbette ve kelime kartlarında sesli okuma
 - [x] Okuma araçları + SRS görünürlüğü — Üstaz artık yazdığı veriyi görebiliyor
 - [x] Agentic seviye tespiti, düzeltme fiilleri, hatırlatıcılar ve yönlendirme önerileri
+- [x] Çoklu dil desteği — dil paketi mimarisi; İngilizce (Mr. Oliver) ve İspanyolca (Profesora Lucía)
 - [ ] Günlük hedefler ve seri (streak) takibi
 - [ ] Öğrencinin ses kaydını Üstaz'ın dinleyip telaffuz puanlaması

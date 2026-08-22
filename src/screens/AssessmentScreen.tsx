@@ -17,6 +17,7 @@ import {
   KICKOFF_ASSESSMENT,
   KICKOFF_CURRICULUM,
 } from "../prompts";
+import { getActivePack } from "../languages";
 import { colors } from "../theme";
 import { Assessment, ChatMessage, Curriculum, Profile } from "../types";
 
@@ -114,7 +115,7 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
     if (messages.filter((m) => m.role === "user").length < 3) {
       Alert.alert(
         "Biraz erken",
-        "Sağlıklı bir değerlendirme için Üstaz ile birkaç mesaj daha yazışmalısın."
+        `Sağlıklı bir değerlendirme için ${getActivePack().teacherName} ile birkaç mesaj daha yazışmalısın.`
       );
       return;
     }
@@ -145,7 +146,7 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
     <View style={styles.container}>
       <Header
         title="Seviye Tespiti"
-        subtitle="Üstaz ile tanışma sohbeti"
+        subtitle={`${getActivePack().teacherName} ile tanışma sohbeti`}
         right={
           <TouchableOpacity
             style={styles.finishButton}

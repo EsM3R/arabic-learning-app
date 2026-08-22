@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Header from "../components/Header";
-import { speakArabic } from "../speech";
+import { getActivePack } from "../languages";
+import { speakTarget } from "../speech";
 import { dueCards, gradeCard } from "../srs";
 import { loadVocab, saveVocab, touchLastActivity } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
@@ -28,6 +29,7 @@ export default function ReviewScreen({ onBack }: Props) {
   }, []);
 
   const current = queue[0];
+  const pack = getActivePack();
 
   const grade = async (g: ReviewGrade) => {
     if (!current) return;
@@ -60,7 +62,7 @@ export default function ReviewScreen({ onBack }: Props) {
           </Text>
           <Text style={styles.emptyText}>
             {allCards.length === 0
-              ? "Üstaz ile ders yaptıkça bilmediğin kelimeleri buraya kendisi ekleyecek."
+              ? `${pack.teacherName} ile ders yaptıkça bilmediğin kelimeleri buraya kendisi ekleyecek.`
               : doneCount > 0
                 ? `${doneCount} kelime tekrar ettin. Yarın yenileri seni bekliyor.`
                 : "Şu an tekrarı gelen kelime yok. Yarın tekrar bak."}
@@ -73,13 +75,13 @@ export default function ReviewScreen({ onBack }: Props) {
             <View style={styles.listenRow}>
               <TouchableOpacity
                 style={styles.listenChip}
-                onPress={() => speakArabic(current.arabic)}
+                onPress={() => speakTarget(current.arabic)}
               >
                 <Text style={styles.listenChipText}>🔊 Dinle</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.listenChip}
-                onPress={() => speakArabic(current.arabic, true)}
+                onPress={() => speakTarget(current.arabic, true)}
               >
                 <Text style={styles.listenChipText}>🐢 Yavaş</Text>
               </TouchableOpacity>
@@ -90,7 +92,7 @@ export default function ReviewScreen({ onBack }: Props) {
                 <Text style={styles.turkish}>{current.turkish}</Text>
                 {current.note ? <Text style={styles.note}>{current.note}</Text> : null}
                 <Text style={styles.trackTag}>
-                  {current.track === "konusma" ? "🗣️ Ammice" : "📖 Fusha"}
+                  {pack.tracks[current.track].icon} {pack.tracks[current.track].short}
                 </Text>
               </>
             ) : (

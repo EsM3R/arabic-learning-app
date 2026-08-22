@@ -17,8 +17,9 @@ import {
 } from "react-native";
 import { generatePronunciationSet } from "../claude";
 import Header from "../components/Header";
+import { getActivePack } from "../languages";
 import { strugglingCards } from "../srs";
-import { speakArabic, stopSpeaking } from "../speech";
+import { speakTarget, stopSpeaking } from "../speech";
 import { loadPronunciationSet, loadVocab, savePronunciationSet } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Profile, PronunciationSet } from "../types";
@@ -111,7 +112,7 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
   };
 
   const newSet = () => {
-    Alert.alert("Yeni set", "Üstaz sana yeni bir telaffuz seti hazırlasın mı?", [
+    Alert.alert("Yeni set", `${getActivePack().teacherName} sana yeni bir telaffuz seti hazırlasın mı?`, [
       { text: "Vazgeç", style: "cancel" },
       { text: "Evet, hazırlasın", onPress: () => void generate() },
     ]);
@@ -133,7 +134,9 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
       {loading || !item ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>Üstaz telaffuz setini hazırlıyor…</Text>
+          <Text style={styles.loadingText}>
+            {getActivePack().teacherName} telaffuz setini hazırlıyor…
+          </Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
@@ -151,13 +154,13 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
           <View style={styles.listenRow}>
             <TouchableOpacity
               style={styles.listenButton}
-              onPress={() => speakArabic(item.arabic)}
+              onPress={() => speakTarget(item.arabic)}
             >
               <Text style={styles.listenText}>🔊 Dinle</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.listenButton}
-              onPress={() => speakArabic(item.arabic, true)}
+              onPress={() => speakTarget(item.arabic, true)}
             >
               <Text style={styles.listenText}>🐢 Yavaş</Text>
             </TouchableOpacity>

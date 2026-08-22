@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getActivePack } from "./languages";
 import { scheduleReminder } from "./notifications";
 import { deckStats, Difficulty, dueCards, gradeCard, newCard, strugglingCards } from "./srs";
 import {
@@ -56,7 +57,7 @@ const READ_TOOLS: Anthropic.Tool[] = [
         arama: {
           type: "string",
           description:
-            "Arapça, transkripsiyon veya Türkçe anlamda geçen metin. Belirli bir kelimeyi kontrol ederken kullan.",
+            "Hedef dilde, okunuşta veya Türkçe anlamda geçen metin. Belirli bir kelimeyi kontrol ederken kullan.",
         },
         track: {
           type: "string",
@@ -123,13 +124,16 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        arabic: { type: "string", description: "Kelime/kalıp, Arap harfleriyle" },
-        transliteration: { type: "string", description: "Latin transkripsiyon" },
+        arabic: { type: "string", description: "Kelime/kalıp, hedef dilin kendi yazımıyla" },
+        transliteration: {
+          type: "string",
+          description: "Okunuş (ayrı alfabeli dillerde Latin transkripsiyon; gerekmiyorsa kelimenin kendisi)",
+        },
         turkish: { type: "string", description: "Türkçe anlamı" },
         track: {
           type: "string",
           enum: ["konusma", "okuma"],
-          description: "konusma = ammice, okuma = fusha",
+          description: "konusma = konuşma parkuru, okuma = okuma parkuru",
         },
         note: { type: "string", description: "İsteğe bağlı kısa kullanım notu veya örnek cümle" },
         zorluk: {
@@ -197,7 +201,7 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: {
         mistake: { type: "string", description: "Öğrencinin yanlış söylediği/yazdığı hâli" },
-        correction: { type: "string", description: "Doğru hâli (Arap harfleri + transkripsiyon)" },
+        correction: { type: "string", description: "Doğru hâli (hedef dilin yazımı + gerekiyorsa okunuş)" },
         explanation: { type: "string", description: "Kısa Türkçe açıklama: neden yanlış" },
         topic: { type: "string", description: "İlgili gramer/kelime konusu, örn. 'geçmiş zaman'" },
         track: { type: "string", enum: ["konusma", "okuma"], description: "Hangi parkurda yapıldı" },
@@ -243,8 +247,8 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        speakingLevel: { type: "string", enum: LEVELS, description: "Yeni konuşma (ammice) seviyesi" },
-        readingLevel: { type: "string", enum: LEVELS, description: "Yeni okuma (fusha) seviyesi" },
+        speakingLevel: { type: "string", enum: LEVELS, description: "Yeni konuşma seviyesi" },
+        readingLevel: { type: "string", enum: LEVELS, description: "Yeni okuma seviyesi" },
         strengths: {
           type: "array",
           items: { type: "string" },
@@ -329,7 +333,8 @@ const INITIATIVE_TOOLS: Anthropic.Tool[] = [
         },
         mesaj: {
           type: "string",
-          description: "Bildirimde görünecek kısa, sıcak Türkçe mesaj (Arapça bir kelime serpiştirebilirsin)",
+          description:
+            "Bildirimde görünecek kısa, sıcak Türkçe mesaj (hedef dilden bir kelime serpiştirebilirsin)",
         },
       },
       required: ["saat_sonra", "mesaj"],
@@ -344,8 +349,8 @@ const ASSESSMENT_FINISH_TOOL: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
-      speakingLevel: { type: "string", enum: LEVELS, description: "Şami ammicesi konuşma seviyesi" },
-      readingLevel: { type: "string", enum: LEVELS, description: "Fusha okuma seviyesi" },
+      speakingLevel: { type: "string", enum: LEVELS, description: "Konuşma parkuru seviyesi" },
+      readingLevel: { type: "string", enum: LEVELS, description: "Okuma parkuru seviyesi" },
       strengths: { type: "array", items: { type: "string" }, description: "Somut güçlü yönler (Türkçe)" },
       weaknesses: { type: "array", items: { type: "string" }, description: "Somut zayıf yönler (Türkçe)" },
       summary: {
@@ -376,12 +381,13 @@ export const ASSESSMENT_TOOLS: Anthropic.Tool[] = [
 // ---------------------------------------------------------------------------
 
 function fmtCard(c: VocabCard): string {
+  const tracks = getActivePack().tracks;
   const bits = [
     `id=${c.id}`,
     c.arabic,
     `(${c.transliteration})`,
     `= ${c.turkish}`,
-    c.track === "konusma" ? "[ammice]" : "[fusha]",
+    `[${tracks[c.track].short.toLowerCase()}]`,
   ];
   const perf =
     c.reps === 0
@@ -520,10 +526,11 @@ export async function executeTool(
       if (track) modules = modules.filter((m) => m.track === track);
       if (onlyOpen) modules = modules.filter((m) => !ctx.profile.completedModuleIds.includes(m.id));
       if (modules.length === 0) return { result: "Bu filtreyle modül yok." };
+      const trackShorts = getActivePack().tracks;
       const lines = modules.map((m) => {
         const done = ctx.profile.completedModuleIds.includes(m.id);
         const active = m.id === ctx.currentModuleId ? " ← ŞU AN İŞLENEN" : "";
-        return `- id=${m.id} [${m.track === "konusma" ? "ammice" : "fusha"} ${m.level}] ${done ? "✓" : "○"} ${m.title}${active}`;
+        return `- id=${m.id} [${trackShorts[m.track].short.toLowerCase()} ${m.level}] ${done ? "✓" : "○"} ${m.title}${active}`;
       });
       const doneCount = curriculum.modules.filter((m) =>
         ctx.profile.completedModuleIds.includes(m.id)
@@ -673,7 +680,10 @@ export async function executeTool(
         createdAt: new Date().toISOString(),
       };
       await saveNotes([...notes, note]);
-      return { result: `Not kaydedildi (id=${note.id}).`, summary: "🗒️ Üstaz kendine not aldı" };
+      return {
+        result: `Not kaydedildi (id=${note.id}).`,
+        summary: `🗒️ ${getActivePack().teacherName} kendine not aldı`,
+      };
     }
 
     case "not_sil": {

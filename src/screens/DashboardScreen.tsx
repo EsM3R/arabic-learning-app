@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { AgentContext, TEACHER_TOOLS } from "../agent";
 import { agenticChat } from "../claude";
+import { getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { pendingReminders } from "../notifications";
 import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
 import { dueCards } from "../srs";
@@ -32,21 +33,9 @@ interface Props {
   onOpenReview: () => void;
   onOpenMistakes: () => void;
   onOpenPronunciation: () => void;
+  onSwitchLanguage: (id: LanguageId) => void;
   onReset: () => void;
 }
-
-const TRACK_META: Record<Track, { title: string; subtitle: string; icon: string }> = {
-  konusma: {
-    title: "Konuşma — Şami Ammicesi",
-    subtitle: "Suriyeli arkadaşlarınla akıcı sohbet",
-    icon: "🗣️",
-  },
-  okuma: {
-    title: "Okuma — Fusha",
-    subtitle: "Profesyonel okuma ve anlama",
-    icon: "📖",
-  },
-};
 
 export default function DashboardScreen({
   profile,
@@ -56,8 +45,10 @@ export default function DashboardScreen({
   onOpenReview,
   onOpenMistakes,
   onOpenPronunciation,
+  onSwitchLanguage,
   onReset,
 }: Props) {
+  const pack = getActivePack();
   const { assessment, curriculum, completedModuleIds } = profile;
   const tracks: Track[] = ["konusma", "okuma"];
   const [vocabTotal, setVocabTotal] = useState(0);
@@ -155,6 +146,20 @@ export default function DashboardScreen({
     ]);
   };
 
+  const pickLanguage = () => {
+    Alert.alert(
+      "Dil değiştir",
+      "Her dilin müfredatı, kelime defteri ve hafızası ayrı tutulur.",
+      [
+        ...LANGUAGE_LIST.filter((l) => l.id !== pack.id).map((l) => ({
+          text: `${l.flag} ${l.label} (${l.teacherName})`,
+          onPress: () => onSwitchLanguage(l.id),
+        })),
+        { text: "Vazgeç", style: "cancel" as const },
+      ]
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} bounces={false}>
       <LinearGradient
@@ -165,9 +170,14 @@ export default function DashboardScreen({
       >
         <View style={styles.heroTopRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.heroSalam}>مرحبا</Text>
+            <Text style={styles.heroSalam}>{pack.greeting}</Text>
             <Text style={styles.heroName}>{profile.name}</Text>
           </View>
+          <TouchableOpacity onPress={pickLanguage} style={styles.langButton} hitSlop={8}>
+            <Text style={styles.langButtonText}>
+              {pack.flag} {pack.label}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={confirmReset} style={styles.resetButton} hitSlop={8}>
             <Text style={styles.resetText}>⋯</Text>
           </TouchableOpacity>
@@ -202,9 +212,9 @@ export default function DashboardScreen({
           <View style={styles.teacherNoteCard}>
             <View style={styles.teacherNoteHeader}>
               <View style={styles.teacherAvatar}>
-                <Text style={styles.teacherAvatarText}>أ</Text>
+                <Text style={styles.teacherAvatarText}>{pack.avatarLetter}</Text>
               </View>
-              <Text style={styles.teacherNoteTitle}>Üstaz'dan not</Text>
+              <Text style={styles.teacherNoteTitle}>Hocandan not</Text>
             </View>
             <Text style={styles.teacherNoteText}>{teacherNote}</Text>
             {teacherSuggestion && (
@@ -241,8 +251,8 @@ export default function DashboardScreen({
           >
             <Text style={styles.chatButtonEmoji}>💬</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.chatButtonTitle}>Üstaz ile Serbest Sohbet</Text>
-              <Text style={styles.chatButtonSub}>Şami ammicesiyle günlük pratik</Text>
+              <Text style={styles.chatButtonTitle}>{pack.teacherName} ile Serbest Sohbet</Text>
+              <Text style={styles.chatButtonSub}>{pack.tracks.konusma.subtitle}</Text>
             </View>
             <Text style={styles.chatButtonArrow}>›</Text>
           </LinearGradient>
@@ -253,8 +263,8 @@ export default function DashboardScreen({
             <Text style={styles.iconSquareText}>🧠</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Üstaz'la Tekrar</Text>
-            <Text style={styles.cardMeta}>Sözlü sınav — Üstaz sorar, puanlar, takvimini kurar</Text>
+            <Text style={styles.cardTitle}>{pack.teacherName} ile Tekrar</Text>
+            <Text style={styles.cardMeta}>Sözlü sınav — hocan sorar, puanlar, takvimini kurar</Text>
           </View>
           {vocabDue > 0 ? (
             <View style={styles.readyPill}>
@@ -297,7 +307,7 @@ export default function DashboardScreen({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Telaffuz Stüdyosu</Text>
-            <Text style={styles.cardMeta}>Dinle, kaydet, karşılaştır — ع، ح، خ ipuçlarıyla</Text>
+            <Text style={styles.cardMeta}>Dinle, kaydet, karşılaştır — sana özel ipuçlarıyla</Text>
           </View>
           <Text style={styles.cardArrow}>›</Text>
         </TouchableOpacity>
@@ -308,10 +318,10 @@ export default function DashboardScreen({
           return (
             <View key={track} style={styles.trackSection}>
               <View style={styles.trackHeader}>
-                <Text style={styles.trackIcon}>{TRACK_META[track].icon}</Text>
+                <Text style={styles.trackIcon}>{pack.tracks[track].icon}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.trackTitle}>{TRACK_META[track].title}</Text>
-                  <Text style={styles.trackSubtitle}>{TRACK_META[track].subtitle}</Text>
+                  <Text style={styles.trackTitle}>{pack.tracks[track].title}</Text>
+                  <Text style={styles.trackSubtitle}>{pack.tracks[track].subtitle}</Text>
                 </View>
                 <View style={styles.trackCount}>
                   <Text style={styles.trackCountText}>
@@ -363,7 +373,17 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
   },
-  heroTopRow: { flexDirection: "row", alignItems: "flex-start" },
+  heroTopRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  langButton: {
+    backgroundColor: "rgba(243,239,228,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(243,239,228,0.22)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    height: 34,
+    justifyContent: "center",
+  },
+  langButtonText: { color: colors.onDeep, fontSize: 12.5, fontWeight: "800" },
   heroSalam: { fontSize: 15, color: colors.goldDeep, fontWeight: "700", marginBottom: 2 },
   heroName: { fontSize: 30, fontWeight: "800", color: colors.onDeep, letterSpacing: -0.5 },
   resetButton: {
