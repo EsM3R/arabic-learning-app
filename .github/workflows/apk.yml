@@ -38,6 +38,12 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci
 
+      # Yanlış SDK'nın native modülü ağaca sızarsa gradle derlemesi GEÇER ama
+      # uygulama açılışta çöker (NoClassDefFoundError). Burada yakalanmazsa
+      # ancak APK telefona kurulunca anlaşılır.
+      - name: Native modül sürümlerini doğrula
+        run: node scripts/check-native-versions.js
+
       # Hata ekranı hangi koddan derlendiğimizi gösterebilsin diye derleme
       # kimliği kaynağa gömülür.
       - name: Derleme kimliğini göm

@@ -16,6 +16,11 @@
     "react": "19.1.0",
     "react-native": "0.81.5"
   },
+  "//overrides": "expo-audio, expo-asset'i '*' olarak istiyor; npm bunu en yeni sürümle (SDK 57'lik) karşılayıp kökene çıkarıyor. Expo'nun autolinking'i kökene baktığı için bağımsız APK'da SDK 57 paketi SDK 54 çekirdeğiyle derleniyor ve uygulama açılışta çöküyor (AnyTypeCache bulunamıyor). Bu iki sürümü SDK 54'e sabitliyoruz.",
+  "overrides": {
+    "expo-asset": "~12.0.13",
+    "expo-constants": "~18.0.13"
+  },
   "devDependencies": {
     "@types/react": "~19.1.0",
     "typescript": "~6.0.3"
