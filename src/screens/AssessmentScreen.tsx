@@ -55,8 +55,7 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
         curriculumBuilderSystem(profile.name, assessment),
         [{ role: "user", content: KICKOFF_CURRICULUM }],
         ctx,
-        TEACHER_TOOLS,
-        16
+        { tools: TEACHER_TOOLS, maxRounds: 16, effort: "high" }
       );
     } catch {
       // agentic kurulum başarısız olursa aşağıdaki yedek yol devreye girer
@@ -74,7 +73,10 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
     setSending(true);
     const ctx: AgentContext = { profile: profileRef.current, profileChanged: false };
     try {
-      const reply = await agenticChat(system, history, ctx, ASSESSMENT_TOOLS);
+      const reply = await agenticChat(system, history, ctx, {
+        tools: ASSESSMENT_TOOLS,
+        effort: "high",
+      });
       const updated: ChatMessage[] = [
         ...history,
         { role: "assistant", content: reply.text, actions: reply.actions },

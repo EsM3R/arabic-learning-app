@@ -113,8 +113,7 @@ export default function DashboardScreen({
           },
           [{ role: "user", content: wakeCheckEvent(digest) }],
           ctx,
-          TEACHER_TOOLS,
-          6
+          { tools: TEACHER_TOOLS, maxRounds: 6, effort: "medium" }
         );
         await saveWakeCheck({ at: new Date().toISOString(), message: reply.text });
         setTeacherNote(reply.text);

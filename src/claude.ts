@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
+import { buildMessages, cachedTools, systemBlocks } from "./caching";
 import { assessmentAnalysisSystem, curriculumSystem, pronunciationSystem } from "./prompts";
 import {
   Assessment,
@@ -50,22 +51,16 @@ export interface SystemPrompt {
   dynamic?: string;
 }
 
-function systemBlocks(system: SystemPrompt): Anthropic.TextBlockParam[] {
-  const blocks: Anthropic.TextBlockParam[] = [
-    { type: "text", text: system.stable, cache_control: { type: "ephemeral" } },
-  ];
-  if (system.dynamic && system.dynamic.trim()) {
-    blocks.push({ type: "text", text: system.dynamic });
-  }
-  return blocks;
+/** Düşünme derinliği. Öğretimin belirlendiği yerlerde "high", mekanik işlerde "medium". */
+export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+
+export interface ChatOptions {
+  tools?: Anthropic.Tool[];
+  maxRounds?: number;
+  effort?: Effort;
 }
 
-/** Araç listesinin son elemanına önbellek işareti koyar (araçlar sabittir). */
-function cachedTools(tools: Anthropic.Tool[]): Anthropic.Tool[] {
-  return tools.map((t, i) =>
-    i === tools.length - 1 ? { ...t, cache_control: { type: "ephemeral" as const } } : t
-  );
-}
+// Önbellek düzeni saf modülde tutulur (bkz. src/caching.ts) — test edilebilsin diye.
 
 const MAX_TOOL_ROUNDS = 12;
 /** Bu kadar tur kalınca modele "toparla" uyarısı iletilir. */
@@ -83,16 +78,17 @@ export async function agenticChat(
   system: string | SystemPrompt,
   messages: ChatMessage[],
   ctx: AgentContext,
-  tools: Anthropic.Tool[] = TEACHER_TOOLS,
-  maxRounds: number = MAX_TOOL_ROUNDS
+  opts: ChatOptions = {}
 ): Promise<AgenticReply> {
+  const {
+    tools = TEACHER_TOOLS,
+    maxRounds = MAX_TOOL_ROUNDS,
+    effort = "high",
+  } = opts;
   const anthropic = client(ctx.profile.apiKey);
   const sys: SystemPrompt = typeof system === "string" ? { stable: system } : system;
   const toolsWithCache = cachedTools(tools);
-  const history: Anthropic.MessageParam[] = messages.map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
+  const history: Anthropic.MessageParam[] = buildMessages(messages, sys.dynamic);
   const actions: string[] = [];
   let lastText = "";
 
@@ -101,7 +97,8 @@ export async function agenticChat(
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: "adaptive" },
-      system: systemBlocks(sys),
+      output_config: { effort },
+      system: systemBlocks(sys.stable),
       tools: toolsWithCache,
       messages: history,
     });

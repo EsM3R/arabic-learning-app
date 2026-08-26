@@ -133,7 +133,10 @@ export default function LessonScreen({
     };
     try {
       const system = await buildSystem(ctx.profile);
-      const reply = await agenticChat(system, history, ctx);
+      // Ders anlatımı tam güçte düşünür; sınav ve serbest sohbet daha mekanik.
+      const reply = await agenticChat(system, history, ctx, {
+        effort: module ? "high" : "medium",
+      });
       const updated: ChatMessage[] = [
         ...history,
         { role: "assistant", content: reply.text, actions: reply.actions },
