@@ -14,7 +14,7 @@ on:
       - "apk-v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -59,6 +59,13 @@ jobs:
           echo "Anahtar SHA256:"
           sha256sum android/app/debug.keystore
 
+      # Her derleme bir öncekinin üstüne güncelleme olarak kurulabilsin diye
+      # versionCode'u derleme numarasıyla artır (app.json'daki değer taban).
+      - name: Sürüm numarasını artır
+        run: |
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          grep -n "versionCode" android/app/build.gradle
+
       - name: Gradle belleğini artır
         run: |
           {
@@ -79,7 +86,11 @@ jobs:
           NAME="lisan-hocasi-${VERSION}-${GITHUB_SHA::7}.apk"
           mkdir -p out
           cp "$SRC" "out/${NAME}"
+          # Kalıcı indirme linki hep aynı kalsın diye sabit adlı kopya
+          cp "$SRC" "out/lisan-hocasi.apk"
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -h "$SRC" | cut -f1)" >> "$GITHUB_OUTPUT"
           echo "### 📦 ${NAME}" >> "$GITHUB_STEP_SUMMARY"
           echo "Boyut: $(du -h "out/${NAME}" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
           APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
@@ -89,10 +100,36 @@ jobs:
               | grep -i "SHA-256 digest" >> "$GITHUB_STEP_SUMMARY" || true
           fi
 
-      - name: APK'yı yükle
+      - name: APK'yı yükle (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: lisan-hocasi-apk
           path: out/*.apk
           if-no-files-found: error
           retention-days: 90
+
+      # Kalıcı ve telefondan tek dokunuşla indirilebilir sürüm. Etiket hep aynı
+      # ("apk-latest") olduğu için indirme adresi de sabit kalır:
+      # .../releases/latest/download/lisan-hocasi.apk
+      - name: Sürümü yayınla (release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=apk-latest
+          {
+            echo "Android APK · ${{ steps.apk.outputs.size }} · commit \`${GITHUB_SHA::7}\`"
+            echo
+            echo "**Telefona kurmak için:** \`lisan-hocasi.apk\` dosyasını indir ve aç."
+            echo "Android \"bilinmeyen kaynak\" uyarısı verirse tarayıcına kurulum izni ver."
+            echo
+            echo "Bu dosya her derlemede aynı anahtarla imzalanır; yeni sürümü eskisinin"
+            echo "üstüne kurabilirsin, öğrenme verilerin korunur."
+          } > release-notes.md
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" \
+            "out/${{ steps.apk.outputs.name }}" \
+            "out/lisan-hocasi.apk" \
+            --title "Lisan Hocası ${{ steps.apk.outputs.version }} (derleme #${{ github.run_number }})" \
+            --notes-file release-notes.md
+          echo "İndirme: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/lisan-hocasi.apk" >> "$GITHUB_STEP_SUMMARY"
