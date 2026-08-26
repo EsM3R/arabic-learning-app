@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import {
   AgenticReply,
   AgenticRequest,
@@ -33,8 +33,11 @@ const meta: ProviderMeta = {
   experimental: true,
 };
 
+/** SDK yalnızca bu sağlayıcı gerçekten kullanıldığında yüklenir (bkz. src/global.d.ts). */
 function client(apiKey: string): OpenAI {
-  return new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+  const mod = require("openai");
+  const Ctor = mod.default ?? mod.OpenAI ?? mod;
+  return new Ctor({ apiKey, dangerouslyAllowBrowser: true }) as OpenAI;
 }
 
 function toTools(req: AgenticRequest): OpenAI.Responses.FunctionTool[] {

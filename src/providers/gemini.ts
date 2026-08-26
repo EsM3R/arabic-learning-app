@@ -1,4 +1,4 @@
-import { Content, FunctionCall, GoogleGenAI, Part } from "@google/genai";
+import type { Content, FunctionCall, GoogleGenAI, Part } from "@google/genai";
 import {
   AgenticReply,
   AgenticRequest,
@@ -30,8 +30,20 @@ const meta: ProviderMeta = {
   experimental: true,
 };
 
+/**
+ * SDK yalnızca bu sağlayıcı kullanıldığında yüklenir. Paketin "node" yapısı
+ * fs/path/ws istiyor ve React Native'de çalışmaz; bu yüzden önce tarayıcı
+ * yapısı denenir.
+ */
 function client(apiKey: string): GoogleGenAI {
-  return new GoogleGenAI({ apiKey });
+  let mod: any;
+  try {
+    mod = require("@google/genai/web");
+  } catch {
+    mod = require("@google/genai");
+  }
+  const Ctor = mod.GoogleGenAI ?? mod.default?.GoogleGenAI ?? mod.default;
+  return new Ctor({ apiKey }) as GoogleGenAI;
 }
 
 function toTools(req: AgenticRequest) {

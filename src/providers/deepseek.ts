@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import {
   AgenticReply,
   AgenticRequest,
@@ -31,12 +31,15 @@ const meta: ProviderMeta = {
   experimental: true,
 };
 
+/** SDK yalnızca bu sağlayıcı gerçekten kullanıldığında yüklenir. */
 function client(apiKey: string): OpenAI {
-  return new OpenAI({
+  const mod = require("openai");
+  const Ctor = mod.default ?? mod.OpenAI ?? mod;
+  return new Ctor({
     apiKey,
     baseURL: "https://api.deepseek.com",
     dangerouslyAllowBrowser: true,
-  });
+  }) as OpenAI;
 }
 
 function toTools(req: AgenticRequest): OpenAI.Chat.Completions.ChatCompletionTool[] {
