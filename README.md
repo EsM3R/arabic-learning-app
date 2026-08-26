@@ -61,12 +61,20 @@ Bu sürümde Expo Go'ya, bilgisayara veya QR koda gerek yok — uygulama telefon
 kendi başına çalışır, kendi ikonu ve bildirimleri olur.
 
 APK'yı [GitHub Actions](https://github.com/EsM3R/arabic-learning-app/actions/workflows/apk.yml)
-derler (`.github/workflows/apk.yml`). Dala her push'ta yeniden derlenir; Actions
-sekmesinden elle de tetikleyebilirsin. Her derleme aynı anahtarla imzalandığı için
-yeni APK'yı eskisinin üstüne kurabilirsin — öğrenme verilerin (kelime defteri,
-müfredat, hoca hafızası) korunur.
+derler (`.github/workflows/apk.yml`). Dala her push'ta yeniden derlenir ve
+yukarıdaki link **her zaman en son derlemeye** işaret eder; Actions sekmesinden
+**Run workflow** ile elle de tetikleyebilirsin. Derleme ~10 dakika sürüyor.
+
+Her derleme aynı anahtarla imzalanır ve `versionCode` derleme numarasından gelir;
+yani yeni APK'yı eskisinin üstüne kurabilirsin — öğrenme verilerin (kelime defteri,
+müfredat, hoca hafızası) korunur. Önce kaldırmana gerek yok.
 
 > Uygulamayı **silersen** tüm ilerleme gider; veriler yalnızca telefonda saklanır.
+
+**Bir hata olursa:** bağımsız APK'da Expo Go'daki kırmızı hata ekranı yoktur, o yüzden
+uygulama hataları kendi ekranında gösterir — mesaj, hata izi ve hangi derlemeden
+geldiği (`derleme #12 · a1b2c3d`) birlikte görünür. Metni uzun basıp kopyalayabilirsin;
+hatayı bildirirken bu metin yeterli.
 
 ### Seçenek B — Geliştirme (Expo Go ile)
 
