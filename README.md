@@ -47,6 +47,29 @@ geri döndüğünde eski ilerlemen aynen yerindedir.
 
 ## Kurulum
 
+### Seçenek A — Hazır APK (bilgisayar gerekmez)
+
+Telefonuna doğrudan kurulabilen bağımsız bir Android uygulaması:
+
+**[⬇️ lisan-hocasi.apk indir](https://github.com/EsM3R/arabic-learning-app/releases/latest/download/lisan-hocasi.apk)**
+
+1. Linki telefonunun tarayıcısında aç, dosyayı indir ve dokun.
+2. Android "bilinmeyen kaynaktan kurulum" uyarısı verirse tarayıcına izin ver.
+3. Uygulama açılınca adını, dilini ve API anahtarını gir.
+
+Bu sürümde Expo Go'ya, bilgisayara veya QR koda gerek yok — uygulama telefonda
+kendi başına çalışır, kendi ikonu ve bildirimleri olur.
+
+APK'yı [GitHub Actions](https://github.com/EsM3R/arabic-learning-app/actions/workflows/apk.yml)
+derler (`.github/workflows/apk.yml`). Dala her push'ta yeniden derlenir; Actions
+sekmesinden elle de tetikleyebilirsin. Her derleme aynı anahtarla imzalandığı için
+yeni APK'yı eskisinin üstüne kurabilirsin — öğrenme verilerin (kelime defteri,
+müfredat, hoca hafızası) korunur.
+
+> Uygulamayı **silersen** tüm ilerleme gider; veriler yalnızca telefonda saklanır.
+
+### Seçenek B — Geliştirme (Expo Go ile)
+
 1. Bilgisayarına [Node.js](https://nodejs.org) kur.
 2. Telefonuna **Expo Go** uygulamasını indir (App Store / Google Play).
 3. Bu repoyu klonla ve bağımlılıkları kur:
