@@ -43,9 +43,7 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
     try {
       const vocab = await loadVocab();
       const newSet = await generatePronunciationSet(
-        profile.apiKey,
-        profile.name,
-        profile.assessment,
+        profile,
         vocab.map((c) => c.arabic),
         strugglingCards(vocab, 8).map((c) => c.arabic)
       );

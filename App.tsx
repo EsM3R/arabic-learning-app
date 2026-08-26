@@ -7,6 +7,7 @@ import LessonScreen from "./src/screens/LessonScreen";
 import MistakesScreen from "./src/screens/MistakesScreen";
 import PronunciationScreen from "./src/screens/PronunciationScreen";
 import ReviewScreen from "./src/screens/ReviewScreen";
+import SettingsScreen from "./src/screens/SettingsScreen";
 import SetupScreen from "./src/screens/SetupScreen";
 import { getActiveLanguageId, LanguageId, setActiveLanguage } from "./src/languages";
 import { loadProfile, resetAll, saveProfile, switchLanguageProgress } from "./src/storage";
@@ -27,7 +28,8 @@ type Screen =
   | { name: "lesson"; module: CurriculumModule | null; quiz?: boolean }
   | { name: "review" }
   | { name: "mistakes" }
-  | { name: "pronunciation" };
+  | { name: "pronunciation" }
+  | { name: "settings" };
 
 /**
  * İki taraf da profili değiştirebilir: öğrenci (düğmeler) ve Üstaz (araçlar).
@@ -79,6 +81,8 @@ export default function App() {
     const fresh: Profile = {
       name,
       apiKey,
+      provider: "anthropic",
+      apiKeys: { anthropic: apiKey },
       activeLanguage: languageId,
       completedModuleIds: [],
     };
@@ -175,7 +179,15 @@ export default function App() {
           onOpenMistakes={() => setScreen({ name: "mistakes" })}
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
           onSwitchLanguage={(id) => void onSwitchLanguage(id)}
+          onOpenSettings={() => setScreen({ name: "settings" })}
           onReset={onReset}
+        />
+      )}
+      {screen.name === "settings" && profile && (
+        <SettingsScreen
+          profile={profile}
+          onSave={(next) => void persist(next)}
+          onBack={() => setScreen({ name: "dashboard" })}
         />
       )}
       {screen.name === "lesson" && profile && (

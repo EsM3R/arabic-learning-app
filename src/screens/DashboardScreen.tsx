@@ -34,6 +34,7 @@ interface Props {
   onOpenMistakes: () => void;
   onOpenPronunciation: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
+  onOpenSettings: () => void;
   onReset: () => void;
 }
 
@@ -46,6 +47,7 @@ export default function DashboardScreen({
   onOpenMistakes,
   onOpenPronunciation,
   onSwitchLanguage,
+  onOpenSettings,
   onReset,
 }: Props) {
   const pack = getActivePack();
@@ -138,6 +140,14 @@ export default function DashboardScreen({
     }
   };
 
+  const openMenu = () => {
+    Alert.alert("Ayarlar", undefined, [
+      { text: "Model ve Anahtarlar", onPress: onOpenSettings },
+      { text: "Sıfırla", style: "destructive", onPress: confirmReset },
+      { text: "Vazgeç", style: "cancel" },
+    ]);
+  };
+
   const confirmReset = () => {
     Alert.alert("Sıfırla", "Tüm ilerleme ve ayarlar silinecek. Emin misin?", [
       { text: "Vazgeç", style: "cancel" },
@@ -177,7 +187,7 @@ export default function DashboardScreen({
               {pack.flag} {pack.label}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={confirmReset} style={styles.resetButton} hitSlop={8}>
+          <TouchableOpacity onPress={openMenu} style={styles.resetButton} hitSlop={8}>
             <Text style={styles.resetText}>⋯</Text>
           </TouchableOpacity>
         </View>

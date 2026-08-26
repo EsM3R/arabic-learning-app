@@ -65,7 +65,7 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
       onComplete(assessment, built);
       return;
     }
-    const curriculum = await generateCurriculum(profile.apiKey, profile.name, assessment);
+    const curriculum = await generateCurriculum(profile, assessment);
     onComplete(assessment, curriculum);
   };
 
@@ -123,7 +123,7 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
     }
     try {
       setFinishStage("analyzing");
-      const assessment = await analyzeAssessment(profile.apiKey, messages);
+      const assessment = await analyzeAssessment(profile, messages);
       await buildCurriculum(assessment);
     } catch (e) {
       setFinishStage("idle");

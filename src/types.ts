@@ -34,7 +34,14 @@ export interface Curriculum {
 
 export interface Profile {
   name: string;
+  /** Eski kayıtlardan gelen Anthropic anahtarı; artık apiKeys.anthropic kullanılır. */
   apiKey: string;
+  /** Aktif model sağlayıcısı ("anthropic" | "openai" | "gemini" | "deepseek"). */
+  provider?: string;
+  /** Sağlayıcı başına API anahtarı — hepsi yalnızca bu cihazda saklanır. */
+  apiKeys?: Record<string, string>;
+  /** Sağlayıcı başına seçilen model. */
+  models?: Record<string, string>;
   /** Aktif dil paketi ("ar" | "en" | "es"). Eski kayıtlarda yoktur → "ar". */
   activeLanguage?: string;
   /** Aktif dilin ilerlemesi — dil değişince langprog deposuna taşınır. */

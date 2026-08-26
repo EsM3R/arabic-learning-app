@@ -4,6 +4,7 @@
   "main": "index.ts",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
+    "@google/genai": "^2.19.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~54.0.36",
     "expo-audio": "~1.1.1",
@@ -11,6 +12,7 @@
     "expo-notifications": "~0.32.17",
     "expo-speech": "~14.0.8",
     "expo-status-bar": "~3.0.9",
+    "openai": "^7.5.0",
     "react": "19.1.0",
     "react-native": "0.81.5"
   },
