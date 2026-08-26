@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import Header from "../components/Header";
-import { keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
+import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Profile } from "../types";
 
@@ -22,7 +22,11 @@ interface Props {
 }
 
 export default function SettingsScreen({ profile, onSave, onBack }: Props) {
-  const initial = (profile.provider as ProviderId) ?? "anthropic";
+  // Depodan gelen değer bilinmeyen bir metin olabilir (eski/bozuk kayıt).
+  // Doğrulamadan kullanırsak aşağıdaki find() undefined döner ve ekran çöker.
+  const initial: ProviderId = isProviderId(profile.provider)
+    ? profile.provider
+    : "anthropic";
   const [selected, setSelected] = useState<ProviderId>(initial);
   // Tüm sağlayıcıların anahtar/model taslakları burada tutulur; kaydederken
   // hepsi birden yazılır, böylece bir sağlayıcıdan diğerine geçince
@@ -38,7 +42,8 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
     return out;
   });
 
-  const current = PROVIDER_LIST.find((p) => p.meta.id === selected)!;
+  const current =
+    PROVIDER_LIST.find((p) => p.meta.id === selected) ?? PROVIDER_LIST[0];
   const meta = current.meta;
 
   const save = () => {
@@ -81,7 +86,9 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
       <View style={styles.container}>
         <Header
           title="Model ve Anahtarlar"
-          subtitle={`Aktif: ${PROVIDER_LIST.find((p) => p.meta.id === initial)?.meta.label}`}
+          subtitle={`Aktif: ${
+            PROVIDER_LIST.find((p) => p.meta.id === initial)?.meta.label ?? "—"
+          }`}
           onBack={onBack}
         />
         <ScrollView contentContainerStyle={styles.body}>

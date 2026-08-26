@@ -38,6 +38,17 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci
 
+      # Hata ekranı hangi koddan derlendiğimizi gösterebilsin diye derleme
+      # kimliği kaynağa gömülür.
+      - name: Derleme kimliğini göm
+        run: |
+          sed -i \
+            -e "s/commit: \"gelistirme\"/commit: \"${GITHUB_SHA::7}\"/" \
+            -e "s/build: \"yerel\"/build: \"#${{ github.run_number }}\"/" \
+            -e "s/date: \"\"/date: \"$(date -u +%Y-%m-%d)\"/" \
+            src/buildInfo.ts
+          cat src/buildInfo.ts | head -12
+
       - name: TypeScript denetimi
         run: npx tsc --noEmit
 

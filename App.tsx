@@ -1,6 +1,8 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
+import ErrorBoundary from "./src/components/ErrorBoundary";
+import { installGlobalErrorHandler, reportError } from "./src/errorLog";
 import AssessmentScreen from "./src/screens/AssessmentScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import LessonScreen from "./src/screens/LessonScreen";
@@ -54,16 +56,24 @@ export default function App() {
   const profileRef = useRef<Profile | null>(null);
 
   useEffect(() => {
+    installGlobalErrorHandler();
     void (async () => {
-      const saved = await loadProfile();
-      if (!saved) {
-        setScreen({ name: "setup" });
-      } else {
+      try {
+        const saved = await loadProfile();
+        if (!saved) {
+          setScreen({ name: "setup" });
+          return;
+        }
         setActiveLanguage(saved.activeLanguage);
         setLang(getActiveLanguageId());
         profileRef.current = saved;
         setProfile(saved);
         setScreen(saved.curriculum ? { name: "dashboard" } : { name: "assessment" });
+      } catch (e) {
+        // Kayıtlı profil okunamazsa açılış ekranında sonsuza kadar beklemek
+        // yerine kurulum ekranına düş; hata da görünür olsun.
+        reportError(e, "profil yüklenirken", false);
+        setScreen({ name: "setup" });
       }
     })();
   }, []);

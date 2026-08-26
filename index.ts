@@ -1,8 +1,10 @@
 import { registerRootComponent } from 'expo';
 
-import App from './App';
+import Root from './Root';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+// Root, App'i hata yakalayıcıyla sarar (bkz. Root.tsx): release APK'da
+// kırmızı hata ekranı olmadığı için hatanın ekranda görünmesi gerekiyor.
+// registerRootComponent calls AppRegistry.registerComponent('main', () => Root);
 // It also ensures that whether you load the app in Expo Go or in a native build,
 // the environment is set up appropriately
-registerRootComponent(App);
+registerRootComponent(Root);
