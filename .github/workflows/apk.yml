@@ -1,0 +1,98 @@
+name: APK derle
+
+# Telefona kurulabilir bir Android APK üretir.
+# Tetikleme: bu geliştirme dalına push, apk-v* etiketi, veya Actions sekmesinden elle.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/arabic-learning-app-21ab83
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+    tags:
+      - "apk-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Android release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v4
+
+      - name: Node kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Java 17 kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: TypeScript denetimi
+        run: npx tsc --noEmit
+
+      # app.json tek doğruluk kaynağı; android/ klasörü repoda tutulmaz,
+      # her derlemede prebuild ile yeniden üretilir (Expo CNG).
+      - name: Android projesini üret (prebuild)
+        run: npx expo prebuild --platform android --no-install
+
+      # Şablonun ürettiği anahtarı değil, repoda sabitlenmiş olanı kullan:
+      # imza her derlemede aynı kalsın ki APK'lar birbirinin üstüne
+      # güncelleme olarak kurulabilsin (yoksa uygulamayı silip yeniden
+      # kurmak gerekir ve öğrenme verisi kaybolur).
+      - name: İmzalama anahtarını sabitle
+        run: |
+          cp .ci/debug.keystore android/app/debug.keystore
+          echo "Anahtar SHA256:"
+          sha256sum android/app/debug.keystore
+
+      - name: Gradle belleğini artır
+        run: |
+          {
+            echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+            echo "org.gradle.daemon=false"
+          } >> android/gradle.properties
+
+      - name: APK derle
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon --stacktrace
+
+      - name: APK'yı adlandır ve doğrula
+        id: apk
+        run: |
+          set -euo pipefail
+          SRC=android/app/build/outputs/apk/release/app-release.apk
+          VERSION=$(node -p "require('./app.json').expo.version")
+          NAME="lisan-hocasi-${VERSION}-${GITHUB_SHA::7}.apk"
+          mkdir -p out
+          cp "$SRC" "out/${NAME}"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "### 📦 ${NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Boyut: $(du -h "out/${NAME}" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+          APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$APKSIGNER" ]; then
+            echo "İmza:" >> "$GITHUB_STEP_SUMMARY"
+            "$APKSIGNER" verify --print-certs "out/${NAME}" \
+              | grep -i "SHA-256 digest" >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+
+      - name: APK'yı yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: lisan-hocasi-apk
+          path: out/*.apk
+          if-no-files-found: error
+          retention-days: 90
