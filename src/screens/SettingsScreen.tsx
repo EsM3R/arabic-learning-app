@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,6 +14,8 @@ import Header from "../components/Header";
 import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Profile } from "../types";
+import { formatTry, usageSummary, UsageSummary } from "../usage";
+import { buildLabel } from "../buildInfo";
 
 interface Props {
   profile: Profile;
@@ -45,6 +47,11 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
   const current =
     PROVIDER_LIST.find((p) => p.meta.id === selected) ?? PROVIDER_LIST[0];
   const meta = current.meta;
+
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  useEffect(() => {
+    void usageSummary().then(setUsage);
+  }, []);
 
   const save = () => {
     const key = (keys[selected] ?? "").trim();
@@ -91,6 +98,26 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
           onBack={onBack}
         />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          {usage && (
+            <View style={styles.usageCard}>
+              <Text style={styles.usageTitle}>TAHMİNİ HARCAMA</Text>
+              <View style={styles.usageRow}>
+                <View>
+                  <Text style={styles.usageBig}>{formatTry(usage.todayUsd)}</Text>
+                  <Text style={styles.usageSmall}>bugün · {usage.todayCalls} istek</Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.usageBig}>{formatTry(usage.monthUsd)}</Text>
+                  <Text style={styles.usageSmall}>bu ay · {usage.monthCalls} istek</Text>
+                </View>
+              </View>
+              <Text style={styles.usageNote}>
+                Token sayılarından hesaplanan tahmindir; kesin tutar sağlayıcının
+                faturasıdır. {buildLabel()}
+              </Text>
+            </View>
+          )}
+
           <Text style={styles.label}>Sağlayıcı</Text>
           {PROVIDER_LIST.map((p) => {
             const active = p.meta.id === selected;
@@ -185,6 +212,29 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 18, paddingBottom: 40 },
   label: { fontSize: 13, fontWeight: "800", color: colors.ink, marginBottom: 8 },
+  usageCard: {
+    backgroundColor: colors.deep,
+    borderRadius: radius.lg,
+    padding: 16,
+    marginBottom: 20,
+    ...shadow,
+  },
+  usageTitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.goldDeep,
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  usageRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
+  usageBig: { fontSize: 22, fontWeight: "800", color: colors.onDeep },
+  usageSmall: { fontSize: 11.5, color: colors.onDeepSoft, marginTop: 1 },
+  usageNote: {
+    fontSize: 10.5,
+    color: colors.onDeepSoft,
+    lineHeight: 15,
+    marginTop: 12,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",

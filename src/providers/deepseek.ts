@@ -1,4 +1,5 @@
 import type OpenAI from "openai";
+import { recordUsage } from "../usage";
 import {
   AgenticReply,
   AgenticRequest,
@@ -95,6 +96,13 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       max_tokens: 8000,
     });
 
+    const du = response.usage as (typeof response.usage & { prompt_cache_hit_tokens?: number }) | undefined;
+    void recordUsage({
+      model: req.model,
+      input: du?.prompt_tokens ?? 0,
+      output: du?.completion_tokens ?? 0,
+      cacheRead: du?.prompt_cache_hit_tokens ?? 0,
+    });
     const choice = response.choices[0];
     const text = (choice?.message?.content ?? "").trim();
     if (text) lastText = text;
@@ -155,6 +163,11 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     ],
     response_format: { type: "json_object" },
     max_tokens: 8000,
+  });
+  void recordUsage({
+    model: req.model,
+    input: response.usage?.prompt_tokens ?? 0,
+    output: response.usage?.completion_tokens ?? 0,
   });
   const text = (response.choices[0]?.message?.content ?? "").trim();
   if (!text) throw new Error(EMPTY_TEXT);

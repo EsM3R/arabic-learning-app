@@ -1,4 +1,5 @@
 import type { Content, FunctionCall, GoogleGenAI, Part } from "@google/genai";
+import { recordUsage } from "../usage";
 import {
   AgenticReply,
   AgenticRequest,
@@ -87,6 +88,13 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       },
     });
 
+    const gm = response.usageMetadata;
+    void recordUsage({
+      model: req.model,
+      input: gm?.promptTokenCount ?? 0,
+      output: gm?.candidatesTokenCount ?? 0,
+      cacheRead: gm?.cachedContentTokenCount ?? 0,
+    });
     const text = (response.text ?? "").trim();
     if (text) lastText = text;
 
@@ -140,6 +148,11 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
       responseJsonSchema: req.schema,
       maxOutputTokens: 16000,
     },
+  });
+  void recordUsage({
+    model: req.model,
+    input: response.usageMetadata?.promptTokenCount ?? 0,
+    output: response.usageMetadata?.candidatesTokenCount ?? 0,
   });
   const text = (response.text ?? "").trim();
   if (!text) throw new Error(EMPTY_TEXT);

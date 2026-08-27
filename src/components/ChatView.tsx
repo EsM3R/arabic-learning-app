@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { getActivePack } from "../languages";
 import { isEventMessage } from "../prompts";
+import RichText from "./RichText";
 import { extractArabic, speakTarget } from "../speech";
 import { colors, shadow } from "../theme";
 import { ChatMessage, NavigationSuggestion } from "../types";
@@ -74,9 +75,15 @@ export default function ChatView({
                   item.role === "user" ? styles.userBubble : styles.assistantBubble,
                 ]}
               >
-                <Text style={item.role === "user" ? styles.userText : styles.assistantText}>
-                  {item.content}
-                </Text>
+                {item.role === "user" ? (
+                  <Text style={styles.userText}>{item.content}</Text>
+                ) : (
+                  <RichText
+                    content={item.content}
+                    style={styles.assistantText}
+                    scaleScript={pack.scriptExtract}
+                  />
+                )}
                 {item.role === "assistant" &&
                   pack.scriptExtract &&
                   extractArabic(item.content).length > 0 && (

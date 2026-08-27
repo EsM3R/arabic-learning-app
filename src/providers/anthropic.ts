@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { buildMessages, cachedTools, systemBlocks } from "../caching";
+import { recordUsage } from "../usage";
 import {
   AgenticReply,
   AgenticRequest,
@@ -60,6 +61,14 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       messages: history,
     });
 
+    void recordUsage({
+      model: req.model,
+      input: response.usage.input_tokens,
+      output: response.usage.output_tokens,
+      cacheRead: response.usage.cache_read_input_tokens ?? 0,
+      cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
+    });
+
     if (response.stop_reason === "refusal") throw new Error(REFUSAL_TEXT);
 
     const text = response.content
@@ -115,6 +124,13 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     system: req.system,
     output_config: { format: { type: "json_schema", schema: req.schema } },
     messages: [{ role: "user", content: req.userMessage }],
+  });
+  void recordUsage({
+    model: req.model,
+    input: response.usage.input_tokens,
+    output: response.usage.output_tokens,
+    cacheRead: response.usage.cache_read_input_tokens ?? 0,
+    cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
   });
   if (response.stop_reason === "refusal") throw new Error(REFUSAL_TEXT);
   const text = response.content

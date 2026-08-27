@@ -1,4 +1,5 @@
 import type OpenAI from "openai";
+import { recordUsage } from "../usage";
 import {
   AgenticReply,
   AgenticRequest,
@@ -72,6 +73,13 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       max_output_tokens: 16000,
     });
 
+    const u = response.usage;
+    void recordUsage({
+      model: req.model,
+      input: u?.input_tokens ?? 0,
+      output: u?.output_tokens ?? 0,
+      cacheRead: u?.input_tokens_details?.cached_tokens ?? 0,
+    });
     const text = (response.output_text ?? "").trim();
     if (text) lastText = text;
 
@@ -128,6 +136,12 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
       },
     },
     max_output_tokens: 16000,
+  });
+  void recordUsage({
+    model: req.model,
+    input: response.usage?.input_tokens ?? 0,
+    output: response.usage?.output_tokens ?? 0,
+    cacheRead: response.usage?.input_tokens_details?.cached_tokens ?? 0,
   });
   const text = (response.output_text ?? "").trim();
   if (!text) throw new Error(EMPTY_TEXT);
