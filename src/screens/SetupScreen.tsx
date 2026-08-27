@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +12,7 @@ import {
 } from "react-native";
 import { LANGUAGE_LIST, LANGUAGE_PACKS, LanguageId } from "../languages";
 import { PROVIDER_LIST, ProviderId } from "../providers";
-import { colors, radius, shadowLift } from "../theme";
+import { colors, radius, shadow, shadowLift } from "../theme";
 
 interface Props {
   onDone: (
@@ -24,16 +23,20 @@ interface Props {
   ) => void;
 }
 
+const STEPS = 4;
+
 export default function SetupScreen({ onDone }: Props) {
+  const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [languageId, setLanguageId] = useState<LanguageId>("ar");
   const [providerId, setProviderId] = useState<ProviderId>("anthropic");
+
   const pack = LANGUAGE_PACKS[languageId];
   const provider =
     PROVIDER_LIST.find((p) => p.meta.id === providerId) ?? PROVIDER_LIST[0];
 
-  const submit = () => {
+  const finish = () => {
     if (!name.trim()) {
       Alert.alert("Eksik bilgi", "Lütfen adını yaz.");
       return;
@@ -53,188 +56,396 @@ export default function SetupScreen({ onDone }: Props) {
     onDone(name.trim(), key, languageId, providerId);
   };
 
-  return (
-    // Edge-to-edge modda Android pencereyi klavye için küçültmediğinden
-    // behavior her iki platformda da verilmeli.
-    <KeyboardAvoidingView style={styles.flex} behavior="padding">
-      <ScrollView
-        style={styles.container}
-        bounces={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <LinearGradient
-          colors={[colors.deep, colors.deepAlt]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <Text style={styles.heroGreeting}>{pack.greeting}</Text>
-          <Text style={styles.heroTitle}>Lisan Hocası</Text>
-          <Text style={styles.heroSub}>
-            Kişisel yapay zekâ öğretmenin {pack.teacherName}, seni {pack.label.toLowerCase()}de
-            sıfırdan uzmanlığa taşıyacak — konuşma ve okuma odaklı, sana özel müfredatla.
-          </Text>
-          <View style={styles.heroBadges}>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>
-                {pack.tracks.konusma.icon} {pack.tracks.konusma.title}
-              </Text>
-            </View>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>
-                {pack.tracks.okuma.icon} {pack.tracks.okuma.title}
-              </Text>
-            </View>
-          </View>
-        </LinearGradient>
+  const next = () => (step === STEPS - 1 ? finish() : setStep(step + 1));
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Hangi dili öğrenmek istiyorsun?</Text>
-          <View style={styles.langRow}>
-            {LANGUAGE_LIST.map((l) => (
-              <TouchableOpacity
-                key={l.id}
-                style={[styles.langChip, languageId === l.id && styles.langChipActive]}
-                onPress={() => setLanguageId(l.id)}
-              >
-                <Text style={styles.langFlag}>{l.flag}</Text>
-                <Text
-                  style={[styles.langLabel, languageId === l.id && styles.langLabelActive]}
-                >
-                  {l.label}
-                </Text>
-              </TouchableOpacity>
+  return (
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      <View style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+        >
+          {step === 0 && <Welcome />}
+          {step === 1 && <HowItWorks />}
+          {step === 2 && (
+            <PickLanguage selected={languageId} onSelect={setLanguageId} />
+          )}
+          {step === 3 && (
+            <Connect
+              name={name}
+              setName={setName}
+              apiKey={apiKey}
+              setApiKey={setApiKey}
+              providerId={providerId}
+              setProviderId={setProviderId}
+              pack={pack}
+            />
+          )}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <View style={styles.dots}>
+            {Array.from({ length: STEPS }, (_, i) => (
+              <View key={i} style={[styles.dot, i === step && styles.dotOn]} />
             ))}
           </View>
-          <Text style={styles.hint}>
-            Diğer dilleri sonra panelden ekleyebilirsin — her dilin müfredatı ve kelime defteri
-            ayrı tutulur.
-          </Text>
-
-          <Text style={styles.label}>Adın</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="örn. Mehmet"
-            placeholderTextColor={colors.inkFaint}
-          />
-
-          <Text style={styles.label}>Model sağlayıcısı</Text>
-          <View style={styles.provRow}>
-            {PROVIDER_LIST.map((p) => {
-              const active = p.meta.id === providerId;
-              return (
-                <TouchableOpacity
-                  key={p.meta.id}
-                  style={[styles.provChip, active && styles.provChipActive]}
-                  onPress={() => setProviderId(p.meta.id)}
-                >
-                  <Text style={[styles.provText, active && styles.provTextActive]}>
-                    {p.meta.label}
-                  </Text>
-                  {p.meta.experimental && <Text style={styles.provBeta}>denenmedi</Text>}
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.navRow}>
+            {step > 0 ? (
+              <TouchableOpacity style={styles.back} onPress={() => setStep(step - 1)}>
+                <Text style={styles.backText}>Geri</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+            <TouchableOpacity onPress={next} activeOpacity={0.85} style={{ flex: 2 }}>
+              <LinearGradient
+                colors={[colors.accent, colors.accentDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.nextButton}
+              >
+                <Text style={styles.nextText}>
+                  {step === STEPS - 1 ? `Başlayalım ${pack.flag}` : "Devam"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.hint}>{provider.meta.costNote}</Text>
-
-          <Text style={[styles.label, { marginTop: 16 }]}>
-            {provider.meta.label} API Anahtarı
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={apiKey}
-            onChangeText={setApiKey}
-            placeholder={provider.meta.keyPrefix ? `${provider.meta.keyPrefix}…` : "anahtarı yapıştır"}
-            placeholderTextColor={colors.inkFaint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-          />
-          <Text style={styles.hint}>
-            Anahtar almak için: {provider.meta.keyHint}
-            {"\n"}Anahtar sadece bu cihazda saklanır; istekler doğrudan cihazından
-            sağlayıcıya gider. Sonradan panelden değiştirebilirsin.
-          </Text>
-
-          <TouchableOpacity onPress={submit} activeOpacity={0.85}>
-            <LinearGradient
-              colors={[colors.accent, colors.accentDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.button}
-            >
-              <Text style={styles.buttonText}>Başlayalım {pack.flag}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
+/* ---------------------------------------------------------------- adımlar */
+
+function Welcome() {
+  return (
+    <View>
+      <LinearGradient
+        colors={[colors.deep, colors.deepAlt]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.bubbles}>
+          <View style={styles.bubbleOutline} />
+          <View style={styles.bubbleFilled}>
+            <View style={styles.bubbleDots}>
+              {[0, 1, 2].map((i) => (
+                <View key={i} style={styles.bubbleDot} />
+              ))}
+            </View>
+          </View>
+        </View>
+        <Text style={styles.heroTitle}>Lisan Hocası</Text>
+        <Text style={styles.heroSub}>
+          Sana özel bir yapay zekâ dil öğretmeni. Sıfırdan başlayıp uzmanlığa kadar,
+          kendi hızında.
+        </Text>
+      </LinearGradient>
+
+      <View style={styles.pad}>
+        <Point
+          icon="🗣️"
+          title="Konuşma ve okuma, ayrı ayrı"
+          text="İki parkur birlikte yürür: gerçek hayatta konuşmak ve profesyonel seviyede okumak. Seviyeler bağımsız ölçülür."
+        />
+        <Point
+          icon="🎓"
+          title="Bir hoca, bir ders kitabı değil"
+          text="Karşındaki bir alıştırma listesi değil; seninle konuşan, hatanı düzelten, seni tanıyan bir öğretmen."
+        />
+        <Point
+          icon="🌍"
+          title="Üç dil, tek uygulama"
+          text="Arapça, İngilizce ve İspanyolca. Her dilin kendi hocası, müfredatı ve defteri var; aynı anda birden fazlasını çalışabilirsin."
+        />
+      </View>
+    </View>
+  );
+}
+
+function HowItWorks() {
+  return (
+    <View style={styles.pad}>
+      <Text style={styles.stepTitle}>Nasıl çalışır?</Text>
+      <Text style={styles.stepLead}>
+        Hocan sadece sohbet etmiyor — arka planda senin için defter tutuyor.
+      </Text>
+      <Step
+        n="1"
+        title="Önce seviyeni ölçer"
+        text="Kısa bir tanışma sohbeti yapar, konuşma ve okuma seviyeni ayrı ayrı belirler."
+      />
+      <Step
+        n="2"
+        title="Sana özel müfredat kurar"
+        text="Zayıf yönlerine ve gerçek hatalarına göre iki parkurlu bir ders planı hazırlar."
+      />
+      <Step
+        n="3"
+        title="Ders yaptıkça defterini tutar"
+        text="Bilmediğin kelimeleri kaydeder, hatalarını not eder, aralıklı tekrar takvimini kendisi kurar."
+      />
+      <Step
+        n="4"
+        title="Seviye atlatır"
+        text="Müfredatı bitirdiğinde performansına bakar, hazırsan bir üst seviyenin planını kurar."
+      />
+      <View style={styles.noteBox}>
+        <Text style={styles.noteText}>
+          Her şey telefonunda kalır. Dersler senin API anahtarınla, doğrudan cihazından
+          çalışır — arada başka bir sunucu yok.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function PickLanguage({
+  selected,
+  onSelect,
+}: {
+  selected: LanguageId;
+  onSelect: (id: LanguageId) => void;
+}) {
+  return (
+    <View style={styles.pad}>
+      <Text style={styles.stepTitle}>Hangi dili öğreneceksin?</Text>
+      <Text style={styles.stepLead}>
+        Diğerlerini sonra panelden ekleyebilirsin — her dilin ilerlemesi ayrı tutulur.
+      </Text>
+      {LANGUAGE_LIST.map((l) => {
+        const active = l.id === selected;
+        return (
+          <TouchableOpacity
+            key={l.id}
+            style={[styles.langCard, active && styles.langCardOn]}
+            onPress={() => onSelect(l.id)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.langFlag}>{l.flag}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.langName, active && { color: colors.accentDark }]}>
+                {l.label}
+              </Text>
+              <Text style={styles.langTeacher}>
+                {l.teacherName} · {l.tracks.konusma.short} + {l.tracks.okuma.short}
+              </Text>
+            </View>
+            <View style={[styles.radio, active && styles.radioOn]}>
+              {active && <View style={styles.radioDot} />}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function Connect({
+  name,
+  setName,
+  apiKey,
+  setApiKey,
+  providerId,
+  setProviderId,
+  pack,
+}: {
+  name: string;
+  setName: (v: string) => void;
+  apiKey: string;
+  setApiKey: (v: string) => void;
+  providerId: ProviderId;
+  setProviderId: (v: ProviderId) => void;
+  pack: (typeof LANGUAGE_PACKS)[LanguageId];
+}) {
+  const provider =
+    PROVIDER_LIST.find((p) => p.meta.id === providerId) ?? PROVIDER_LIST[0];
+  return (
+    <View style={styles.pad}>
+      <Text style={styles.stepTitle}>Son adım</Text>
+      <Text style={styles.stepLead}>
+        {pack.teacherName} sana adınla hitap edecek ve derslerini senin anahtarınla
+        yapacak.
+      </Text>
+
+      <Text style={styles.label}>Adın</Text>
+      <TextInput
+        style={styles.input}
+        value={name}
+        onChangeText={setName}
+        placeholder="örn. Mehmet"
+        placeholderTextColor={colors.inkFaint}
+      />
+
+      <Text style={styles.label}>Model sağlayıcısı</Text>
+      <View style={styles.provRow}>
+        {PROVIDER_LIST.map((p) => {
+          const active = p.meta.id === providerId;
+          return (
+            <TouchableOpacity
+              key={p.meta.id}
+              style={[styles.provChip, active && styles.provChipOn]}
+              onPress={() => setProviderId(p.meta.id)}
+            >
+              <Text style={[styles.provText, active && { color: colors.accent }]}>
+                {p.meta.label}
+              </Text>
+              {p.meta.experimental && <Text style={styles.provBeta}>denenmedi</Text>}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <Text style={styles.hint}>{provider.meta.costNote}</Text>
+
+      <Text style={[styles.label, { marginTop: 16 }]}>
+        {provider.meta.label} API Anahtarı
+      </Text>
+      <TextInput
+        style={styles.input}
+        value={apiKey}
+        onChangeText={setApiKey}
+        placeholder={
+          provider.meta.keyPrefix ? `${provider.meta.keyPrefix}…` : "anahtarı yapıştır"
+        }
+        placeholderTextColor={colors.inkFaint}
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry
+      />
+      <Text style={styles.hint}>
+        Anahtar almak için: {provider.meta.keyHint}
+        {"\n"}Anahtar yalnızca bu cihazda saklanır. Sonradan panelden
+        değiştirebilirsin.
+      </Text>
+    </View>
+  );
+}
+
+function Point({ icon, title, text }: { icon: string; title: string; text: string }) {
+  return (
+    <View style={styles.point}>
+      <Text style={styles.pointIcon}>{icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.pointTitle}>{title}</Text>
+        <Text style={styles.pointText}>{text}</Text>
+      </View>
+    </View>
+  );
+}
+
+function Step({ n, title, text }: { n: string; title: string; text: string }) {
+  return (
+    <View style={styles.point}>
+      <View style={styles.stepNum}>
+        <Text style={styles.stepNumText}>{n}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.pointTitle}>{title}</Text>
+        <Text style={styles.pointText}>{text}</Text>
+      </View>
+    </View>
+  );
+}
+
+/* ---------------------------------------------------------------- stiller */
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
+  scroll: { paddingBottom: 24 },
+  pad: { padding: 24, paddingTop: 64 },
+
   hero: {
-    paddingTop: 96,
-    paddingBottom: 40,
-    paddingHorizontal: 28,
+    paddingTop: 80,
+    paddingBottom: 34,
+    paddingHorizontal: 26,
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
   },
-  heroGreeting: { fontSize: 56, lineHeight: 76, color: colors.goldDeep, fontWeight: "700" },
-  heroTitle: {
-    fontSize: 34,
-    fontWeight: "800",
-    color: colors.onDeep,
-    letterSpacing: -0.5,
-    marginTop: 2,
+  bubbles: { height: 78, marginBottom: 14 },
+  bubbleOutline: {
+    position: "absolute",
+    right: 4,
+    top: 0,
+    width: 62,
+    height: 44,
+    borderRadius: 15,
+    borderWidth: 3,
+    borderColor: colors.onDeep,
   },
-  heroSub: { fontSize: 14.5, color: colors.onDeepSoft, lineHeight: 22, marginTop: 12 },
-  heroBadges: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 18 },
-  heroBadge: {
-    backgroundColor: "rgba(243,239,228,0.12)",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: "rgba(243,239,228,0.22)",
-  },
-  heroBadgeText: { color: colors.onDeep, fontSize: 12.5, fontWeight: "700" },
-  form: { padding: 24, paddingTop: 28 },
-  label: { fontSize: 13, fontWeight: "800", color: colors.ink, marginBottom: 7 },
-  langRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
-  langChip: {
-    flex: 1,
+  bubbleFilled: {
+    position: "absolute",
+    left: 0,
+    top: 26,
+    width: 78,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: colors.goldDeep,
     alignItems: "center",
-    gap: 4,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    justifyContent: "center",
+  },
+  bubbleDots: { flexDirection: "row", gap: 7 },
+  bubbleDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.deep },
+  heroTitle: { fontSize: 32, fontWeight: "800", color: colors.onDeep, letterSpacing: -0.5 },
+  heroSub: { fontSize: 15, color: colors.onDeepSoft, lineHeight: 23, marginTop: 8 },
+
+  stepTitle: { fontSize: 25, fontWeight: "800", color: colors.ink, letterSpacing: -0.4 },
+  stepLead: { fontSize: 14.5, color: colors.inkSoft, lineHeight: 22, marginTop: 8, marginBottom: 22 },
+
+  point: { flexDirection: "row", gap: 14, marginBottom: 20, alignItems: "flex-start" },
+  pointIcon: { fontSize: 24, width: 30, textAlign: "center" },
+  stepNum: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.accentSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepNumText: { color: colors.accentDark, fontWeight: "800", fontSize: 14 },
+  pointTitle: { fontSize: 15.5, fontWeight: "800", color: colors.ink },
+  pointText: { fontSize: 13.5, color: colors.inkSoft, lineHeight: 20, marginTop: 3 },
+
+  noteBox: {
+    backgroundColor: colors.accentSoft,
     borderRadius: radius.md,
-    backgroundColor: colors.card,
-    paddingVertical: 12,
+    padding: 14,
+    marginTop: 4,
   },
-  langChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  langFlag: { fontSize: 26 },
-  langLabel: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
-  langLabelActive: { color: colors.accent },
-  provRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
-  provChip: {
+  noteText: { fontSize: 12.5, color: colors.accentDark, lineHeight: 19 },
+
+  langCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: colors.card,
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: 999,
-    backgroundColor: colors.card,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    alignItems: "center",
+    borderRadius: radius.lg,
+    padding: 16,
+    marginBottom: 11,
+    ...shadow,
   },
-  provChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  provText: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
-  provTextActive: { color: colors.accent },
-  provBeta: { fontSize: 9, fontWeight: "800", color: colors.gold, marginTop: 1 },
+  langCardOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  langFlag: { fontSize: 30 },
+  langName: { fontSize: 16.5, fontWeight: "800", color: colors.ink },
+  langTeacher: { fontSize: 12.5, color: colors.inkSoft, marginTop: 2 },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.inkFaint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioOn: { borderColor: colors.accent },
+  radioDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.accent },
+
+  label: { fontSize: 13, fontWeight: "800", color: colors.ink, marginBottom: 7 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -246,12 +457,40 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginBottom: 18,
   },
-  hint: { fontSize: 12, color: colors.inkSoft, lineHeight: 18, marginBottom: 28 },
-  button: {
+  provRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  provChip: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 999,
+    backgroundColor: colors.card,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  provChipOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  provText: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
+  provBeta: { fontSize: 9, fontWeight: "800", color: colors.gold, marginTop: 1 },
+  hint: { fontSize: 12, color: colors.inkSoft, lineHeight: 18 },
+
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 22,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  dots: { flexDirection: "row", justifyContent: "center", gap: 7, marginBottom: 12 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.border },
+  dotOn: { backgroundColor: colors.accent, width: 20 },
+  navRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  back: { flex: 1, paddingVertical: 16, alignItems: "center" },
+  backText: { color: colors.inkSoft, fontSize: 15, fontWeight: "700" },
+  nextButton: {
     borderRadius: radius.lg,
-    paddingVertical: 17,
+    paddingVertical: 16,
     alignItems: "center",
     ...shadowLift,
   },
-  buttonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  nextText: { color: "#FFFFFF", fontSize: 16.5, fontWeight: "800" },
 });

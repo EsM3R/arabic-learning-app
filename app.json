@@ -13,7 +13,7 @@
       "package": "com.esm3r.lisanhocasi",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B3D34",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -30,7 +30,17 @@
           "microphonePermission": "Telaffuz pratiği için mikrofon erişimi gerekiyor."
         }
       ],
-      "expo-notifications"
-    ]
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0B3D34"
+        }
+      ]
+    ],
+    "backgroundColor": "#F6F1E7"
   }
 }
