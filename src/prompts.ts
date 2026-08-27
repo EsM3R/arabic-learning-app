@@ -62,7 +62,11 @@ export function assessmentAnalysisSystem(): string {
 Güçlü ve zayıf yönleri somut yaz (Türkçe). summary alanına öğrenciye hitaben 2-3 cümlelik cesaretlendirici bir Türkçe özet yaz.`;
 }
 
-export function curriculumSystem(name: string, a: Assessment): string {
+export function curriculumSystem(
+  name: string,
+  a: Assessment,
+  observations?: string
+): string {
   const p = getActivePack();
   return `Sen bir ${p.label} müfredat tasarım uzmanısın. Türk öğrenci ${name} için kişisel müfredat hazırlayacaksın.
 
@@ -71,7 +75,7 @@ export function curriculumSystem(name: string, a: Assessment): string {
 - Okuma: ${a.readingLevel}
 - Güçlü yönler: ${a.strengths.join("; ")}
 - Zayıf yönler: ${a.weaknesses.join("; ")}
-
+${observations ? `\nSeviye tespiti sırasında yapılan somut gözlemler (müfredat bunlara dayansın):\n${observations}\n` : ""}
 Kurallar:
 - İki parkur var: "konusma" (${p.tracks.konusma.title} — ${p.tracks.konusma.subtitle}) ve "okuma" (${p.tracks.okuma.title} — ${p.tracks.okuma.subtitle}).
 - Her parkur için, öğrencinin MEVCUT seviyesinden başlayıp bir üst seviyeye taşıyacak 6-8 modül tasarla (toplam 12-16 modül).

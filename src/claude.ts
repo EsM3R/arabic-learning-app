@@ -134,11 +134,12 @@ const CURRICULUM_SCHEMA = {
 /** Seviye raporuna göre kişisel müfredat üretir (agentic kurulum başarısız olursa yedek yol). */
 export async function generateCurriculum(
   profile: Profile,
-  assessment: Assessment
+  assessment: Assessment,
+  observations?: string
 ): Promise<Curriculum> {
   const { provider, model, apiKey } = requireKey(profile);
   const parsed = await provider.structured<{ modules: CurriculumModule[] }>({
-    system: curriculumSystem(profile.name, assessment),
+    system: curriculumSystem(profile.name, assessment, observations),
     userMessage: "Müfredatımı hazırla lütfen.",
     schema: CURRICULUM_SCHEMA as unknown as Record<string, unknown>,
     model,

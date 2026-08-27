@@ -32,6 +32,7 @@ interface Props {
 export default function PronunciationScreen({ profile, onBack }: Props) {
   const [set, setSet] = useState<PronunciationSet | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
 
@@ -40,6 +41,7 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
 
   const generate = async () => {
     setLoading(true);
+    setError(null);
     try {
       const vocab = await loadVocab();
       const newSet = await generatePronunciationSet(
@@ -52,7 +54,9 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
       setIndex(0);
       setRecordingUri(null);
     } catch (e) {
-      Alert.alert("Hata", e instanceof Error ? e.message : String(e));
+      // Alert kapanınca ekran sonsuza kadar "hazırlanıyor" yazmasın:
+      // hatayı ekranda tut ve tekrar deneme yolu sun.
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -129,7 +133,18 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
         }
       />
 
-      {loading || !item ? (
+      {error && !loading ? (
+        <View style={styles.loading}>
+          <Text style={styles.errEmoji}>😕</Text>
+          <Text style={styles.errTitle}>Telaffuz seti hazırlanamadı</Text>
+          <Text style={styles.errText} selectable>
+            {error}
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => void generate()}>
+            <Text style={styles.retryText}>Tekrar dene</Text>
+          </TouchableOpacity>
+        </View>
+      ) : loading || !item ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>
@@ -212,6 +227,24 @@ const styles = StyleSheet.create({
   newSetText: { color: colors.gold, fontWeight: "700", fontSize: 12 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14 },
   loadingText: { color: colors.inkSoft, fontSize: 14 },
+  errEmoji: { fontSize: 38 },
+  errTitle: { fontSize: 18, fontWeight: "800", color: colors.ink },
+  errText: {
+    fontSize: 13,
+    color: colors.inkSoft,
+    textAlign: "center",
+    lineHeight: 19,
+    paddingHorizontal: 28,
+  },
+  retryButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 36,
+    marginTop: 6,
+    ...shadow,
+  },
+  retryText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   body: { padding: 20, paddingBottom: 40 },
   card: {
     backgroundColor: colors.card,

@@ -7,18 +7,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { AgentContext, TEACHER_TOOLS, ASSESSMENT_TOOLS } from "../agent";
+import { AgentContext, ASSESSMENT_TOOLS } from "../agent";
 import ChatView from "../components/ChatView";
 import Header from "../components/Header";
 import { agenticChat, analyzeAssessment, generateCurriculum } from "../claude";
-import {
-  assessmentSystem,
-  curriculumBuilderSystem,
-  KICKOFF_ASSESSMENT,
-  KICKOFF_CURRICULUM,
-} from "../prompts";
 import { getActivePack } from "../languages";
-import { colors } from "../theme";
+import { assessmentSystem, KICKOFF_ASSESSMENT } from "../prompts";
+import { loadMistakes, loadNotes } from "../storage";
+import { colors, radius, shadowLift } from "../theme";
 import { Assessment, ChatMessage, Curriculum, Profile } from "../types";
 
 interface Props {
@@ -26,47 +22,77 @@ interface Props {
   onComplete: (assessment: Assessment, curriculum: Curriculum) => void;
 }
 
+/** Müfredatın gerçek gözlemlere dayanması için değerlendirme sırasındaki kayıtlar. */
+function summarizeObservations(
+  mistakes: { topic: string; mistake: string; correction: string }[],
+  notes: { note: string }[]
+): string {
+  const parts: string[] = [];
+  if (mistakes.length > 0) {
+    parts.push(
+      mistakes
+        .slice(-10)
+        .map((m) => `- [${m.topic}] "${m.mistake}" → "${m.correction}"`)
+        .join("\n")
+    );
+  }
+  if (notes.length > 0) {
+    parts.push(notes.slice(-5).map((n) => `- ${n.note}`).join("\n"));
+  }
+  return parts.join("\n");
+}
+
 export default function AssessmentScreen({ profile, onComplete }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [finishStage, setFinishStage] = useState<"idle" | "analyzing" | "planning">("idle");
+  const [buildError, setBuildError] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const started = useRef(false);
   const profileRef = useRef(profile);
 
   const system = assessmentSystem(profile.name);
+  const teacher = getActivePack().teacherName;
+
+  // Uzun süren adımda ekranın donmadığı görünsün diye geçen süre sayılır.
+  useEffect(() => {
+    if (finishStage === "idle" || buildError) return;
+    setElapsed(0);
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [finishStage, buildError]);
 
   /**
-   * Seviye raporu hazır → müfredatı ÜSTAZ kendisi inşa eder: modul_ekle
-   * aracını çağıra çağıra, değerlendirmede kaydettiği hataları okuyarak.
-   * Yeterli modül kuramazsa tek atımlık üretime düşülür (yedek yol).
+   * Seviye raporu hazır → müfredat TEK yapılandırılmış çağrıyla üretilir.
+   *
+   * Önceden modüller agentic döngüde modul_ekle ile tek tek ekleniyordu:
+   * 12-16 modül için 10+ tur, her tur ayrı bir API çağrısı — dakikalarca
+   * hiç değişmeyen bir bekleme ekranı demekti. Aynı promptun tek atımlık
+   * hâli aynı müfredatı bir çağrıda veriyor. Agentic yolun tek üstünlüğü
+   * olan "değerlendirmedeki gözlemleri okuma" özelliği, gözlemler prompta
+   * verilerek korundu.
    */
   const buildCurriculum = async (assessment: Assessment) => {
+    setBuildError(null);
     setFinishStage("planning");
-    const ctx: AgentContext = {
-      profile: {
-        ...profileRef.current,
-        assessment,
-        curriculum: { modules: [], generatedAt: new Date().toISOString() },
-      },
-      profileChanged: false,
-    };
     try {
-      await agenticChat(
-        curriculumBuilderSystem(profile.name, assessment),
-        [{ role: "user", content: KICKOFF_CURRICULUM }],
-        ctx,
-        { tools: TEACHER_TOOLS, maxRounds: 16, effort: "high" }
+      const [mistakes, notes] = await Promise.all([loadMistakes(), loadNotes()]);
+      const curriculum = await generateCurriculum(
+        profileRef.current,
+        assessment,
+        summarizeObservations(mistakes, notes)
       );
-    } catch {
-      // agentic kurulum başarısız olursa aşağıdaki yedek yol devreye girer
+      const count = curriculum.modules?.length ?? 0;
+      if (count < 4) {
+        throw new Error(
+          `Müfredat beklenenden kısa geldi (${count} modül). Tekrar denemek genelde çözer.`
+        );
+      }
+      onComplete(assessment, curriculum);
+    } catch (e) {
+      // Çıkmaz sokak bırakma: hatayı göster, tekrar deneme yolu sun.
+      setBuildError(e instanceof Error ? e.message : String(e));
     }
-    const built = ctx.profile.curriculum;
-    if (built && built.modules.length >= 6) {
-      onComplete(assessment, built);
-      return;
-    }
-    const curriculum = await generateCurriculum(profile, assessment);
-    onComplete(assessment, curriculum);
   };
 
   const runTurn = async (history: ChatMessage[]) => {
@@ -84,7 +110,7 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
       setMessages(updated);
       if (ctx.profileChanged) profileRef.current = ctx.profile;
 
-      // Üstaz değerlendirmeyi kendisi bitirdiyse müfredata geç.
+      // Hoca değerlendirmeyi kendisi bitirdiyse müfredata geç.
       if (ctx.assessmentResult) {
         await buildCurriculum(ctx.assessmentResult);
       }
@@ -112,33 +138,66 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
     void runTurn(history);
   };
 
-  /** Kullanıcı yedek yolu: Üstaz beklerken öğrenci bitirmek isterse. */
+  const userTurns = messages.filter((m) => m.role === "user").length;
+  const canFinish = userTurns >= 3;
+
+  /** Öğrenci beklemek istemezse kendi bitirebilir. */
   const finishManually = async () => {
-    if (messages.filter((m) => m.role === "user").length < 3) {
+    if (!canFinish) {
       Alert.alert(
         "Biraz erken",
-        `Sağlıklı bir değerlendirme için ${getActivePack().teacherName} ile birkaç mesaj daha yazışmalısın.`
+        `Sağlıklı bir değerlendirme için ${teacher} ile birkaç mesaj daha yazışmalısın.`
       );
       return;
     }
+    setBuildError(null);
+    setFinishStage("analyzing");
     try {
-      setFinishStage("analyzing");
-      const assessment = await analyzeAssessment(profile, messages);
+      const assessment = await analyzeAssessment(profileRef.current, messages);
       await buildCurriculum(assessment);
     } catch (e) {
-      setFinishStage("idle");
-      Alert.alert("Hata", e instanceof Error ? e.message : String(e));
+      setBuildError(e instanceof Error ? e.message : String(e));
     }
   };
 
+  const retry = () => {
+    setBuildError(null);
+    void finishManually();
+  };
+
+  const backToChat = () => {
+    setBuildError(null);
+    setFinishStage("idle");
+  };
+
   if (finishStage !== "idle") {
+    if (buildError) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.errEmoji}>😕</Text>
+          <Text style={styles.errTitle}>Müfredat hazırlanamadı</Text>
+          <Text style={styles.errText} selectable>
+            {buildError}
+          </Text>
+          <TouchableOpacity style={styles.primary} onPress={retry} activeOpacity={0.85}>
+            <Text style={styles.primaryText}>Tekrar dene</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondary} onPress={backToChat}>
+            <Text style={styles.secondaryText}>Sohbete dön</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     return (
-      <View style={styles.loading}>
+      <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.loadingText}>
           {finishStage === "analyzing"
             ? "Seviyen değerlendiriliyor…"
             : "Sana özel müfredat hazırlanıyor…"}
+        </Text>
+        <Text style={styles.loadingSub}>
+          {elapsed}s · {teacher} iki parkur için 12-16 modül tasarlıyor
         </Text>
       </View>
     );
@@ -148,14 +207,20 @@ export default function AssessmentScreen({ profile, onComplete }: Props) {
     <View style={styles.container}>
       <Header
         title="Seviye Tespiti"
-        subtitle={`${getActivePack().teacherName} ile tanışma sohbeti`}
+        subtitle={
+          canFinish
+            ? "Yeterli geldiyse sağ üstten bitirebilirsin"
+            : `${teacher} ile tanışma sohbeti`
+        }
         right={
           <TouchableOpacity
-            style={styles.finishButton}
+            style={[styles.finishButton, canFinish && styles.finishButtonReady]}
             onPress={() => void finishManually()}
             disabled={sending}
           >
-            <Text style={styles.finishText}>Değerlendirmeyi Bitir</Text>
+            <Text style={[styles.finishText, canFinish && styles.finishTextReady]}>
+              Bitir
+            </Text>
           </TouchableOpacity>
         }
       />
@@ -169,16 +234,39 @@ const styles = StyleSheet.create({
   finishButton: {
     backgroundColor: colors.goldSoft,
     borderRadius: 999,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  finishButtonReady: { backgroundColor: colors.accent },
   finishText: { color: colors.gold, fontWeight: "800", fontSize: 12.5 },
-  loading: {
+  finishTextReady: { color: "#FFFFFF" },
+  center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.bg,
-    gap: 16,
+    padding: 32,
+    gap: 12,
   },
-  loadingText: { fontSize: 16, color: colors.inkSoft },
+  loadingText: { fontSize: 16, color: colors.ink, fontWeight: "700", marginTop: 4 },
+  loadingSub: { fontSize: 13, color: colors.inkSoft, textAlign: "center" },
+  errEmoji: { fontSize: 40 },
+  errTitle: { fontSize: 19, fontWeight: "800", color: colors.ink },
+  errText: {
+    fontSize: 13.5,
+    color: colors.inkSoft,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  primary: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.lg,
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    ...shadowLift,
+  },
+  primaryText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+  secondary: { paddingVertical: 10, paddingHorizontal: 20 },
+  secondaryText: { color: colors.accent, fontSize: 14, fontWeight: "700" },
 });
