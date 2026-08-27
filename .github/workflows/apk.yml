@@ -128,14 +128,21 @@ jobs:
       # Kalıcı ve telefondan tek dokunuşla indirilebilir sürüm. Etiket hep aynı
       # ("apk-latest") olduğu için indirme adresi de sabit kalır:
       # .../releases/latest/download/lisan-hocasi.apk
+      #
+      # Release'i ASLA silip yeniden kurmuyoruz. Eskiden öyle yapılıyordu ve
+      # yükleme düşünce (uploads.github.com HTTP 400) gh, az önce açtığı
+      # release'i geri sildiği için ortada indirilebilir hiçbir APK kalmıyordu.
+      # Artık release yerinde güncelleniyor: yeni yükleme başarısız olsa bile
+      # bir önceki çalışan APK indirilebilir durumda kalır.
       - name: Sürümü yayınla (release)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TAG=apk-latest
+          TITLE="Lisan Hocası ${{ steps.apk.outputs.version }} (derleme #${{ github.run_number }})"
           {
-            echo "Android APK · ${{ steps.apk.outputs.size }} · commit \`${GITHUB_SHA::7}\`"
+            echo "Android APK · ${{ steps.apk.outputs.size }} · commit \`${GITHUB_SHA::7}\` · derleme #${{ github.run_number }}"
             echo
             echo "**Telefona kurmak için:** \`lisan-hocasi.apk\` dosyasını indir ve aç."
             echo "Android \"bilinmeyen kaynak\" uyarısı verirse tarayıcına kurulum izni ver."
@@ -143,10 +150,30 @@ jobs:
             echo "Bu dosya her derlemede aynı anahtarla imzalanır; yeni sürümü eskisinin"
             echo "üstüne kurabilirsin, öğrenme verilerin korunur."
           } > release-notes.md
-          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
-          gh release create "$TAG" \
-            "out/${{ steps.apk.outputs.name }}" \
-            "out/lisan-hocasi.apk" \
-            --title "Lisan Hocası ${{ steps.apk.outputs.version }} (derleme #${{ github.run_number }})" \
-            --notes-file release-notes.md
+
+          # Etiketi bu commit'e taşı (release adı sabit kaldığı için indirme
+          # adresi değişmez, ama etiket artık doğru koda işaret eder).
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --latest
+          else
+            gh release create "$TAG" --title "$TITLE" --notes-file release-notes.md --latest
+          fi
+
+          # Yükleme ağ kaynaklı düşebiliyor; tek deneme yetmiyor.
+          ok=""
+          for attempt in 1 2 3 4; do
+            if gh release upload "$TAG" "out/lisan-hocasi.apk" --clobber; then
+              ok=1
+              break
+            fi
+            echo "Yükleme başarısız (deneme ${attempt}/4), bekleniyor..."
+            sleep $((attempt * 20))
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::APK release'e yüklenemedi. Artifact üzerinden indirilebilir."
+            exit 1
+          fi
           echo "İndirme: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/lisan-hocasi.apk" >> "$GITHUB_STEP_SUMMARY"
