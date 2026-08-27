@@ -167,11 +167,16 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
   },
 };
 
-export const LANGUAGE_LIST: LanguagePack[] = [
-  LANGUAGE_PACKS.ar,
-  LANGUAGE_PACKS.en,
-  LANGUAGE_PACKS.es,
-];
+/**
+ * Listeyi elle yazmıyoruz: yeni bir dil eklerken tek yapılacak iş
+ * LanguageId'ye kimliği eklemek ve LANGUAGE_PACKS'e paketi yazmak.
+ * Sıra, paketlerin tanımlanma sırasıdır.
+ */
+export const LANGUAGE_LIST: LanguagePack[] = Object.values(LANGUAGE_PACKS);
+
+export function isLanguageId(v: unknown): v is LanguageId {
+  return typeof v === "string" && Object.prototype.hasOwnProperty.call(LANGUAGE_PACKS, v);
+}
 
 // ---------------------------------------------------------------------------
 // Aktif dil durumu — storage anahtar uzayı ve promptlar buradan okur.
@@ -180,7 +185,9 @@ export const LANGUAGE_LIST: LanguagePack[] = [
 let activeLanguageId: LanguageId = "ar";
 
 export function setActiveLanguage(id: string | undefined): void {
-  activeLanguageId = (id === "en" || id === "es" ? id : "ar") as LanguageId;
+  // Doğrulama paketlerden türetilir; elle liste tutulsaydı yeni dil eklenince
+  // burayı güncellemeyi unutmak sessizce Arapça'ya düşürürdü.
+  activeLanguageId = isLanguageId(id) ? id : "ar";
 }
 
 export function getActiveLanguageId(): LanguageId {
