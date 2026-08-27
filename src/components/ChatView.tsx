@@ -46,9 +46,12 @@ export default function ChatView({
   };
 
   return (
+    // behavior Android'de de "padding" olmalı: uygulama edge-to-edge modunda
+    // çalışıyor ve o modda Android pencereyi klavye için küçültmüyor. undefined
+    // bırakılırsa yazı kutusu klavyenin altında kalıyor.
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <FlatList

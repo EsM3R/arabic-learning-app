@@ -12,39 +12,56 @@ import {
   View,
 } from "react-native";
 import { LANGUAGE_LIST, LANGUAGE_PACKS, LanguageId } from "../languages";
+import { PROVIDER_LIST, ProviderId } from "../providers";
 import { colors, radius, shadowLift } from "../theme";
 
 interface Props {
-  onDone: (name: string, apiKey: string, languageId: LanguageId) => void;
+  onDone: (
+    name: string,
+    apiKey: string,
+    languageId: LanguageId,
+    providerId: ProviderId
+  ) => void;
 }
 
 export default function SetupScreen({ onDone }: Props) {
   const [name, setName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [languageId, setLanguageId] = useState<LanguageId>("ar");
+  const [providerId, setProviderId] = useState<ProviderId>("anthropic");
   const pack = LANGUAGE_PACKS[languageId];
+  const provider =
+    PROVIDER_LIST.find((p) => p.meta.id === providerId) ?? PROVIDER_LIST[0];
 
   const submit = () => {
     if (!name.trim()) {
       Alert.alert("Eksik bilgi", "Lütfen adını yaz.");
       return;
     }
-    if (!apiKey.trim().startsWith("sk-ant-")) {
+    const key = apiKey.trim();
+    if (!key) {
+      Alert.alert("Anahtar eksik", `${provider.meta.label} API anahtarını gir.`);
+      return;
+    }
+    if (provider.meta.keyPrefix && !key.startsWith(provider.meta.keyPrefix)) {
       Alert.alert(
         "API anahtarı hatalı görünüyor",
-        "Anthropic API anahtarları 'sk-ant-' ile başlar. Anahtarı console.anthropic.com adresinden alabilirsin."
+        `${provider.meta.label} anahtarları "${provider.meta.keyPrefix}" ile başlar.\n\n${provider.meta.keyHint}`
       );
       return;
     }
-    onDone(name.trim(), apiKey.trim(), languageId);
+    onDone(name.trim(), key, languageId, providerId);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView style={styles.container} bounces={false}>
+    // Edge-to-edge modda Android pencereyi klavye için küçültmediğinden
+    // behavior her iki platformda da verilmeli.
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      <ScrollView
+        style={styles.container}
+        bounces={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <LinearGradient
           colors={[colors.deep, colors.deepAlt]}
           start={{ x: 0, y: 0 }}
@@ -103,20 +120,43 @@ export default function SetupScreen({ onDone }: Props) {
             placeholderTextColor={colors.inkFaint}
           />
 
-          <Text style={styles.label}>Anthropic API Anahtarı</Text>
+          <Text style={styles.label}>Model sağlayıcısı</Text>
+          <View style={styles.provRow}>
+            {PROVIDER_LIST.map((p) => {
+              const active = p.meta.id === providerId;
+              return (
+                <TouchableOpacity
+                  key={p.meta.id}
+                  style={[styles.provChip, active && styles.provChipActive]}
+                  onPress={() => setProviderId(p.meta.id)}
+                >
+                  <Text style={[styles.provText, active && styles.provTextActive]}>
+                    {p.meta.label}
+                  </Text>
+                  {p.meta.experimental && <Text style={styles.provBeta}>denenmedi</Text>}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.hint}>{provider.meta.costNote}</Text>
+
+          <Text style={[styles.label, { marginTop: 16 }]}>
+            {provider.meta.label} API Anahtarı
+          </Text>
           <TextInput
             style={styles.input}
             value={apiKey}
             onChangeText={setApiKey}
-            placeholder="sk-ant-…"
+            placeholder={provider.meta.keyPrefix ? `${provider.meta.keyPrefix}…` : "anahtarı yapıştır"}
             placeholderTextColor={colors.inkFaint}
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
           />
           <Text style={styles.hint}>
-            Anahtar almak için: console.anthropic.com → hesap aç → "API Keys" → "Create Key".
-            Anahtar sadece bu cihazda saklanır; istekler doğrudan Anthropic'e gider.
+            Anahtar almak için: {provider.meta.keyHint}
+            {"\n"}Anahtar sadece bu cihazda saklanır; istekler doğrudan cihazından
+            sağlayıcıya gider. Sonradan panelden değiştirebilirsin.
           </Text>
 
           <TouchableOpacity onPress={submit} activeOpacity={0.85}>
@@ -181,6 +221,20 @@ const styles = StyleSheet.create({
   langFlag: { fontSize: 26 },
   langLabel: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
   langLabelActive: { color: colors.accent },
+  provRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  provChip: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 999,
+    backgroundColor: colors.card,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  provChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  provText: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
+  provTextActive: { color: colors.accent },
+  provBeta: { fontSize: 9, fontWeight: "800", color: colors.gold, marginTop: 1 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

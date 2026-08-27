@@ -53,6 +53,25 @@ function toTools(req: AgenticRequest): OpenAI.Chat.Completions.ChatCompletionToo
   }));
 }
 
+/**
+ * DeepSeek V4-Pro'nun bilinen kusuru: araç çağrısını bazen `tool_calls`
+ * alanı yerine düz metin olarak yazıyor. Bu bizim döngüde SESSİZ bir
+ * başarısızlık olurdu — araç hiç çalışmaz (kelime kaydedilmez, kart
+ * puanlanmaz) ve öğrenci ekranda ham JSON görür. Yakalayıp modele düzgün
+ * mekanizmayı kullanmasını söylüyoruz.
+ */
+function looksLikeToolCall(text: string, toolNames: string[]): boolean {
+  const t = text.trim();
+  if (!t.includes("{") || !t.includes("}")) return false;
+  return toolNames.some((n) => t.includes(`"${n}"`) || t.includes(`'${n}'`));
+}
+
+const TOOL_TEXT_CORRECTION =
+  "[Sistem: Az önceki cevabında bir araç çağrısını düz metin olarak yazdın. " +
+  "Araçlar metinle çağrılmaz — gerçekten çağırman gerekiyorsa aracı usulüne " +
+  "uygun biçimde çağır, gerekmiyorsa öğrenciye dönük cevabını yaz. Ham JSON " +
+  "gösterme.]";
+
 async function chat(req: AgenticRequest): Promise<AgenticReply> {
   const openai = client(req.apiKey);
   const tools = toTools(req);
@@ -83,6 +102,17 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     const calls = choice?.message?.tool_calls ?? [];
     if (calls.length === 0) {
       if (!text) throw new Error(EMPTY_TEXT);
+      if (
+        round < req.maxRounds - 1 &&
+        looksLikeToolCall(
+          text,
+          req.tools.map((t) => t.name)
+        )
+      ) {
+        messages.push({ role: "assistant", content: text });
+        messages.push({ role: "user", content: TOOL_TEXT_CORRECTION });
+        continue;
+      }
       return { text, actions };
     }
 

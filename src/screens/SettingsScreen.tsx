@@ -79,10 +79,9 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    // Edge-to-edge modda Android pencereyi klavye için küçültmediğinden
+    // behavior her iki platformda da verilmeli.
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <View style={styles.container}>
         <Header
           title="Model ve Anahtarlar"
@@ -91,7 +90,7 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
           }`}
           onBack={onBack}
         />
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text style={styles.label}>Sağlayıcı</Text>
           {PROVIDER_LIST.map((p) => {
             const active = p.meta.id === selected;

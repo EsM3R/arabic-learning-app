@@ -85,14 +85,20 @@ export default function App() {
     await saveProfile(merged);
   };
 
-  const onSetupDone = async (name: string, apiKey: string, languageId: LanguageId) => {
+  const onSetupDone = async (
+    name: string,
+    apiKey: string,
+    languageId: LanguageId,
+    providerId: string
+  ) => {
     setActiveLanguage(languageId);
     setLang(getActiveLanguageId());
     const fresh: Profile = {
       name,
-      apiKey,
-      provider: "anthropic",
-      apiKeys: { anthropic: apiKey },
+      // Eski alan yalnızca Anthropic anahtarını taşır (geriye dönük uyumluluk)
+      apiKey: providerId === "anthropic" ? apiKey : "",
+      provider: providerId,
+      apiKeys: { [providerId]: apiKey },
       activeLanguage: languageId,
       completedModuleIds: [],
     };
