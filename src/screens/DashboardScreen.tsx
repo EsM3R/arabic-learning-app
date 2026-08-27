@@ -34,6 +34,7 @@ interface Props {
   onOpenMistakes: () => void;
   onOpenPronunciation: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
+  onOpenLevel: () => void;
   onOpenSettings: () => void;
   onReset: () => void;
 }
@@ -47,6 +48,7 @@ export default function DashboardScreen({
   onOpenMistakes,
   onOpenPronunciation,
   onSwitchLanguage,
+  onOpenLevel,
   onOpenSettings,
   onReset,
 }: Props) {
@@ -140,6 +142,19 @@ export default function DashboardScreen({
     }
   };
 
+  // Defter boşken sınav başlatmak, hocanın "tekrar edecek kelime yok" demesi
+  // için boşuna bir API çağrısı harcıyordu.
+  const startQuiz = () => {
+    if (vocabTotal === 0) {
+      Alert.alert(
+        "Kelime defteri boş",
+        `Önce ${pack.teacherName} ile bir ders yap — öğrendiğin kelimeleri kendisi deftere ekleyecek. Sınav ondan sonra anlamlı olur.`
+      );
+      return;
+    }
+    onQuiz();
+  };
+
   const openMenu = () => {
     Alert.alert("Ayarlar", undefined, [
       { text: "Model ve Anahtarlar", onPress: onOpenSettings },
@@ -192,7 +207,11 @@ export default function DashboardScreen({
           </TouchableOpacity>
         </View>
 
-        <View style={styles.levelRow}>
+        <TouchableOpacity
+          style={styles.levelRow}
+          onPress={onOpenLevel}
+          activeOpacity={0.85}
+        >
           <View style={styles.levelChip}>
             <Text style={styles.levelChipLabel}>🗣️ Konuşma</Text>
             <Text style={styles.levelChipValue}>{assessment?.speakingLevel ?? "-"}</Text>
@@ -201,7 +220,8 @@ export default function DashboardScreen({
             <Text style={styles.levelChipLabel}>📖 Okuma</Text>
             <Text style={styles.levelChipValue}>{assessment?.readingLevel ?? "-"}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
+        <Text style={styles.levelHint}>Seviye raporun için dokun ›</Text>
 
         <View style={styles.progressBlock}>
           <View style={styles.progressLabelRow}>
@@ -267,7 +287,7 @@ export default function DashboardScreen({
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.quizCard} onPress={onQuiz} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.quizCard} onPress={startQuiz} activeOpacity={0.85}>
           <View style={[styles.iconSquare, { backgroundColor: colors.goldSoft }]}>
             <Text style={styles.iconSquareText}>🧠</Text>
           </View>
@@ -419,6 +439,12 @@ const styles = StyleSheet.create({
   },
   levelChipLabel: { color: colors.onDeepSoft, fontSize: 12.5, fontWeight: "700" },
   levelChipValue: { color: colors.goldDeep, fontSize: 18, fontWeight: "800" },
+  levelHint: {
+    color: colors.onDeepSoft,
+    fontSize: 11,
+    marginTop: 6,
+    textAlign: "right",
+  },
   progressBlock: { marginTop: 18 },
   progressLabelRow: {
     flexDirection: "row",

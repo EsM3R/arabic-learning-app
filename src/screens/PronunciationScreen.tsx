@@ -64,13 +64,11 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
 
   useEffect(() => {
     void (async () => {
+      // Ekranı açmak tek başına para harcamamalı: kayıtlı set varsa onu aç,
+      // yoksa üretmeden önce kullanıcıya sor.
       const saved = await loadPronunciationSet();
-      if (saved && saved.items.length > 0) {
-        setSet(saved);
-        setLoading(false);
-      } else {
-        await generate();
-      }
+      if (saved && saved.items.length > 0) setSet(saved);
+      setLoading(false);
     })();
     return () => stopSpeaking();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,12 +142,24 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
             <Text style={styles.retryText}>Tekrar dene</Text>
           </TouchableOpacity>
         </View>
-      ) : loading || !item ? (
+      ) : loading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>
             {getActivePack().teacherName} telaffuz setini hazırlıyor…
           </Text>
+        </View>
+      ) : !item ? (
+        <View style={styles.loading}>
+          <Text style={styles.errEmoji}>🎙️</Text>
+          <Text style={styles.errTitle}>Telaffuz setin hazır değil</Text>
+          <Text style={styles.errText}>
+            {getActivePack().teacherName} senin seviyene ve kelime defterine göre bir
+            alıştırma seti hazırlasın mı? Bu bir API isteği harcar (yaklaşık birkaç lira).
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => void generate()}>
+            <Text style={styles.retryText}>Set hazırla</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>

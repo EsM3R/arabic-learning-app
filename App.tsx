@@ -6,6 +6,7 @@ import { installGlobalErrorHandler, reportError } from "./src/errorLog";
 import AssessmentScreen from "./src/screens/AssessmentScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import LessonScreen from "./src/screens/LessonScreen";
+import LevelScreen from "./src/screens/LevelScreen";
 import MistakesScreen from "./src/screens/MistakesScreen";
 import PronunciationScreen from "./src/screens/PronunciationScreen";
 import ReviewScreen from "./src/screens/ReviewScreen";
@@ -31,7 +32,8 @@ type Screen =
   | { name: "review" }
   | { name: "mistakes" }
   | { name: "pronunciation" }
-  | { name: "settings" };
+  | { name: "settings" }
+  | { name: "level" };
 
 /**
  * İki taraf da profili değiştirebilir: öğrenci (düğmeler) ve Üstaz (araçlar).
@@ -195,9 +197,13 @@ export default function App() {
           onOpenMistakes={() => setScreen({ name: "mistakes" })}
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
           onSwitchLanguage={(id) => void onSwitchLanguage(id)}
+          onOpenLevel={() => setScreen({ name: "level" })}
           onOpenSettings={() => setScreen({ name: "settings" })}
           onReset={onReset}
         />
+      )}
+      {screen.name === "level" && profile && (
+        <LevelScreen profile={profile} onBack={() => setScreen({ name: "dashboard" })} />
       )}
       {screen.name === "settings" && profile && (
         <SettingsScreen
