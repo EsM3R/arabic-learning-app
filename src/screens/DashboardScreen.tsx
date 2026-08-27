@@ -35,6 +35,7 @@ interface Props {
   onOpenPronunciation: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
   onOpenLevel: () => void;
+  onLevelUp: () => void;
   onOpenSettings: () => void;
   onReset: () => void;
 }
@@ -49,6 +50,7 @@ export default function DashboardScreen({
   onOpenPronunciation,
   onSwitchLanguage,
   onOpenLevel,
+  onLevelUp,
   onOpenSettings,
   onReset,
 }: Props) {
@@ -237,6 +239,20 @@ export default function DashboardScreen({
       </LinearGradient>
 
       <View style={styles.body}>
+        {totalModules > 0 && doneModules === totalModules && (
+          <TouchableOpacity style={styles.levelUpCard} onPress={onLevelUp} activeOpacity={0.85}>
+            <Text style={styles.levelUpEmoji}>🎓</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.levelUpTitle}>Bu seviyeyi bitirdin</Text>
+              <Text style={styles.levelUpText}>
+                {totalModules} modülün hepsi tamam. {pack.teacherName} ilerlemene baksın ve
+                sıradaki seviyenin müfredatını kursun.
+              </Text>
+            </View>
+            <Text style={styles.levelUpArrow}>›</Text>
+          </TouchableOpacity>
+        )}
+
         {teacherNote && (
           <View style={styles.teacherNoteCard}>
             <View style={styles.teacherNoteHeader}>
@@ -461,6 +477,20 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: "100%", borderRadius: 4, backgroundColor: colors.goldDeep },
   body: { paddingHorizontal: 18, marginTop: -24 },
+  levelUpCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.deep,
+    borderRadius: radius.lg,
+    padding: 16,
+    marginBottom: 14,
+    ...shadowLift,
+  },
+  levelUpEmoji: { fontSize: 26 },
+  levelUpTitle: { fontSize: 16, fontWeight: "800", color: colors.goldDeep },
+  levelUpText: { fontSize: 12.5, color: colors.onDeepSoft, lineHeight: 18, marginTop: 2 },
+  levelUpArrow: { fontSize: 24, color: colors.goldDeep, fontWeight: "800" },
   teacherNoteCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,

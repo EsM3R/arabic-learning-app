@@ -7,6 +7,7 @@ import AssessmentScreen from "./src/screens/AssessmentScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import LessonScreen from "./src/screens/LessonScreen";
 import LevelScreen from "./src/screens/LevelScreen";
+import LevelUpScreen from "./src/screens/LevelUpScreen";
 import MistakesScreen from "./src/screens/MistakesScreen";
 import PronunciationScreen from "./src/screens/PronunciationScreen";
 import ReviewScreen from "./src/screens/ReviewScreen";
@@ -33,7 +34,8 @@ type Screen =
   | { name: "mistakes" }
   | { name: "pronunciation" }
   | { name: "settings" }
-  | { name: "level" };
+  | { name: "level" }
+  | { name: "levelup" };
 
 /**
  * İki taraf da profili değiştirebilir: öğrenci (düğmeler) ve Üstaz (araçlar).
@@ -128,6 +130,21 @@ export default function App() {
     setScreen({ name: "dashboard" });
   };
 
+  /**
+   * Seviye atlama: yeni müfredat gelince tamamlanan modüller SIFIRLANIR.
+   * Yeni müfredatın id'leri de "k1", "o1"... biçiminde üretiliyor; eski
+   * listeyi taşırsak yeni modüller daha baştan bitmiş görünürdü.
+   */
+  const onLevelUp = async (assessment: Assessment, curriculum: Curriculum) => {
+    const current = profileRef.current;
+    if (!current) return;
+    const next: Profile = { ...current, assessment, curriculum, completedModuleIds: [] };
+    profileRef.current = next;
+    setProfile(next);
+    await saveProfile(next);
+    setScreen({ name: "dashboard" });
+  };
+
   const onCompleteModule = async (moduleId: string) => {
     const current = profileRef.current;
     if (!current) return;
@@ -198,8 +215,17 @@ export default function App() {
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
           onSwitchLanguage={(id) => void onSwitchLanguage(id)}
           onOpenLevel={() => setScreen({ name: "level" })}
+          onLevelUp={() => setScreen({ name: "levelup" })}
           onOpenSettings={() => setScreen({ name: "settings" })}
           onReset={onReset}
+        />
+      )}
+      {screen.name === "levelup" && profile && (
+        <LevelUpScreen
+          key={lang}
+          profile={profile}
+          onComplete={(assessment, curriculum) => void onLevelUp(assessment, curriculum)}
+          onBack={() => setScreen({ name: "dashboard" })}
         />
       )}
       {screen.name === "level" && profile && (

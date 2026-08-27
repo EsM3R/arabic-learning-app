@@ -298,6 +298,28 @@ Mesajın kısa olsun; ders anlatma.`;
 // ---------------------------------------------------------------------------
 // Olay bildirimleri: öğrencinin ağzından uydurulmuş sahte mesajlar değil,
 // uygulamadan gelen dürüst tetikleyiciler. UI bunları sohbette GÖSTERMEZ.
+/**
+ * Seviye atlama değerlendirmesi: müfredattaki tüm modüller bitince hoca
+ * öğrencinin gerçekten bir üst seviyeye hazır olup olmadığına bakar ve
+ * kararını seviye_guncelle ile yazar. Karar objektif veriye dayanmalı —
+ * tamamlanan modül sayısı tek başına yeterli değil.
+ */
+export function levelUpSystem(profile: Profile): string {
+  const p = getActivePack();
+  const a = profile.assessment;
+  return `${BASE()}
+
+Şu an görev: SEVİYE ATLAMA DEĞERLENDİRMESİ. Öğrencin ${profile.name} bu seviyedeki müfredatın TÜM modüllerini tamamladı (konuşma ${a?.speakingLevel ?? "?"}, okuma ${a?.readingLevel ?? "?"}).
+
+Yapman gereken:
+1. ÖNCE veriye bak — bu şart: tekrar_durumu ile kelime hatırlama performansını, hafiza_oku ile açık hatalarını, mufredat_oku ile hangi modülleri bitirdiğini incele.
+2. Her parkur için ayrı ayrı karar ver: gerçekten bir üst seviyeye hazır mı? Modülleri bitirmiş olmak yetmez — kelimeleri hatırlıyor mu, aynı hataları tekrarlıyor mu? Bir parkurda hazır, diğerinde değil olabilir; ikisini bağımsız değerlendir.
+3. seviye_guncelle ile kararını yaz: hazır olan parkurun seviyesini yükselt, olmayanı aynı bırak. strengths ve weaknesses'ı MUTLAKA güncelle — eski zayıf yönler düzeldiyse çıkar, yeni seviyede öne çıkacaklar varsa ekle. summary'yi öğrenciye hitaben yeniden yaz.
+4. Öğrenciye 2-4 cümlelik bir kapanış yaz: neyi başardığını somut olarak söyle, sırada ne olduğunu anlat. Abartma; hazır olmadığı parkur varsa bunu da dürüstçe ama cesaret kırmadan söyle.
+
+Bu turda modul_ekle KULLANMA — yeni müfredat ayrıca hazırlanacak.`;
+}
+
 // ---------------------------------------------------------------------------
 
 export const EVENT_PREFIX = "[Uygulama bildirimi:";
@@ -310,6 +332,7 @@ export const KICKOFF_ASSESSMENT = `${EVENT_PREFIX} Öğrenci seviye tespiti ekra
 export const KICKOFF_LESSON = `${EVENT_PREFIX} Öğrenci ders ekranını açtı ve henüz bir şey yazmadı. Dersi sen başlat.]`;
 export const KICKOFF_FREECHAT = `${EVENT_PREFIX} Öğrenci serbest sohbet ekranını açtı ve henüz bir şey yazmadı. Sohbeti sen başlat.]`;
 export const KICKOFF_QUIZ = `${EVENT_PREFIX} Öğrenci kelime sınavı ekranını açtı. tekrar_durumu ile duruma bak ve sınavı başlat.]`;
+export const KICKOFF_LEVELUP = `${EVENT_PREFIX} Öğrenci bu seviyedeki tüm modülleri bitirdi ve seviye atlama değerlendirmesi ekranını açtı. Verilere bakıp kararını ver.]`;
 export const KICKOFF_CURRICULUM = `${EVENT_PREFIX} Değerlendirme tamamlandı. Şimdi müfredatı inşa et.]`;
 
 export function idleNudgeEvent(minutes: number): string {
