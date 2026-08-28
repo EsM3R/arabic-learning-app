@@ -33,7 +33,7 @@ ${p.contentFormat}
 - ANLAŞILIR GİRDİ (i+1): Kullandığın hedef dil, öğrencinin seviyesinin BİR TIK üstünde olsun — bağlamdan çözebileceği kadar yeni, boğulmayacağı kadar tanıdık.
 - GERÇEK HAYAT: Konuşma pratiği kurgusal alıştırma cümleleriyle değil, gerçek senaryolarla aksın: ${p.scenarios}. Öğrencinin yarın gerçekten kullanabileceği cümleler öğret.
 - SARMAL TEKRAR: Yeni konuyu işlerken önceki derslerin kelimelerini ve hata defterindeki konuları bilinçli olarak geri döndür — öğrenilen şey kullanılmazsa ölür.
-- DÜZELTME DENGESİ: Anlamı bozan hataları hemen düzelt; küçük pürüzleri öğrencinin akışını kesmeden not et, uygun anda topluca ver. Öğrenciyi konuşmaktan korkutma.
+- DÜZELTME DENGESİ: Bir cevapta EN FAZLA BİR hatayı düzelt — anlamı bozan öncelikli. Diğer hataları sessizce hata defterine kaydet ve sonraki fırsatlarda döndür; uzun düzeltme blokları öğrenciyi boğar ve hiçbirini öğretmez. Öğrenciyi konuşmaktan korkutma.
 - DERS KAPANIŞI: Her dersi küçük bir üretim göreviyle bitir ("bunu kendi cümlenle yaz") — ezber değil, transfer.`;
 }
 
@@ -151,24 +151,42 @@ export function memoryContext(
   }
 
   const open = mistakes.filter((m) => !m.resolved);
+  // 3+ kez kaydedilen hata fosilleşiyor demektir: kenar notuyla geçilmez,
+  // ayrı bir başlık altında "bu derste işle" talimatıyla verilir.
+  const chronic = open.filter((m) => (m.timesSeen ?? 1) >= 3);
+  if (chronic.length > 0) {
+    parts.push(
+      `⚠️ TEKRARLAYAN HATALAR — öğrenci bunları defalarca yaptı, fosilleşiyorlar. Bu derste EN AZ BİRİNİ açıkça işle: konuyu kısaca anlat, 2-3 hedefli üretim sorusu sor, doğru kullanırsa hata_cozuldu ile kapat:\n${chronic
+        .map(
+          (m) =>
+            `- id=${m.id} [${m.topic}] ${m.timesSeen}. kez: "${m.mistake}" → "${m.correction}"`
+        )
+        .join("\n")}`
+    );
+  }
   if (open.length > 0) {
     const rank = (m: MistakeEntry) => (m.track === track ? 0 : m.track ? 2 : 1);
-    const ordered = [...open].sort((a, b) => {
+    const rest = open.filter((m) => (m.timesSeen ?? 1) < 3);
+    const ordered = [...rest].sort((a, b) => {
       const byTrack = rank(a) - rank(b);
       if (byTrack !== 0) return byTrack;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     const shown = ordered.slice(0, 10);
-    parts.push(
-      `Öğrencinin AÇIK hataları (${open.length} kayıt, en ilgili ${shown.length} tanesi — fırsat buldukça bu konuları tekrar ettir; düzeldiyse hata_cozuldu ile kapat):\n${shown
-        .map(
-          (m) =>
-            `- id=${m.id} [${m.topic}] "${m.mistake}" → "${m.correction}" — ${m.explanation}`
-        )
-        .join("\n")}`
-    );
-    if (open.length > shown.length) {
-      parts.push(`(Kalan ${open.length - shown.length} hataya hafiza_oku ile bakabilirsin.)`);
+    if (shown.length > 0) {
+      parts.push(
+        `Öğrencinin diğer AÇIK hataları (${open.length} kayıt — fırsat buldukça bu konuları tekrar ettir; düzeldiyse hata_cozuldu ile kapat):\n${shown
+          .map(
+            (m) =>
+              `- id=${m.id} [${m.topic}] "${m.mistake}" → "${m.correction}" — ${m.explanation}`
+          )
+          .join("\n")}`
+      );
+    }
+    if (open.length > chronic.length + shown.length) {
+      parts.push(
+        `(Kalan ${open.length - chronic.length - shown.length} hataya hafiza_oku ile bakabilirsin.)`
+      );
     }
   }
 

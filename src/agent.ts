@@ -636,17 +636,50 @@ export async function executeTool(
 
     case "hata_kaydet": {
       const entries = await loadMistakes();
+      const topic = String(input.topic ?? "");
+      // Aynı konuda AÇIK bir kayıt varsa yeni kayıt açılmaz: sayaç artar.
+      // Tekrarlayan hata fosilleşme sinyalidir; sayaç 3'e ulaşınca hafıza
+      // bağlamı bu hatayı "derste açıkça işle" diye öne çıkarır.
+      const norm = (s: string) => s.trim().toLowerCase();
+      const existing = entries.find((m) => !m.resolved && norm(m.topic) === norm(topic));
+      if (existing) {
+        const timesSeen = (existing.timesSeen ?? 1) + 1;
+        await saveMistakes(
+          entries.map((m) =>
+            m.id === existing.id
+              ? {
+                  ...m,
+                  timesSeen,
+                  // En güncel örnek daha öğretici olabilir; açıklamayı tazele.
+                  mistake: String(input.mistake ?? existing.mistake),
+                  correction: String(input.correction ?? existing.correction),
+                  explanation: String(input.explanation ?? existing.explanation),
+                  createdAt: new Date().toISOString(),
+                }
+              : m
+          )
+        );
+        return {
+          result: `DİKKAT: "${topic}" konusundaki hata ${timesSeen}. kez kaydedildi — bu hata fosilleşiyor. ${
+            timesSeen >= 3
+              ? "Artık kenar notu yetmez: bu konuyu bu derste veya bir sonrakinde AÇIKÇA işle, öğrenciye kısa hedefli alıştırma yaptır."
+              : "Fırsat buldukça bu konuyu geri döndür."
+          }`,
+          summary: `📒 Aynı hata ${timesSeen}. kez: ${topic}`,
+        };
+      }
       const entry = {
         id: `m${Date.now()}${Math.floor(Math.random() * 1000)}`,
         mistake: String(input.mistake ?? ""),
         correction: String(input.correction ?? ""),
         explanation: String(input.explanation ?? ""),
-        topic: String(input.topic ?? ""),
+        topic,
         track:
           input.track === "okuma" || input.track === "konusma"
             ? (input.track as Track)
             : ctx.currentTrack,
         createdAt: new Date().toISOString(),
+        timesSeen: 1,
       };
       await saveMistakes([...entries, entry]);
       return {

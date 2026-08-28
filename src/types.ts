@@ -80,6 +80,13 @@ export interface MistakeEntry {
   explanation: string;
   topic: string;
   createdAt: string;
+  /**
+   * Aynı konudaki hata kaç kez kaydedildi. 3'e ulaşan hata "fosilleşiyor"
+   * demektir ve derste açıkça işlenmek üzere hafızada öne çıkarılır —
+   * AI hocaların en bilinen kusuru, tekrarlayan hatayı anlayıp geçmesidir.
+   * Eski kayıtlarda olmayabilir (→ 1 sayılır).
+   */
+  timesSeen?: number;
   /** Hangi parkurda yapıldı — hafıza filtrelemesi için. Eski kayıtlarda olmayabilir. */
   track?: Track;
   /** Üstaz "artık bu hatayı yapmıyor" dediğinde işaretlenir; hafızadan düşer. */

@@ -58,6 +58,10 @@ jobs:
       - name: TypeScript denetimi
         run: npx tsc --noEmit
 
+      # Saf mantık modüllerinin testleri (SRS, istatistik, metin işleme).
+      - name: Testler
+        run: npm test
+
       # app.json tek doğruluk kaynağı; android/ klasörü repoda tutulmaz,
       # her derlemede prebuild ile yeniden üretilir (Expo CNG).
       - name: Android projesini üret (prebuild)
