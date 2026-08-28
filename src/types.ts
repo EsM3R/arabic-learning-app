@@ -126,7 +126,7 @@ export interface PronunciationSet {
 
 /** Üstaz'ın ekrana_git aracıyla önerdiği yönlendirme (zorlamaz, öneri çipi olarak gösterilir). */
 export interface NavigationSuggestion {
-  screen: "dashboard" | "review" | "quiz" | "pronunciation" | "mistakes" | "module";
+  screen: "dashboard" | "review" | "quiz" | "pronunciation" | "mistakes" | "module" | "reading";
   moduleId?: string;
   label: string;
 }
@@ -138,4 +138,85 @@ export interface Reminder {
   fireAt: string;
   createdAt: string;
   notificationId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Okuma Salonu — kelime defterinden üretilen okuma metinleri
+// ---------------------------------------------------------------------------
+
+/** Okuma metni uzunluk kademesi. */
+export type ReadingLength = "kisa" | "orta" | "uzun";
+
+export interface ReadingSentence {
+  /** Hedef dilin kendi yazımıyla TEK cümle (Arapça'da hareke politikasına göre). */
+  target: string;
+  /** Türkçe okunuşa yakın Latin transkripsiyon; Latin dillerde "". */
+  translit: string;
+  /** Doğal Türkçe çeviri. */
+  tr: string;
+}
+
+export interface ReadingNewWord {
+  /** Hedef yazım (Arapça'da HER ZAMAN tam harekeli). */
+  word: string;
+  translit: string;
+  tr: string;
+  /** Anlamın bağlamdan nasıl çıkarılacağına dair 1 cümlelik Türkçe ipucu. */
+  hint: string;
+}
+
+export interface ReadingQuestion {
+  /** Türkçe soru. */
+  q: string;
+  /** 3 Türkçe seçenek. */
+  choices: string[];
+  /** Doğru seçeneğin 0 tabanlı indeksi. */
+  answer: number;
+}
+
+/** Metin sonu üretim görevi — okuma tanımayla değil transferle bitsin. */
+export interface ReadingProductionTask {
+  /** Türkçe yönerge ("Metindeki kelimelerle dün ne yediğini yaz" gibi). */
+  instruction: string;
+  /** Hedef dilde tek cümlelik örnek cevap (öğrenci yazdıktan sonra açılır). */
+  example: string;
+}
+
+/** Modelden dönen ham üretim — provider.structured<ReadingGenPayload>. */
+export interface ReadingGenPayload {
+  title: string; // hedef dilde başlık
+  titleTr: string; // Türkçe başlık
+  sentences: ReadingSentence[];
+  newWords: ReadingNewWord[];
+  /** Metne gömüldüğü beyan edilen tekrar kelimeleri (verilen yazımla aynen). */
+  usedReviewWords: string[];
+  questions: ReadingQuestion[];
+  productionTask: ReadingProductionTask;
+}
+
+/** Kütüphanede saklanan okuma metni. */
+export interface ReadingText extends ReadingGenPayload {
+  id: string; // "r" + epoch + rastgele (newCard id kalıbı)
+  topic: string;
+  /** Konu bir müfredat modülünden türetildiyse. */
+  moduleId?: string;
+  level: string; // üretim anındaki readingLevel
+  length: ReadingLength;
+  /** Soğuk başlangıç metni mi (defter < COLD_START_MIN). */
+  coldStart: boolean;
+  createdAt: string; // ISO
+  /** bilinen/toplam — yaklaşık GERÇEK kapsam (yeni kelimeler bilinmeyen sayılır). Tanı amaçlı. */
+  knownRatio: number;
+  /** (bilinen + bildirilmiş yeni)/toplam — KURAL UYUMU; uyarı bandı buna bakar. */
+  complianceRatio: number;
+  /** newWords'te bildirilmeden geçen bilinmeyen tokenlar (normalize halleriyle, en fazla 20). */
+  unplannedUnknown: string[];
+  /** Cihazda metne eşlenen tekrar kartı id'leri. */
+  reviewCardIds: string[];
+  /** Bu metinden deftere eklenen kartların id'leri (mükerrer eklemeyi önler). */
+  addedWordIds: string[];
+  /** Okuma bitti işareti + soru skoru. */
+  finishedAt?: string;
+  quizCorrect?: number;
+  quizTotal?: number;
 }

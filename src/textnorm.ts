@@ -142,3 +142,64 @@ export function coverage(
     unknown: Array.from(unknown),
   };
 }
+
+export interface ReadingCoverage {
+  /** bilinen / toplam — yaklaşık GERÇEK kapsam (planlı yeni kelimeler de bilinmeyen sayılır). */
+  knownRatio: number;
+  /** (bilinen + PLANLI yeni) / toplam — kural uyumu: bildirilmemiş sürpriz oranını ölçer. */
+  complianceRatio: number;
+  totalTokens: number;
+  knownTokens: number;
+  plannedNewTokens: number;
+  /** newWords'te BİLDİRİLMEDEN geçen bilinmeyenler (normalize halleriyle, tekil). */
+  unplannedUnknown: string[];
+}
+
+/**
+ * Okuma metni kapsam ölçümü. knownRatio pedagojik kapsamın yaklaşığıdır;
+ * complianceRatio ise kural İHLALİNİ ölçer: model her yeni kelimeyi newWords'e
+ * yazmak zorundadır, oraya yazılmış kelimeler "planlı"dır ve uyumu düşürmez.
+ * Yaklaşık ölçümdür (kırık çoğul, çekim kalıpları yakalanmaz) — rozet/uyarı
+ * içindir, hakem değildir; otomatik hiçbir aksiyon buna bağlanmaz.
+ */
+export function readingCoverage(
+  text: string,
+  knownWords: string[],
+  plannedNewWords: string[],
+  arabicScript: boolean
+): ReadingCoverage {
+  const buildSet = (words: string[]) => {
+    const set = new Set<string>();
+    for (const w of words) {
+      const n = normalizeTarget(w, arabicScript);
+      if (!n) continue;
+      set.add(n);
+      for (const part of n.split(" ")) if (part.length >= 2) set.add(part);
+    }
+    return set;
+  };
+  const known = buildSet(knownWords);
+  const planned = buildSet(plannedNewWords);
+
+  const tokens = normalizeTarget(text, arabicScript)
+    .split(" ")
+    .filter((t) => t.length > 0);
+  let knownCount = 0;
+  let plannedCount = 0;
+  const unplanned = new Set<string>();
+  for (const tok of tokens) {
+    const cands = arabicScript ? arabicStemCandidates(tok) : [tok];
+    if (cands.some((c) => known.has(c))) knownCount += 1;
+    else if (cands.some((c) => planned.has(c))) plannedCount += 1;
+    else unplanned.add(tok);
+  }
+  const total = tokens.length;
+  return {
+    knownRatio: total === 0 ? 1 : knownCount / total,
+    complianceRatio: total === 0 ? 1 : (knownCount + plannedCount) / total,
+    totalTokens: total,
+    knownTokens: knownCount,
+    plannedNewTokens: plannedCount,
+    unplannedUnknown: Array.from(unplanned),
+  };
+}

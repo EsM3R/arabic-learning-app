@@ -305,13 +305,13 @@ const INITIATIVE_TOOLS: Anthropic.Tool[] = [
   {
     name: "ekrana_git",
     description:
-      "Öğrenciye bir sonraki adım için ekran önerir; sohbetin altında tıklanabilir bir öneri olarak görünür (zorlama yok). Modülü tamamladıktan sonra sıradaki modülü, tekrarı gelen kelime varsa kelime defterini, telaffuz sorunu görürsen telaffuz stüdyosunu öner.",
+      "Öğrenciye bir sonraki adım için ekran önerir; sohbetin altında tıklanabilir bir öneri olarak görünür (zorlama yok). Modülü tamamladıktan sonra sıradaki modülü, tekrarı gelen kelime varsa kelime defterini, telaffuz sorunu görürsen telaffuz stüdyosunu öner. Okuma çalışması önereceksen 'reading' ile Okuma Salonu'nu öner — öğrenci orada kelime defterinden örülmüş metin okur; tekrarı gelen kelimeler birikince de uygundur.",
     input_schema: {
       type: "object",
       properties: {
         screen: {
           type: "string",
-          enum: ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module"],
+          enum: ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module", "reading"],
           description: "Hedef ekran. 'module' seçersen moduleId de ver.",
         },
         moduleId: { type: "string", description: "screen='module' ise açılacak modülün id'si" },
@@ -832,7 +832,7 @@ export async function executeTool(
 
     case "ekrana_git": {
       const screen = String(input.screen ?? "");
-      const allowed = ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module"];
+      const allowed = ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module", "reading"];
       if (!allowed.includes(screen)) return { result: `Hata: geçersiz ekran '${screen}'.` };
       const moduleId = input.moduleId ? String(input.moduleId) : undefined;
       if (screen === "module") {

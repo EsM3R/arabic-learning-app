@@ -33,6 +33,7 @@ interface Props {
   onOpenReview: () => void;
   onOpenMistakes: () => void;
   onOpenPronunciation: () => void;
+  onOpenReading: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
   onOpenLevel: () => void;
   onLevelUp: () => void;
@@ -48,6 +49,7 @@ export default function DashboardScreen({
   onOpenReview,
   onOpenMistakes,
   onOpenPronunciation,
+  onOpenReading,
   onSwitchLanguage,
   onOpenLevel,
   onLevelUp,
@@ -343,6 +345,23 @@ export default function DashboardScreen({
         </View>
 
         <TouchableOpacity
+          style={styles.readingCard}
+          onPress={onOpenReading}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconSquare, { backgroundColor: colors.goldSoft }]}>
+            <Text style={styles.iconSquareText}>📖</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Okuma Salonu</Text>
+            <Text style={styles.cardMeta}>
+              Kelime defterinden örülmüş, sana özel okuma metinleri
+            </Text>
+          </View>
+          <Text style={styles.cardArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.pronunciationCard}
           onPress={onOpenPronunciation}
           activeOpacity={0.85}
@@ -608,6 +627,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   dueBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
+  readingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 12,
+    marginBottom: 12,
+    ...shadow,
+  },
   pronunciationCard: {
     flexDirection: "row",
     alignItems: "center",

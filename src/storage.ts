@@ -7,6 +7,7 @@ import {
   MistakeEntry,
   Profile,
   PronunciationSet,
+  ReadingText,
   Reminder,
   TeacherNote,
   VocabCard,
@@ -47,6 +48,9 @@ export const loadNotes = () => loadList<TeacherNote>(langKey("notes"));
 export const saveNotes = (notes: TeacherNote[]) => saveList(langKey("notes"), notes);
 export const loadReminders = () => loadList<Reminder>(langKey("reminders"));
 export const saveReminders = (reminders: Reminder[]) => saveList(langKey("reminders"), reminders);
+/** Okuma Salonu kütüphanesi. Kayıt her zaman pruneReadings ile budanarak yapılmalı. */
+export const loadReadings = () => loadList<ReadingText>(langKey("readings"));
+export const saveReadings = (list: ReadingText[]) => saveList(langKey("readings"), list);
 
 /** Öğrencinin son çalışma zamanı — uyanış kontrolü buna bakar. */
 export async function touchLastActivity(): Promise<void> {

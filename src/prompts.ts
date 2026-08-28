@@ -1,4 +1,5 @@
 import { getActivePack } from "./languages";
+import { LENGTH_SPECS, ReadingRequest } from "./reading";
 import { deckStats, strugglingCards } from "./srs";
 import {
   Assessment,
@@ -359,4 +360,84 @@ export function idleNudgeEvent(minutes: number): string {
 
 export function wakeCheckEvent(digest: string): string {
   return `${EVENT_PREFIX} Öğrenci uygulamayı açtı. Durum özeti: ${digest}]`;
+}
+
+// ---------------------------------------------------------------------------
+// Okuma Salonu — kelime defterinden okuma metni üretimi
+// ---------------------------------------------------------------------------
+
+/**
+ * Okuma metni üretimi: öğrencinin kelime defterinden %96-98 kapsamlı ÖZGÜN
+ * metin + anlama soruları + üretim görevi — TEK yapılandırılmış çağrı.
+ * Kurallar system'da, defter/tekrar listeleri userMessage'da
+ * (analyzeAssessment idiomu: veri kullanıcı mesajında taşınır).
+ */
+export function readingTextSystem(
+  name: string,
+  req: ReadingRequest,
+  avoidWords?: string[]
+): string {
+  const p = getActivePack();
+  const spec = LENGTH_SPECS[req.length];
+  const sep = p.scriptExtract ? "، " : ", ";
+  const translitRule = p.scriptExtract
+    ? `- Her cümlenin ve her yeni kelimenin translit alanına Türkçe okunuşa yakın Latin transkripsiyon yaz (örnek biçim: "şu ahbārak").`
+    : `- Bu dil Latin alfabelidir: bütün translit alanlarına boş string ("") yaz.`;
+
+  const coverageBlock = req.coldStart
+    ? `DEFTER DURUMU — SOĞUK BAŞLANGIÇ: Öğrencinin kelime defterinde henüz yalnızca ${req.deckSize} kelime var; %96-98 kapsam matematiksel olarak imkânsız. Bu bir BAŞLANGIÇ metni; kuralların:
+1. Kullanıcı mesajındaki defter kelimelerinin TAMAMINI metne doğal biçimde göm — her biri en az bir kez geçsin.${p.diglossic ? " (İstisna: günlük konuşma diline özgü olup yazı dilindeki karşılığı FARKLI olan biçimleri aynen gömme; yazı dilindeki karşılığını kullan ve o karşılığı newWords'e ekle.)" : ""} Gömdüklerini usedReviewWords alanına verilen yazımlarıyla yaz.
+2. Metnin kalanını ${req.level} seviyesinin EN SIK kullanılan, en temel kelimeleriyle kur — bu seviyedeki bir ders kitabının ilk ünitelerini düşün; nadir kelime kullanma.
+3. Defter dışından kullandığın İÇERİK kelimelerinden öğrenciye en faydalı 6-10 tanesini newWords'e yaz (hepsini değil — en işe yarayanları seç); temel işlev kelimelerini (${p.readingFunctionWords}) yazma.
+4. Cümleler birbirinin üstüne bindirsin; aynı kelimeler cümleden cümleye tekrar etsin ki metin kendi kendini öğretsin.`
+    : `KAPSAM KURALI — işin kalbi bu, taviz yok:
+Araştırma bulgusu net: öğrencinin bir metni yardımsız anlayıp yeni kelimeleri bağlamdan çıkarabilmesi için metindeki kelimelerin %96-98'ini zaten biliyor olması gerekir. Bunu şöyle sağlarsın:
+1. Metnin gövdesini SADECE kullanıcı mesajındaki BİLİNEN KELİMELER listesinden ve bu kelimelerin doğal çekimlerinden (çoğul, iyelik, şahıs/zaman çekimi) kur. Bilinen kelimenin çekimi yeni sayılmaz; yine de en yalın, en tanıdık biçimleri tercih et. Listeyle kurulamayan cümleyi yazma — cümleyi değiştir.
+2. Dilin en temel işlev kelimeleri (${p.readingFunctionWords}) listede olmasa da serbesttir ve yeni sayılmaz; ${req.level} seviyesinin bildiği varsayılabilecek olanlarla sınırlı kal.
+3. Bunların dışındaki HER içerik kelimesi YENİ KELİMEDİR. En fazla ${spec.maxNew} yeni kelime kullanabilirsin (metnin %2-5'i); daha azı daha iyidir, sıfır da olabilir. Kullandığın HER yeni kelimeyi istisnasız newWords'e yaz — bildirmeden kullandığın her kelime kural ihlalidir. Bilinen ve işlev kelimelerini newWords'e YAZMA.
+4. Her yeni kelimeyi, anlamı bağlamdan TAHMİN EDİLEBİLECEK bir cümleye yerleştir: çevresindeki bütün kelimeler bilinen kelimeler olsun ve cümlenin akışı anlamı neredeyse ele versin. Aynı yeni kelimeyi metinde 2-3 farklı cümlede tekrar kullan — kelime tek görüşte öğrenilmez.
+
+TEKRAR KELİMELERİ — öğrencinin tekrar takvimi gelen kelimeleri; bu metin onların provasıdır:
+Kullanıcı mesajında verilen tekrar kelimelerinin HER BİRİNİ metinde en az bir kez, mümkünse iki kez doğal biçimde kullan (metni zorlayan olursa en fazla 1-2 tanesini atlayabilirsin). Kullandıklarını usedReviewWords alanına, metindeki çekimli halleriyle DEĞİL, sana verilen yazımlarıyla yaz.`;
+
+  const avoidBlock = avoidWords?.length
+    ? `\n\nKAÇINILACAK KELİMELER: Şu kelimeleri bu metinde hiç KULLANMA (önceki denemede plansız geçtiler; normalize yazımlarıyla verilmiştir): ${avoidWords.join(sep)}`
+    : "";
+
+  return `Sen "${p.teacherName}" adında usta bir ${p.label} öğretmenisin. Türk öğrencin ${name} için, ONUN KELİME DEFTERİNDEN örülmüş, ${req.level} seviyesinde ÖZGÜN bir okuma metni YAZACAKSIN — hazır metin bulur gibi değil, bu defter için sıfırdan üreterek. Defter ve tekrar listesi kullanıcı mesajında verilecek.
+
+${p.readingVariant}
+${p.readingScriptRule(req.level)}
+
+${coverageBlock}${avoidBlock}
+
+METİN:
+- Konuya sadık kal ve GERÇEKÇİ bir tür seç: kısa hikâye, WhatsApp yazışması, ilan, kısa haber, günlük anlatısı... (${p.scenarios} tarzı gerçek hayat). Ders kitabı kokan yapay cümleler kurma; öğrencinin yarın karşılaşabileceği türden bir metin yaz.
+- Uzunluk: ${spec.sentences[0]}-${spec.sentences[1]} cümle (yaklaşık ${spec.words[0]}-${spec.words[1]} kelime). Her sentences öğesi TEK cümle içersin; cümleler kısa ve net olsun.
+
+ANLAMA SORULARI — tam ${spec.questionCount} soru:
+- İlk soru metnin genel fikrini ölçsün; ortadakiler somut detayları; SON soru yeni kelimelerden birinin anlamını bağlamdan çıkarttırsın ("Metne göre ... ne anlama geliyor?" gibi). Yeni kelime yoksa son soru da detay sorusu olsun.
+- Soru ve seçenekler TÜRKÇE; her soruda tam 3 seçenek; answer doğru seçeneğin 0 tabanlı indeksi. Yanlış seçenekler makul görünsün ama metinle açıkça çelişsin — kelime oyunu değil, anlama testi.
+
+ÜRETİM GÖREVİ (productionTask): instruction alanına, öğrencinin metindeki kelimelerle KENDİ hayatına dair 1-2 cümle kurmasını isteyen kısa bir Türkçe yönerge; example alanına hedef dilde tek cümlelik örnek cevap yaz. Ezber değil transfer — metindeki cümlenin kopyası olmasın.
+
+Alan kuralları:
+- title: hedef dilde kısa, merak uyandıran bir başlık; titleTr: Türkçe karşılığı.
+- sentences[i].tr: cümlenin doğal Türkçe çevirisi (kelimesi kelimesine değil).
+- newWords[i]: word (metindeki yazımıyla${p.scriptExtract ? ", her zaman TAM harekeli" : ""}), translit, tr (Türkçe anlam), hint (anlamın bağlamdan nasıl çıkarılacağına dair 1 cümlelik Türkçe ipucu — anlamı doğrudan söyleme, yolu göster).
+${translitRule}`;
+}
+
+export function readingTextUserMessage(req: ReadingRequest): string {
+  const sep = getActivePack().scriptExtract ? "، " : ", ";
+  const review = req.reviewCards.map((c) => c.arabic);
+  return `Konu: ${req.topic}
+
+BİLİNEN KELİMELER (${req.knownWords.length} adet):
+${req.knownWords.join(sep) || "(defter tamamen boş — metni tümüyle seviyenin temel kelimelerinden kur)"}
+
+TEKRAR KELİMELERİ${req.coldStart ? " (defterdekilerin tamamı — hepsini göm)" : ""}:
+${review.join(sep) || "(bu sefer yok)"}
+
+Okuma metnimi hazırla.`;
 }

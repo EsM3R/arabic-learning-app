@@ -36,6 +36,20 @@ export interface LanguagePack {
   scenarios: string;
   /** Okuma dersi malzeme notu (ör. hareke politikası). */
   readingNote: string;
+  /**
+   * Yazı dili ile konuşma dili ayrı register mı (Arapça: fusha ↔ Şami ammice)?
+   * true → okuma metnine gömülecek TEKRAR kelimeleri yalnız "okuma" parkurundan
+   * seçilir; soğuk başlangıçta konuşma-diline özgü biçimler yazı-dili
+   * karşılığıyla değiştirilir (prompt kuralı). scriptExtract ALFABE bayrağıdır,
+   * register bayrağı değil — o yüzden ayrı alan.
+   */
+  diglossic: boolean;
+  /** Okuma metni ÜRETİMİ: dil varyantı talimatı (prompt'a aynen girer). */
+  readingVariant: string;
+  /** Okuma seviyesine göre yazı/işaret politikası talimatı (Arapça hareke). */
+  readingScriptRule: (readingLevel: string) => string;
+  /** Yeni sayılmayan temel işlev kelimesi örnekleri (prompt'ta anılır). */
+  readingFunctionWords: string;
   /** Türk öğrencinin bu dilde zorlandığı sesler (telaffuz stüdyosu). */
   pronunciationFocus: string;
   /** Seviye tespitinde nelerin yoklanacağı. */
@@ -77,6 +91,17 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     rolePartner: "Suriyeli bir arkadaş",
     scenarios: "selamlaşma, misafirlik, çarşı-pazar, yemek, taksi, WhatsApp mesajlaşması",
     readingNote: "(harekeli metinle başla, seviye ilerledikçe harekesizle)",
+    diglossic: true,
+    readingVariant:
+      "Metni FUSHA (Modern Standart Arapça) yaz — okuma parkuru fushadır. Bilinen kelimeler listesinde Şami ammice biçimler olabilir; bir kelimenin fusha karşılığı listedeki ammice biçimden belirgin şekilde farklıysa (örn. شو → ماذا), ammice biçimi metne aynen gömme: fusha karşılığını kullan ve o karşılığı YENİ kelime sayıp newWords'e ekle. Ammice-fusha ortak kelimeleri (بيت، سوق، يوم gibi) serbestçe kullan.",
+    readingScriptRule: (level) => {
+      if (["A0", "A1", "A2"].includes(level))
+        return "HAREKE POLİTİKASI: Metnin TAMAMINI tam harekeli yaz (fetha, damme, kesra, sükûn, şedde) — başlık dahil. Öğrenci bu seviyede harekesiz okuyamaz.";
+      if (level === "B1")
+        return "HAREKE POLİTİKASI: Yalnızca yeni kelimeleri ve okunuşu karışabilecek biçimleri (meçhul fiil, az bilinen kalıp) harekele; metnin kalanını harekesiz yaz — öğrenci harekesize geçiş aşamasında.";
+      return "HAREKE POLİTİKASI: Metni harekesiz yaz — gerçek metin görünümü. Yalnızca gerçekten belirsizlik doğuran yerde tekil hareke kullan.";
+    },
+    readingFunctionWords: "örn. في، من، إلى، على، هذا، هذه، هو، هي، و، أنّ، كان، لا",
     pronunciationFocus:
       "Türklerin zorlandığı sesler: ع، ح، خ، غ، ق، ض، ظ، ص. İpuçlarını Türkçedeki benzer seslerden yola çıkarak ver (örn. \"ع boğazın sıkışmasıyla çıkar\", \"خ Türkçedeki h'den sert, hırıltılı\").",
     assessmentFocus:
@@ -117,6 +142,12 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     rolePartner: "İngilizce konuşan bir arkadaş veya iş arkadaşı",
     scenarios: "small talk, iş toplantısı, seyahat, restoran, e-posta ve mesajlaşma",
     readingNote: "",
+    diglossic: false,
+    readingVariant:
+      "Metin doğal, güncel İngilizce olsun (İngiliz kullanımı esas); ders kitabı İngilizcesi değil, gerçek metin türleri.",
+    readingScriptRule: () =>
+      "Metni doğal, gerçek hayattaki yazımıyla yaz (kısaltmalar serbest: I'm, don't).",
+    readingFunctionWords: "örn. the, a, is, are, and, but, in, on, this, that, have",
     pronunciationFocus:
       "Türklerin zorlandığı sesler: th (θ/ð — 'think' vs 'this'), w-v ayrımı, ship-sheep gibi kısa/uzun ünlüler, kelime vurgusu ve schwa (ə). İpuçlarını Türkçe seslerle kıyaslayarak ver.",
     assessmentFocus:
@@ -157,6 +188,12 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     rolePartner: "İspanyol bir arkadaş",
     scenarios: "tapas barında sohbet, seyahat, alışveriş, yol sorma, WhatsApp mesajlaşması",
     readingNote: "",
+    diglossic: false,
+    readingVariant:
+      "Metin İspanya İspanyolcasıyla, doğal ve güncel olsun; ders kitabı kokan yapay dil kullanma.",
+    readingScriptRule: () =>
+      "Metni doğal İspanyolca yazımıyla yaz (aksanlar ve ¿¡ işaretleri eksiksiz).",
+    readingFunctionWords: "örn. el, la, un, una, es, está, y, pero, en, este, que, hay",
     pronunciationFocus:
       "Türklerin zorlandığı sesler: rr (titrek r), j (jota — sert h), ll/y, b-v aynılığı, c/z (İspanya'da θ), kelime vurgusu. İpuçlarını Türkçe seslerle kıyaslayarak ver.",
     assessmentFocus:

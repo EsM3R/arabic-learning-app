@@ -35,3 +35,66 @@ export const speakArabic = speakTarget;
 export function stopSpeaking(): void {
   Speech.stop();
 }
+
+export interface SequenceHandle {
+  cancel: () => void;
+}
+
+/**
+ * Cümleleri sırayla okur. Android'de kelime-seviyesi onBoundary güvenilmez —
+ * senkron CÜMLE seviyesinde, onDone zinciriyle kurulur. onError da zinciri
+ * sürdürür; bazı Android TTS motorları onDone/onError'ı HİÇ çağırmadığı için
+ * her cümleye bekçi zamanlayıcı konur (metin uzunluğuna göre ölçekli).
+ */
+export function speakSequence(
+  texts: string[],
+  opts: {
+    startIndex?: number;
+    slow?: boolean;
+    onSentence?: (index: number) => void;
+    onDone?: () => void;
+  } = {}
+): SequenceHandle {
+  const pack = getActivePack();
+  let cancelled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const clear = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const speakAt = (i: number) => {
+    if (cancelled) return;
+    if (i >= texts.length) {
+      opts.onDone?.();
+      return;
+    }
+    opts.onSentence?.(i);
+    let advanced = false;
+    const next = () => {
+      if (advanced || cancelled) return;
+      advanced = true;
+      clear();
+      speakAt(i + 1);
+    };
+    timer = setTimeout(next, 8000 + texts[i].length * 200); // bekçi
+    Speech.speak(texts[i], {
+      language: pack.ttsLocale,
+      rate: opts.slow ? 0.55 : 0.9,
+      onDone: next,
+      onError: next,
+    });
+  };
+
+  Speech.stop();
+  speakAt(opts.startIndex ?? 0);
+  return {
+    cancel: () => {
+      cancelled = true;
+      clear();
+      Speech.stop();
+    },
+  };
+}

@@ -10,6 +10,7 @@ import LevelScreen from "./src/screens/LevelScreen";
 import LevelUpScreen from "./src/screens/LevelUpScreen";
 import MistakesScreen from "./src/screens/MistakesScreen";
 import PronunciationScreen from "./src/screens/PronunciationScreen";
+import ReadingScreen from "./src/screens/ReadingScreen";
 import ReviewScreen from "./src/screens/ReviewScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import SetupScreen from "./src/screens/SetupScreen";
@@ -33,6 +34,7 @@ type Screen =
   | { name: "review" }
   | { name: "mistakes" }
   | { name: "pronunciation" }
+  | { name: "reading" }
   | { name: "settings" }
   | { name: "level" }
   | { name: "levelup" };
@@ -169,6 +171,9 @@ export default function App() {
       case "pronunciation":
         setScreen({ name: "pronunciation" });
         break;
+      case "reading":
+        setScreen({ name: "reading" });
+        break;
       case "mistakes":
         setScreen({ name: "mistakes" });
         break;
@@ -213,6 +218,7 @@ export default function App() {
           onOpenReview={() => setScreen({ name: "review" })}
           onOpenMistakes={() => setScreen({ name: "mistakes" })}
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
+          onOpenReading={() => setScreen({ name: "reading" })}
           onSwitchLanguage={(id) => void onSwitchLanguage(id)}
           onOpenLevel={() => setScreen({ name: "level" })}
           onLevelUp={() => setScreen({ name: "levelup" })}
@@ -258,6 +264,9 @@ export default function App() {
       )}
       {screen.name === "pronunciation" && profile && (
         <PronunciationScreen profile={profile} onBack={() => setScreen({ name: "dashboard" })} />
+      )}
+      {screen.name === "reading" && profile && (
+        <ReadingScreen key={lang} profile={profile} onBack={() => setScreen({ name: "dashboard" })} />
       )}
     </View>
   );

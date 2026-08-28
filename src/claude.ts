@@ -1,6 +1,19 @@
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
+import { getActivePack } from "./languages";
 import { activeSetup, Effort, ToolSpec } from "./providers";
-import { assessmentAnalysisSystem, curriculumSystem, pronunciationSystem } from "./prompts";
+import {
+  assessmentAnalysisSystem,
+  curriculumSystem,
+  pronunciationSystem,
+  readingTextSystem,
+  readingTextUserMessage,
+} from "./prompts";
+import {
+  buildReadingRequest,
+  finalizeReading,
+  ReadingOptions,
+  topicFromModule,
+} from "./reading";
 import {
   Assessment,
   ChatMessage,
@@ -9,6 +22,9 @@ import {
   Profile,
   PronunciationItem,
   PronunciationSet,
+  ReadingGenPayload,
+  ReadingText,
+  VocabCard,
 } from "./types";
 
 export type { Effort } from "./providers";
@@ -169,6 +185,107 @@ const PRONUNCIATION_SCHEMA = {
   required: ["items"],
   additionalProperties: false,
 } as const;
+
+const READING_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    titleTr: { type: "string" },
+    sentences: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          target: { type: "string" },
+          translit: { type: "string" },
+          tr: { type: "string" },
+        },
+        required: ["target", "translit", "tr"],
+        additionalProperties: false,
+      },
+    },
+    newWords: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          word: { type: "string" },
+          translit: { type: "string" },
+          tr: { type: "string" },
+          hint: { type: "string" },
+        },
+        required: ["word", "translit", "tr", "hint"],
+        additionalProperties: false,
+      },
+    },
+    usedReviewWords: { type: "array", items: { type: "string" } },
+    questions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          q: { type: "string" },
+          choices: { type: "array", items: { type: "string" } },
+          answer: { type: "integer" },
+        },
+        required: ["q", "choices", "answer"],
+        additionalProperties: false,
+      },
+    },
+    productionTask: {
+      type: "object",
+      properties: {
+        instruction: { type: "string" },
+        example: { type: "string" },
+      },
+      required: ["instruction", "example"],
+      additionalProperties: false,
+    },
+  },
+  required: [
+    "title",
+    "titleTr",
+    "sentences",
+    "newWords",
+    "usedReviewWords",
+    "questions",
+    "productionTask",
+  ],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Kelime defterinden %96-98 kapsamlı okuma metni — TEK yapılandırılmış çağrı.
+ * Kapsam ölçümü ve kart eşleme cihazda (src/reading.ts + src/textnorm.ts).
+ */
+export async function generateReadingText(
+  profile: Profile,
+  vocab: VocabCard[],
+  opts: ReadingOptions
+): Promise<ReadingText> {
+  const { provider, model, apiKey } = requireKey(profile);
+  const pack = getActivePack();
+  const level = profile.assessment?.readingLevel ?? "A1";
+  const module = opts.moduleId
+    ? profile.curriculum?.modules.find((m) => m.id === opts.moduleId)
+    : undefined;
+  const req = buildReadingRequest(
+    vocab,
+    opts,
+    level,
+    module ? topicFromModule(module) : undefined,
+    pack.scenarios,
+    pack.diglossic
+  );
+  const raw = await provider.structured<ReadingGenPayload>({
+    system: readingTextSystem(profile.name, req, opts.avoidWords),
+    userMessage: readingTextUserMessage(req),
+    schema: READING_SCHEMA as unknown as Record<string, unknown>,
+    model,
+    apiKey,
+  });
+  return finalizeReading(raw, req, vocab, pack.scriptExtract);
+}
 
 /** Seviyeye ve kelime defterine göre telaffuz pratik seti üretir. */
 export async function generatePronunciationSet(
