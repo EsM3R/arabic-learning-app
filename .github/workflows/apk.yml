@@ -23,10 +23,11 @@ jobs:
       - name: Kodu al
         uses: actions/checkout@v4
 
+      # Node 22: testler --experimental-strip-types ile koşuyor (22.6+ gerekir).
       - name: Node kur
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Java 17 kur

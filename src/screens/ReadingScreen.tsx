@@ -403,10 +403,10 @@ export default function ReadingScreen({ profile, onBack }: Props) {
             <TextInput
               style={[styles.productionInput, pack.scriptExtract && styles.rtl]}
               value={production}
-              onChangeText={(t) => {
-                const wasEmpty = production.trim().length === 0;
-                setProduction(t);
-                if (wasEmpty && t.trim().length > 0) void recordStat("produced");
+              onChangeText={setProduction}
+              onEndEditing={() => {
+                // Yazım bittiğinde sayılır — ilk harfte değil (dürüst sayaç).
+                if (production.trim().length > 0) void recordStat("produced");
               }}
               placeholder="Cevabını buraya yaz…"
               placeholderTextColor={colors.inkFaint}

@@ -179,9 +179,9 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
   };
 
   const restart = () => {
-    setQueue(buildShadowQueue([], null, notes, pack.scriptExtract, 0)); // geçici boşalt
     void (async () => {
       const [texts, pron] = await Promise.all([loadReadings(), loadPronunciationSet()]);
+      // Kuyruk notlarla yeniden kurulur — "tekrar lazım" dedikleri öne gelir.
       setQueue(buildShadowQueue(texts, pron, notes, pack.scriptExtract));
       setIndex(0);
       setPass(1);
