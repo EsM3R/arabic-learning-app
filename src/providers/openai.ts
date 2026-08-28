@@ -1,4 +1,6 @@
 import type OpenAI from "openai";
+// RN fetch gövde akışını desteklemez; Expo'nunki destekler (akışlı sohbet şartı).
+import { fetch as expoFetch } from "expo/fetch";
 import { recordUsage } from "../usage";
 import {
   AgenticReply,
@@ -38,7 +40,11 @@ const meta: ProviderMeta = {
 function client(apiKey: string): OpenAI {
   const mod = require("openai");
   const Ctor = mod.default ?? mod.OpenAI ?? mod;
-  return new Ctor({ apiKey, dangerouslyAllowBrowser: true }) as OpenAI;
+  return new Ctor({
+    apiKey,
+    dangerouslyAllowBrowser: true,
+    fetch: expoFetch as unknown as typeof globalThis.fetch,
+  }) as OpenAI;
 }
 
 function toTools(req: AgenticRequest): OpenAI.Responses.FunctionTool[] {
@@ -55,7 +61,8 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
   const openai = client(req.apiKey);
   const tools = toTools(req);
   const actions: string[] = [];
-  let lastText = "";
+  // Ekrana akanla kaydedilen aynı olsun diye cevap TÜM turların metnidir.
+  const textParts: string[] = [];
 
   const input: OpenAI.Responses.ResponseInput = req.messages.map((m, i) => ({
     role: m.role,
@@ -64,7 +71,9 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
   }));
 
   for (let round = 0; round < req.maxRounds; round++) {
-    const response = await openai.responses.create({
+    req.onRound?.(round);
+    // Akış: metin delta'ları geldikçe ekrana damlar; sonda tam yanıt alınır.
+    const stream = openai.responses.stream({
       model: req.model,
       instructions: req.stable,
       input,
@@ -72,6 +81,11 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       reasoning: { effort: req.effort },
       max_output_tokens: 16000,
     });
+    stream.on("response.output_text.delta", (ev: { delta: string }) => {
+      if (ev.delta) req.onText?.(ev.delta);
+    });
+    stream.on("response.reasoning_summary_part.added", () => req.onThinking?.());
+    const response = await stream.finalResponse();
 
     const u = response.usage;
     void recordUsage({
@@ -81,16 +95,18 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       cacheRead: u?.input_tokens_details?.cached_tokens ?? 0,
     });
     const text = (response.output_text ?? "").trim();
-    if (text) lastText = text;
+    if (text) textParts.push(text);
 
+    // finalResponse() Parsed* tipleri döndürür; okuduğumuz alanlar (name,
+    // arguments, call_id) taban tiple aynı — güvenli daraltma.
     const calls = response.output.filter(
-      (item): item is OpenAI.Responses.ResponseFunctionToolCall =>
-        item.type === "function_call"
-    );
+      (item) => item.type === "function_call"
+    ) as OpenAI.Responses.ResponseFunctionToolCall[];
 
     if (calls.length === 0) {
-      if (!text) throw new Error(EMPTY_TEXT);
-      return { text, actions };
+      const full = textParts.join("\n\n").trim();
+      if (!full) throw new Error(EMPTY_TEXT);
+      return { text: full, actions };
     }
 
     // Modelin ürettiği öğeleri aynen geri ver, sonra sonuçları ekle
@@ -98,6 +114,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       input.push(item as unknown as OpenAI.Responses.ResponseInputItem);
     }
     for (const call of calls) {
+      req.onTool?.(call.name);
       let parsed: Record<string, unknown> = {};
       try {
         parsed = JSON.parse(call.arguments || "{}") as Record<string, unknown>;
@@ -119,7 +136,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     }
   }
 
-  return { text: lastText || BUDGET_EXHAUSTED_TEXT, actions };
+  return { text: textParts.join("\n\n").trim() || BUDGET_EXHAUSTED_TEXT, actions };
 }
 
 async function structured<T>(req: StructuredRequest): Promise<T> {

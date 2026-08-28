@@ -54,6 +54,10 @@ export default function LessonScreen({
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
+  /** Akış halindeki hoca cevabı (henüz kaydedilmedi) — ChatView canlı balon çizer. */
+  const [live, setLive] = useState<string | null>(null);
+  /** "düşünüyor… / defterine bakıyor…" durum satırı. */
+  const [status, setStatus] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<NavigationSuggestion | null>(null);
   const started = useRef(false);
   /** Turlar arası en güncel profil — React state'inin gecikmesine takılmamak için. */
@@ -62,6 +66,9 @@ export default function LessonScreen({
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nudgeUsed = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
+  /** Akış tamponu: her delta'da setState yapmamak için ~80ms'de bir boşaltılır. */
+  const liveBuf = useRef("");
+  const liveFlush = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     profileRef.current = profile;
@@ -122,10 +129,44 @@ export default function LessonScreen({
     };
   };
 
+  /** Tampondaki akışı ekrana bas (en geç 80 ms'de bir). */
+  const scheduleFlush = () => {
+    if (liveFlush.current) return;
+    liveFlush.current = setTimeout(() => {
+      liveFlush.current = null;
+      setLive(liveBuf.current);
+    }, 80);
+  };
+
+  /** Araç adları öğrenciye "hoca ne yapıyor" diliyle gösterilir. */
+  const toolLabel = (name: string): string =>
+    ({
+      kelime_ara: "defterine bakıyor…",
+      tekrar_durumu: "tekrar defterine bakıyor…",
+      hafiza_oku: "hafızasını yokluyor…",
+      mufredat_oku: "müfredata bakıyor…",
+      kelime_kaydet: "kelimeyi deftere yazıyor…",
+      kelime_puanla: "cevabını puanlıyor…",
+      kelime_duzelt: "defteri düzeltiyor…",
+      kelime_sil: "defteri düzeltiyor…",
+      hata_kaydet: "hatayı not ediyor…",
+      hata_cozuldu: "hatanı kapatıyor…",
+      not_yaz: "kendine not alıyor…",
+      not_sil: "notlarını düzenliyor…",
+      seviye_guncelle: "seviyeni güncelliyor…",
+      modul_ekle: "müfredata ekliyor…",
+      modul_tamamla: "modülü kapatıyor…",
+      ekrana_git: "sana öneri hazırlıyor…",
+      hatirlatici_kur: "hatırlatıcı kuruyor…",
+    })[name] ?? "bir araç kullanıyor…";
+
   const runTurn = async (history: ChatMessage[]) => {
     clearIdleTimer();
     setSending(true);
     setSuggestion(null);
+    setStatus(null);
+    liveBuf.current = "";
+    setLive(null);
     void touchLastActivity();
     const ctx: AgentContext = {
       profile: profileRef.current,
@@ -138,6 +179,23 @@ export default function LessonScreen({
       // Ders anlatımı tam güçte düşünür; sınav ve serbest sohbet daha mekanik.
       const reply = await agenticChat(system, history, ctx, {
         effort: module ? "high" : "medium",
+        hooks: {
+          onThinking: () => {
+            if (!liveBuf.current) setStatus("düşünüyor…");
+          },
+          onText: (delta) => {
+            setStatus(null);
+            liveBuf.current += delta;
+            scheduleFlush();
+          },
+          onTool: (name) => setStatus(toolLabel(name)),
+          onRound: (round) => {
+            // Araç turundan dönen yeni metin, öncekinin dibine yapışmasın.
+            if (round > 0 && liveBuf.current && !liveBuf.current.endsWith("\n\n")) {
+              liveBuf.current += "\n\n";
+            }
+          },
+        },
       });
       const updated: ChatMessage[] = [
         ...history,
@@ -158,6 +216,13 @@ export default function LessonScreen({
         profileRef.current = ctx.profile;
         onProfileChange(ctx.profile);
       }
+      if (liveFlush.current) {
+        clearTimeout(liveFlush.current);
+        liveFlush.current = null;
+      }
+      liveBuf.current = "";
+      setLive(null);
+      setStatus(null);
       setSending(false);
     }
   };
@@ -231,6 +296,8 @@ export default function LessonScreen({
       <ChatView
         messages={messages}
         sending={sending}
+        live={live}
+        status={status}
         onSend={onSend}
         placeholder={module || quiz ? "Cevabını yaz…" : pack.chatPlaceholderFree}
         suggestion={suggestion}

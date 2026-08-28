@@ -63,7 +63,9 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
   const ai = client(req.apiKey);
   const tools = toTools(req);
   const actions: string[] = [];
-  let lastText = "";
+  // Gemini SDK'sının RN'de güvenilir akışı yok: metin tek parça teslim edilir
+  // ama AYNI kancalardan geçer — UI farkı bilmez, sadece damlamaz.
+  const textParts: string[] = [];
 
   const contents: Content[] = req.messages.map((m, i) => ({
     role: m.role === "assistant" ? "model" : "user",
@@ -78,6 +80,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
   }));
 
   for (let round = 0; round < req.maxRounds; round++) {
+    req.onRound?.(round);
     const response = await ai.models.generateContent({
       model: req.model,
       contents,
@@ -96,12 +99,16 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       cacheRead: gm?.cachedContentTokenCount ?? 0,
     });
     const text = (response.text ?? "").trim();
-    if (text) lastText = text;
+    if (text) {
+      textParts.push(text);
+      req.onText?.(text);
+    }
 
     const calls: FunctionCall[] = response.functionCalls ?? [];
     if (calls.length === 0) {
-      if (!text) throw new Error(EMPTY_TEXT);
-      return { text, actions };
+      const full = textParts.join("\n\n").trim();
+      if (!full) throw new Error(EMPTY_TEXT);
+      return { text: full, actions };
     }
 
     // Modelin turu (araç çağrıları dahil) geçmişe aynen eklenir
@@ -114,6 +121,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     const resultParts: Part[] = [];
     for (const call of calls) {
       const name = call.name ?? "";
+      req.onTool?.(name);
       const outcome = await req.runTool(
         name,
         (call.args ?? {}) as Record<string, unknown>
@@ -135,7 +143,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     contents.push({ role: "user", parts: resultParts });
   }
 
-  return { text: lastText || BUDGET_EXHAUSTED_TEXT, actions };
+  return { text: textParts.join("\n\n").trim() || BUDGET_EXHAUSTED_TEXT, actions };
 }
 
 async function structured<T>(req: StructuredRequest): Promise<T> {

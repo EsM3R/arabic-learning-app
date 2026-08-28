@@ -1,7 +1,7 @@
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
 import { sanitizeMinimalPairs } from "./hvpt";
 import { getActivePack } from "./languages";
-import { activeSetup, Effort, ToolSpec } from "./providers";
+import { activeSetup, Effort, StreamHooks, ToolSpec } from "./providers";
 import {
   curriculumSystem,
   pronunciationSystem,
@@ -50,6 +50,8 @@ export interface ChatOptions {
   tools?: ToolSpec[];
   maxRounds?: number;
   effort?: Effort;
+  /** Canlı akış kancaları — veren ekran cevabı damla damla alır. */
+  hooks?: StreamHooks;
 }
 
 const MAX_TOOL_ROUNDS = 12;
@@ -90,6 +92,7 @@ export async function agenticChat(
     model,
     apiKey,
     runTool: (name, input) => executeTool(name, input, ctx),
+    ...opts.hooks,
   });
 }
 

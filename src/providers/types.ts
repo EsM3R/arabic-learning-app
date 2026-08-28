@@ -21,7 +21,23 @@ export interface ToolOutcome {
   summary?: string;
 }
 
-export interface AgenticRequest {
+/**
+ * Canlı akış kancaları. Algılanan hızın asıl kaynağı bunlar: cevabın bitmesi
+ * beklenmez, üretildikçe ekrana akar. Hepsi isteğe bağlıdır — vermeyen çağıran
+ * (ör. panel arka plan kontrolü) eski davranışı aynen alır.
+ */
+export interface StreamHooks {
+  /** Cevap metninin yeni parçası (kümülatif değil, delta). */
+  onText?: (delta: string) => void;
+  /** Model düşünmeye başladı/düşünüyor — UI "düşünüyor…" gösterebilir. */
+  onThinking?: () => void;
+  /** Model bir aracı çağırıyor; UI "defterine bakıyor…" gibi durum gösterebilir. */
+  onTool?: (name: string) => void;
+  /** Yeni model turu başladı (araç sonrası devam) — UI ayraç koyabilir. */
+  onRound?: (round: number) => void;
+}
+
+export interface AgenticRequest extends StreamHooks {
   /** Sabit sistem promptu — önbelleklenir. */
   stable: string;
   /** Her turda değişen hafıza; önbellek işaretinin arkasına konur. */

@@ -20,6 +20,10 @@ import { ChatMessage, NavigationSuggestion } from "../types";
 interface Props {
   messages: ChatMessage[];
   sending: boolean;
+  /** Akış halindeki hoca cevabı — kaydedilmeden canlı balonda çizilir. */
+  live?: string | null;
+  /** "düşünüyor… / defterine bakıyor…" durum satırı (yazıyor… yerine). */
+  status?: string | null;
   onSend: (text: string) => void;
   placeholder?: string;
   /** Üstaz'ın ekrana_git önerisi — zorlamaz, tıklanabilir bir şerit olarak çıkar. */
@@ -30,6 +34,8 @@ interface Props {
 export default function ChatView({
   messages,
   sending,
+  live,
+  status,
   onSend,
   placeholder,
   suggestion,
@@ -57,7 +63,10 @@ export default function ChatView({
     >
       <FlatList
         ref={listRef}
-        data={messages.filter((m) => !(m.role === "user" && isEventMessage(m.content)))}
+        data={[
+          ...messages.filter((m) => !(m.role === "user" && isEventMessage(m.content))),
+          ...(live ? [{ role: "assistant" as const, content: live }] : []),
+        ]}
         keyExtractor={(_, i) => String(i)}
         contentContainerStyle={styles.list}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
@@ -108,13 +117,15 @@ export default function ChatView({
           </View>
         )}
       />
-      {sending && (
+      {sending && (status || !live) && (
         <View style={styles.typing}>
           <View style={styles.avatarSmall}>
             <Text style={styles.avatarSmallText}>{pack.avatarLetter}</Text>
           </View>
           <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={styles.typingText}>{pack.teacherName} yazıyor…</Text>
+          <Text style={styles.typingText}>
+            {pack.teacherName} {status ?? "yazıyor…"}
+          </Text>
         </View>
       )}
       {suggestion && !sending && (

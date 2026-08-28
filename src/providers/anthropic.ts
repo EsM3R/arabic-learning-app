@@ -1,4 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+// RN'in kendi fetch'i gövde akışını (ReadableStream) desteklemez; Expo'nunki
+// destekler. Akışlı sohbetin çalışmasının ön şartı bu import.
+import { fetch as expoFetch } from "expo/fetch";
 import { buildMessages, cachedTools, systemBlocks } from "../caching";
 import { recordUsage } from "../usage";
 import {
@@ -27,7 +30,11 @@ const meta: ProviderMeta = {
 function client(apiKey: string): Anthropic {
   // Kişisel uygulama: anahtar kullanıcının cihazında saklanır ve istekler
   // doğrudan cihazdan Anthropic'e gider.
-  return new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  return new Anthropic({
+    apiKey,
+    dangerouslyAllowBrowser: true,
+    fetch: expoFetch as unknown as typeof globalThis.fetch,
+  });
 }
 
 function toTools(req: AgenticRequest): Anthropic.Tool[] {
@@ -43,23 +50,52 @@ function toTools(req: AgenticRequest): Anthropic.Tool[] {
 /** Bu kadar tur kalınca modele "toparla" uyarısı iletilir. */
 const WRAP_UP_AT = 3;
 
+/**
+ * Bir model turunu AKIŞLA çalıştırır: metin geldikçe onText'e damlar,
+ * düşünme başlarsa onThinking tetiklenir; sonda tam mesaj döner (araç
+ * blokları ve usage dahil) ve döngü eskisi gibi onunla ilerler.
+ */
+async function streamRound(
+  anthropic: Anthropic,
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  req: AgenticRequest
+): Promise<Anthropic.Message> {
+  const stream = anthropic.messages.stream(params);
+  stream.on("text", (delta) => {
+    if (delta) req.onText?.(delta);
+  });
+  stream.on("streamEvent", (ev) => {
+    if (ev.type === "content_block_start" && ev.content_block.type === "thinking") {
+      req.onThinking?.();
+    }
+  });
+  return stream.finalMessage();
+}
+
 async function chat(req: AgenticRequest): Promise<AgenticReply> {
   const anthropic = client(req.apiKey);
   const tools = toTools(req);
   const history = buildMessages(req.messages, req.dynamic);
   const actions: string[] = [];
-  let lastText = "";
+  // Ekrana akanla kaydedilen aynı olsun diye cevap TÜM turların metnidir
+  // (araç öncesi "bakayım…" girişleri dahil) — akış sonunda içerik küçülmez.
+  const textParts: string[] = [];
 
   for (let round = 0; round < req.maxRounds; round++) {
-    const response = await anthropic.messages.create({
-      model: req.model,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: req.effort },
-      system: systemBlocks(req.stable),
-      tools,
-      messages: history,
-    });
+    req.onRound?.(round);
+    const response = await streamRound(
+      anthropic,
+      {
+        model: req.model,
+        max_tokens: 16000,
+        thinking: { type: "adaptive" },
+        output_config: { effort: req.effort },
+        system: systemBlocks(req.stable),
+        tools,
+        messages: history,
+      },
+      req
+    );
 
     void recordUsage({
       model: req.model,
@@ -76,7 +112,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       .map((b) => b.text)
       .join("\n")
       .trim();
-    if (text) lastText = text;
+    if (text) textParts.push(text);
 
     // Sunucu tarafı araç döngüsü duraklarsa aynı geçmişle devam et
     if (response.stop_reason === "pause_turn") {
@@ -85,8 +121,9 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     }
 
     if (response.stop_reason !== "tool_use") {
-      if (!text) throw new Error(EMPTY_TEXT);
-      return { text, actions };
+      const full = textParts.join("\n\n").trim();
+      if (!full) throw new Error(EMPTY_TEXT);
+      return { text: full, actions };
     }
 
     // Thinking blokları dahil içeriği aynen geri ver
@@ -94,6 +131,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     const results: Anthropic.ContentBlockParam[] = [];
     for (const block of response.content) {
       if (block.type !== "tool_use") continue;
+      req.onTool?.(block.name);
       const outcome = await req.runTool(
         block.name,
         block.input as Record<string, unknown>
@@ -113,7 +151,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     history.push({ role: "user", content: results });
   }
 
-  return { text: lastText || BUDGET_EXHAUSTED_TEXT, actions };
+  return { text: textParts.join("\n\n").trim() || BUDGET_EXHAUSTED_TEXT, actions };
 }
 
 async function structured<T>(req: StructuredRequest): Promise<T> {

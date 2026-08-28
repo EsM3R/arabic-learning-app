@@ -1,4 +1,7 @@
 import type OpenAI from "openai";
+// RN fetch gövde akışını desteklemez; Expo'nunki destekler (akışlı sohbet şartı).
+import { fetch as expoFetch } from "expo/fetch";
+import { completedToolCalls, mergeToolCallDelta, ToolCallDraft } from "../toolstream";
 import { recordUsage } from "../usage";
 import {
   AgenticReply,
@@ -40,6 +43,7 @@ function client(apiKey: string): OpenAI {
     apiKey,
     baseURL: "https://api.deepseek.com",
     dangerouslyAllowBrowser: true,
+    fetch: expoFetch as unknown as typeof globalThis.fetch,
   }) as OpenAI;
 }
 
@@ -77,7 +81,8 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
   const openai = client(req.apiKey);
   const tools = toTools(req);
   const actions: string[] = [];
-  let lastText = "";
+  // Ekrana akanla kaydedilen aynı olsun diye cevap TÜM turların metnidir.
+  const textParts: string[] = [];
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: req.stable },
@@ -89,27 +94,57 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
   ];
 
   for (let round = 0; round < req.maxRounds; round++) {
-    const response = await openai.chat.completions.create({
+    req.onRound?.(round);
+    // Akış: content delta'ları ekrana damlar; tool_calls parçaları
+    // toolstream ile birleştirilir; usage son chunk'ta gelir.
+    const stream = await openai.chat.completions.create({
       model: req.model,
       messages,
       tools,
       max_tokens: 8000,
+      stream: true,
+      stream_options: { include_usage: true },
     });
 
-    const du = response.usage as (typeof response.usage & { prompt_cache_hit_tokens?: number }) | undefined;
+    let content = "";
+    const drafts: ToolCallDraft[] = [];
+    let usage: OpenAI.CompletionUsage | undefined;
+    let thinkingSignalled = false;
+    for await (const chunk of stream) {
+      if (chunk.usage) usage = chunk.usage;
+      const delta = chunk.choices[0]?.delta as
+        | (OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
+            reasoning_content?: string | null;
+          })
+        | undefined;
+      if (!delta) continue;
+      if (delta.reasoning_content && !thinkingSignalled) {
+        thinkingSignalled = true;
+        req.onThinking?.();
+      }
+      if (delta.content) {
+        content += delta.content;
+        req.onText?.(delta.content);
+      }
+      for (const tc of delta.tool_calls ?? []) {
+        mergeToolCallDelta(drafts, tc);
+      }
+    }
+
+    const du = usage as (OpenAI.CompletionUsage & { prompt_cache_hit_tokens?: number }) | undefined;
     void recordUsage({
       model: req.model,
       input: du?.prompt_tokens ?? 0,
       output: du?.completion_tokens ?? 0,
       cacheRead: du?.prompt_cache_hit_tokens ?? 0,
     });
-    const choice = response.choices[0];
-    const text = (choice?.message?.content ?? "").trim();
-    if (text) lastText = text;
+    const text = content.trim();
+    if (text) textParts.push(text);
 
-    const calls = choice?.message?.tool_calls ?? [];
+    const calls = completedToolCalls(drafts);
     if (calls.length === 0) {
-      if (!text) throw new Error(EMPTY_TEXT);
+      const full = textParts.join("\n\n").trim();
+      if (!full) throw new Error(EMPTY_TEXT);
       if (
         round < req.maxRounds - 1 &&
         looksLikeToolCall(
@@ -121,19 +156,27 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
         messages.push({ role: "user", content: TOOL_TEXT_CORRECTION });
         continue;
       }
-      return { text, actions };
+      return { text: full, actions };
     }
 
-    messages.push(choice.message);
+    messages.push({
+      role: "assistant",
+      content: text || null,
+      tool_calls: calls.map((c) => ({
+        id: c.id,
+        type: "function" as const,
+        function: { name: c.name, arguments: c.arguments },
+      })),
+    });
     for (const call of calls) {
-      if (call.type !== "function") continue;
+      req.onTool?.(call.name);
       let parsed: Record<string, unknown> = {};
       try {
-        parsed = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+        parsed = JSON.parse(call.arguments || "{}") as Record<string, unknown>;
       } catch {
         parsed = {};
       }
-      const outcome = await req.runTool(call.function.name, parsed);
+      const outcome = await req.runTool(call.name, parsed);
       if (outcome.summary) actions.push(outcome.summary);
       messages.push({
         role: "tool",
@@ -148,7 +191,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
     }
   }
 
-  return { text: lastText || BUDGET_EXHAUSTED_TEXT, actions };
+  return { text: textParts.join("\n\n").trim() || BUDGET_EXHAUSTED_TEXT, actions };
 }
 
 async function structured<T>(req: StructuredRequest): Promise<T> {
