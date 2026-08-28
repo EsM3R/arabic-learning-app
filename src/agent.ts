@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getActivePack } from "./languages";
 import { scheduleReminder } from "./notifications";
-import { deckStats, Difficulty, dueCards, gradeCard, newCard, strugglingCards } from "./srs";
+import { cardMemory, deckStats, Difficulty, dueCards, gradeCard, newCard, strugglingCards } from "./srs";
 import {
   loadMistakes,
   loadNotes,
@@ -389,10 +389,17 @@ function fmtCard(c: VocabCard): string {
     `= ${c.turkish}`,
     `[${tracks[c.track].short.toLowerCase()}]`,
   ];
+  const mem = cardMemory(c);
   const perf =
-    c.reps === 0
+    c.reps === 0 && (c.lapses ?? 0) === 0
       ? "hiç tekrar edilmedi"
-      : `${c.reps} tekrar, ${c.lapses ?? 0} kez unutuldu, kolaylık ${c.ease.toFixed(1)}`;
+      : `${c.reps} tekrar, ${c.lapses ?? 0} kez unutuldu, zorluk ${mem.difficulty.toFixed(1)}/10, hafıza gücü ${
+          mem.stability === undefined
+            ? "—"
+            : mem.stability < 1
+              ? "1 günden az"
+              : `${Math.round(mem.stability)} gün`
+        }`;
   return `- ${bits.join(" ")} — ${perf}`;
 }
 

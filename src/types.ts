@@ -60,13 +60,22 @@ export interface VocabCard {
   note?: string;
   addedAt: string;
   due: string; // ISO — bu tarihten sonra tekrar sorulur
+  /** FSRS aralığının aynası (geriye uyumluluk; 0 = bilemedi beklemesi). */
   intervalDays: number;
+  /** FSRS difficulty'den türetilen SM-2 aynası (eski APK'ya dönüş güvencesi). */
   ease: number;
+  /** Başarılı tekrar sayısı (FSRS: unutma reps'i SIFIRLAMAZ). */
   reps: number;
   /** Kaç kez "Bilemedim" denildi. Eski kayıtlarda olmayabilir. */
   lapses?: number;
   /** Son tekrarın zamanı (ISO). Eski kayıtlarda olmayabilir. */
   lastReviewedAt?: string;
+  /** FSRS hafıza gücü (gün): hatırlama olasılığının %90'a düştüğü süre.
+   *  Eski SM-2 kayıtlarında ve hiç çalışılmamış kartlarda yoktur; ilk puanlamada yazılır. */
+  stability?: number;
+  /** FSRS zorluğu, 1 (çok kolay) – 10 (çok zor). Yeni kartta hocanın kolay/orta/zor
+   *  tohumunu taşır; ilk puanlamada gerçek D0'a dönüşür. Eski kayıtlarda yoktur. */
+  difficulty?: number;
 }
 
 /** Tekrar notu: 0 = bilemedim, 1 = zor, 2 = bildim, 3 = çok kolay */
