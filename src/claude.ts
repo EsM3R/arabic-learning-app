@@ -1,4 +1,5 @@
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
+import { sanitizeMinimalPairs } from "./hvpt";
 import { getActivePack } from "./languages";
 import { activeSetup, Effort, ToolSpec } from "./providers";
 import {
@@ -20,6 +21,7 @@ import {
   Curriculum,
   CurriculumModule,
   Profile,
+  MinimalPairItem,
   PronunciationItem,
   PronunciationSet,
   ReadingGenPayload,
@@ -181,8 +183,33 @@ const PRONUNCIATION_SCHEMA = {
         additionalProperties: false,
       },
     },
+    minimalPairs: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          a: {
+            type: "object",
+            properties: { word: { type: "string" }, translit: { type: "string" } },
+            required: ["word", "translit"],
+            additionalProperties: false,
+          },
+          b: {
+            type: "object",
+            properties: { word: { type: "string" }, translit: { type: "string" } },
+            required: ["word", "translit"],
+            additionalProperties: false,
+          },
+          focus: { type: "string" },
+          tip: { type: "string" },
+          playIndex: { type: "integer", enum: [0, 1] },
+        },
+        required: ["a", "b", "focus", "tip", "playIndex"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["items"],
+  required: ["items", "minimalPairs"],
   additionalProperties: false,
 } as const;
 
@@ -294,7 +321,10 @@ export async function generatePronunciationSet(
   strugglingWords: string[] = []
 ): Promise<PronunciationSet> {
   const { provider, model, apiKey } = requireKey(profile);
-  const parsed = await provider.structured<{ items: PronunciationItem[] }>({
+  const parsed = await provider.structured<{
+    items: PronunciationItem[];
+    minimalPairs: MinimalPairItem[];
+  }>({
     system: pronunciationSystem(
       profile.name,
       profile.assessment,
@@ -306,5 +336,9 @@ export async function generatePronunciationSet(
     model,
     apiKey,
   });
-  return { items: parsed.items, createdAt: new Date().toISOString() };
+  return {
+    items: parsed.items,
+    minimalPairs: sanitizeMinimalPairs(parsed.minimalPairs ?? [], getActivePack().scriptExtract),
+    createdAt: new Date().toISOString(),
+  };
 }

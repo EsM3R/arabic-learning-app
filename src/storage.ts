@@ -52,6 +52,23 @@ export const saveReminders = (reminders: Reminder[]) => saveList(langKey("remind
 export const loadReadings = () => loadList<ReadingText>(langKey("readings"));
 export const saveReadings = (list: ReadingText[]) => saveList(langKey("readings"), list);
 
+/** Kelime sınavı modu tercihi ("yaz" | "soyle") — dil-bağımsız UI ayarı. */
+export async function loadReviewMode(): Promise<string | null> {
+  return AsyncStorage.getItem("reviewMode.v1");
+}
+export async function saveReviewMode(mode: string): Promise<void> {
+  await AsyncStorage.setItem("reviewMode.v1", mode);
+}
+
+/** Shadowing öz-notları (SRS değil; kuyruk sıralamasını etkiler). */
+export async function loadShadowNotes<T>(): Promise<T> {
+  const raw = await AsyncStorage.getItem(langKey("shadowNotes"));
+  return (raw ? JSON.parse(raw) : {}) as T;
+}
+export async function saveShadowNotes(map: unknown): Promise<void> {
+  await AsyncStorage.setItem(langKey("shadowNotes"), JSON.stringify(map));
+}
+
 /** Öğrencinin son çalışma zamanı — uyanış kontrolü buna bakar. */
 export async function touchLastActivity(): Promise<void> {
   await AsyncStorage.setItem(langKey("lastActivity"), new Date().toISOString());

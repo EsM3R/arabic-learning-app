@@ -36,6 +36,52 @@ export function stopSpeaking(): void {
   Speech.stop();
 }
 
+const voiceCache = new Map<string, string[]>(); // languageId → voice identifier listesi
+
+/**
+ * Aktif dilin TTS locale'ine uyan cihaz seslerinin kimlikleri (HVPT ses
+ * çeşitliliği için). Eşleşme dil ön ekiyle yapılır ("ar" → "ar-SA", "ar_EG";
+ * en-GB dersinde en-US sesi hata değil, istenen çeşitliliktir). Hata olursa
+ * boş liste döner — arayan hız varyasyonuna düşer.
+ */
+export async function getTargetVoiceIds(): Promise<string[]> {
+  const pack = getActivePack();
+  const cached = voiceCache.get(pack.id);
+  if (cached) return cached;
+  try {
+    const voices = await Speech.getAvailableVoicesAsync();
+    const prefix = pack.ttsLocale.split("-")[0].toLowerCase();
+    const ids = voices
+      .filter((v) => (v.language ?? "").toLowerCase().replace("_", "-").split("-")[0] === prefix)
+      .map((v) => v.identifier);
+    voiceCache.set(pack.id, ids);
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
+/** speakTarget'in ses/hız/geri çağrı seçenekli hali (HVPT ve shadowing kullanır). */
+export function speakTargetWith(
+  text: string,
+  opts: { voiceId?: string; rate?: number; onDone?: () => void; onError?: () => void } = {}
+): void {
+  const pack = getActivePack();
+  const toSpeak = pack.scriptExtract ? extractArabic(text) || text : text;
+  if (!toSpeak.trim()) {
+    opts.onDone?.();
+    return;
+  }
+  Speech.stop();
+  Speech.speak(toSpeak, {
+    language: pack.ttsLocale,
+    voice: opts.voiceId,
+    rate: opts.rate ?? 0.95,
+    onDone: opts.onDone,
+    onError: opts.onError ?? opts.onDone, // hata da zinciri kilitlemesin
+  });
+}
+
 export interface SequenceHandle {
   cancel: () => void;
 }

@@ -57,6 +57,56 @@ export function answersMatch(expected: string, given: string, arabicScript: bool
   return e.length > 0 && e === g;
 }
 
+/**
+ * Transliterasyon karşılaştırması için kayıplı katlama (yalnız Arapça yönünde
+ * kullanılır). Öğrencinin kartlarda gördüğü Türkçe-okunuş gösterimiyle,
+ * İngiliz-tarzı veya Arap chat alfabesiyle yazdığı cevabı aynı uzaya indirir.
+ * Ekranda asla gösterilmez.
+ */
+export function normalizeTranslit(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/ı/g, "i")
+    // İngiliz-tarzı digraflar → Türkçe gösterimin katlanmış haline
+    .replace(/kh/g, "h")
+    .replace(/sh/g, "s")
+    .replace(/gh/g, "g")
+    .replace(/th/g, "t")
+    // Arap chat alfabesi rakamları
+    .replace(/3/g, "") // ع
+    .replace(/2/g, "") // ء
+    .replace(/7/g, "h") // ح
+    .replace(/5/g, "h") // خ
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // makron/aksan/sedil: ā→a, ş→s, ç→c
+    .replace(/[ʿʾʻʼ'’`]/g, "") // ayn/hamza işaretleri
+    .replace(/[¿¡.!,;:?"()\-…،؛؟]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export type ProductionMatch = "target" | "translit" | "none";
+
+/**
+ * Üretici sınav eşleşmesi: önce hedef yazım, sonra (yalnız Arapça alfabeli
+ * dilde) transliterasyon. Arap klavyesi olmayan öğrenci okunuşla yazarak da
+ * üretim yapmış olur — amaç yazım sınavı değil, sözcüğü geri ÇAĞIRMAK.
+ * Latin dillerde translit yolu kapalıdır (hedef zaten Latin).
+ */
+export function matchProduction(
+  expectedTarget: string,
+  expectedTranslit: string,
+  given: string,
+  arabicScript: boolean
+): ProductionMatch {
+  if (answersMatch(expectedTarget, given, arabicScript)) return "target";
+  if (arabicScript) {
+    const e = normalizeTranslit(expectedTranslit);
+    if (e.length > 0 && e === normalizeTranslit(given)) return "translit";
+  }
+  return "none";
+}
+
 // ---------------------------------------------------------------------------
 // Kapsam ölçümü (okuma metinleri)
 // ---------------------------------------------------------------------------

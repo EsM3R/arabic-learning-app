@@ -5,6 +5,8 @@ import ChatView from "../components/ChatView";
 import Header from "../components/Header";
 import { agenticChat } from "../claude";
 import { getActivePack } from "../languages";
+import { extractArabic } from "../speech";
+import { recordStat } from "../statsStore";
 import {
   freeChatSystem,
   idleNudgeEvent,
@@ -180,6 +182,12 @@ export default function LessonScreen({
   const onSend = (text: string) => {
     clearIdleTimer();
     nudgeUsed.current = false; // öğrenci yazdı → dürtme hakkı yenilenir
+    // Hedef dilde yazılmış mesaj üretimdir. Yalnız ayrı alfabeli dillerde
+    // güvenle tespit edilebiliyor (Latin dillerde Türkçe/hedef ayrımı yok —
+    // dürüst metrik için sayılmaz; oradaki üretim sınav/okuma/gölgelemeden gelir).
+    if (getActivePack().scriptExtract && extractArabic(text).length > 0) {
+      void recordStat("produced");
+    }
     const history: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(history);
     void saveChat(chatId, history);

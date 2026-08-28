@@ -12,6 +12,7 @@ import MistakesScreen from "./src/screens/MistakesScreen";
 import PronunciationScreen from "./src/screens/PronunciationScreen";
 import ReadingScreen from "./src/screens/ReadingScreen";
 import ReviewScreen from "./src/screens/ReviewScreen";
+import ShadowingScreen from "./src/screens/ShadowingScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import SetupScreen from "./src/screens/SetupScreen";
 import { getActiveLanguageId, LanguageId, setActiveLanguage } from "./src/languages";
@@ -35,6 +36,7 @@ type Screen =
   | { name: "mistakes" }
   | { name: "pronunciation" }
   | { name: "reading" }
+  | { name: "shadowing" }
   | { name: "settings" }
   | { name: "level" }
   | { name: "levelup" };
@@ -174,6 +176,9 @@ export default function App() {
       case "reading":
         setScreen({ name: "reading" });
         break;
+      case "shadowing":
+        setScreen({ name: "shadowing" });
+        break;
       case "mistakes":
         setScreen({ name: "mistakes" });
         break;
@@ -219,6 +224,7 @@ export default function App() {
           onOpenMistakes={() => setScreen({ name: "mistakes" })}
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
           onOpenReading={() => setScreen({ name: "reading" })}
+          onOpenShadowing={() => setScreen({ name: "shadowing" })}
           onSwitchLanguage={(id) => void onSwitchLanguage(id)}
           onOpenLevel={() => setScreen({ name: "level" })}
           onLevelUp={() => setScreen({ name: "levelup" })}
@@ -267,6 +273,14 @@ export default function App() {
       )}
       {screen.name === "reading" && profile && (
         <ReadingScreen key={lang} profile={profile} onBack={() => setScreen({ name: "dashboard" })} />
+      )}
+      {screen.name === "shadowing" && (
+        <ShadowingScreen
+          key={lang}
+          onBack={() => setScreen({ name: "dashboard" })}
+          onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
+          onOpenReading={() => setScreen({ name: "reading" })}
+        />
       )}
     </View>
   );

@@ -14,6 +14,7 @@ import { getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { pendingReminders } from "../notifications";
 import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
 import { dueCards } from "../srs";
+import { loadStatsSummary } from "../statsStore";
 import {
   loadLastActivity,
   loadMistakes,
@@ -34,6 +35,7 @@ interface Props {
   onOpenMistakes: () => void;
   onOpenPronunciation: () => void;
   onOpenReading: () => void;
+  onOpenShadowing: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
   onOpenLevel: () => void;
   onLevelUp: () => void;
@@ -50,6 +52,7 @@ export default function DashboardScreen({
   onOpenMistakes,
   onOpenPronunciation,
   onOpenReading,
+  onOpenShadowing,
   onSwitchLanguage,
   onOpenLevel,
   onLevelUp,
@@ -62,6 +65,7 @@ export default function DashboardScreen({
   const [vocabTotal, setVocabTotal] = useState(0);
   const [vocabDue, setVocabDue] = useState(0);
   const [mistakeCount, setMistakeCount] = useState(0);
+  const [weekLine, setWeekLine] = useState<string | null>(null);
   const [teacherNote, setTeacherNote] = useState<string | null>(null);
   const [teacherSuggestion, setTeacherSuggestion] = useState<NavigationSuggestion | null>(null);
   const wakeStarted = React.useRef(false);
@@ -73,10 +77,28 @@ export default function DashboardScreen({
 
   useEffect(() => {
     void (async () => {
-      const [cards, mistakes] = await Promise.all([loadVocab(), loadMistakes()]);
+      const [cards, mistakes, stats] = await Promise.all([
+        loadVocab(),
+        loadMistakes(),
+        loadStatsSummary(),
+      ]);
       setVocabTotal(cards.length);
       setVocabDue(dueCards(cards).length);
       setMistakeCount(mistakes.filter((m) => !m.resolved).length);
+      // Üretim odaklı hafta özeti — gün serisi değil: ne ÜRETTİN?
+      const w = stats.week;
+      const produced = w.produced ?? 0;
+      const reviewed = w.reviewed ?? 0;
+      const shadowed = w.shadowed ?? 0;
+      const read = w.readSentence ?? 0;
+      if (produced + reviewed + shadowed + read > 0) {
+        const parts: string[] = [];
+        if (produced > 0) parts.push(`${produced} cümle ürettin`);
+        if (reviewed > 0) parts.push(`${reviewed} kelime tekrar ettin`);
+        if (read > 0) parts.push(`${read} cümle okudun`);
+        if (shadowed > 0) parts.push(`${shadowed} gölgeleme yaptın`);
+        setWeekLine(`Bu hafta: ${parts.join(" · ")} — ${stats.activeDays7} gün aktiftin.`);
+      }
     })();
   }, []);
 
@@ -139,6 +161,8 @@ export default function DashboardScreen({
     if (s.screen === "review") onOpenReview();
     else if (s.screen === "quiz") onQuiz();
     else if (s.screen === "pronunciation") onOpenPronunciation();
+    else if (s.screen === "reading") onOpenReading();
+    else if (s.screen === "shadowing") onOpenShadowing();
     else if (s.screen === "mistakes") onOpenMistakes();
     else if (s.screen === "module") {
       const target = curriculum?.modules.find((m) => m.id === s.moduleId);
@@ -272,6 +296,12 @@ export default function DashboardScreen({
           </View>
         )}
 
+        {weekLine && (
+          <View style={styles.weekCard}>
+            <Text style={styles.weekText}>📈 {weekLine}</Text>
+          </View>
+        )}
+
         <View style={styles.statsRow}>
           <View style={styles.statTile}>
             <Text style={styles.statValue}>{vocabTotal}</Text>
@@ -361,20 +391,30 @@ export default function DashboardScreen({
           <Text style={styles.cardArrow}>›</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.pronunciationCard}
-          onPress={onOpenPronunciation}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.iconSquare, { backgroundColor: colors.accentSoft }]}>
-            <Text style={styles.iconSquareText}>🎙️</Text>
-          </View>
-          <View style={{ flex: 1 }}>
+        <View style={[styles.toolsRow, { marginBottom: 26 }]}>
+          <TouchableOpacity
+            style={styles.toolCard}
+            onPress={onOpenPronunciation}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.iconSquare, { backgroundColor: colors.accentSoft }]}>
+              <Text style={styles.iconSquareText}>🎙️</Text>
+            </View>
             <Text style={styles.cardTitle}>Telaffuz Stüdyosu</Text>
-            <Text style={styles.cardMeta}>Dinle, kaydet, karşılaştır — sana özel ipuçlarıyla</Text>
-          </View>
-          <Text style={styles.cardArrow}>›</Text>
-        </TouchableOpacity>
+            <Text style={styles.cardMeta}>Kulak turu + dinle-kaydet-karşılaştır</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toolCard}
+            onPress={onOpenShadowing}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.iconSquare, { backgroundColor: colors.goldSoft }]}>
+              <Text style={styles.iconSquareText}>🗣️</Text>
+            </View>
+            <Text style={styles.cardTitle}>Gölgeleme</Text>
+            <Text style={styles.cardMeta}>Dinle, üstüne konuş — akıcılık antrenmanı</Text>
+          </TouchableOpacity>
+        </View>
 
         {tracks.map((track) => {
           const modules = curriculum?.modules.filter((m) => m.track === track) ?? [];
@@ -546,6 +586,17 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   teacherNoteButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
+  weekCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    ...shadow,
+  },
+  weekText: { fontSize: 12.5, color: colors.inkSoft, lineHeight: 18 },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
   statTile: {
     flex: 1,
@@ -637,18 +688,6 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 12,
     marginBottom: 12,
-    ...shadow,
-  },
-  pronunciationCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    gap: 12,
-    marginBottom: 26,
     ...shadow,
   },
   trackSection: { marginBottom: 24 },

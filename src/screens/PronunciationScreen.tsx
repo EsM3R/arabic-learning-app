@@ -17,10 +17,12 @@ import {
 } from "react-native";
 import { generatePronunciationSet } from "../claude";
 import Header from "../components/Header";
+import { effectivePlayIndex, pickVoiceVariant } from "../hvpt";
 import { getActivePack } from "../languages";
 import { strugglingCards } from "../srs";
-import { speakTarget, stopSpeaking } from "../speech";
-import { loadPronunciationSet, loadVocab, savePronunciationSet } from "../storage";
+import { getTargetVoiceIds, speakTarget, speakTargetWith, stopSpeaking } from "../speech";
+import { recordStat } from "../statsStore";
+import { loadPronunciationSet, loadVocab, savePronunciationSet, touchLastActivity } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Profile, PronunciationSet } from "../types";
 
@@ -29,15 +31,40 @@ interface Props {
   onBack: () => void;
 }
 
+/**
+ * Telaffuz Stüdyosu — HVPT düzeni: önce KULAK turu (ayırt etme: iki benzer
+ * kelimeden hangisi çalındı?), sonra kayıt turu (dinle-kaydet-karşılaştır).
+ * Araştırma şartı: algı üretimden önce eğitilir ve uyaran çeşitli sunulur —
+ * cihazdaki farklı TTS sesleri döndürülür, tek ses varsa hız değişir.
+ */
+type PronPhase = "ayirt" | "ozet" | "kayit";
+
 export default function PronunciationScreen({ profile, onBack }: Props) {
   const [set, setSet] = useState<PronunciationSet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [phase, setPhase] = useState<PronPhase>("kayit");
+  const [pairIndex, setPairIndex] = useState(0);
+  const [picked, setPicked] = useState<0 | 1 | null>(null);
+  const [score, setScore] = useState(0);
+  /** Kulak turu kaçıncı kez oynanıyor — cevap tarafı her turda çevrilir (ezber kırma). */
+  const [round, setRound] = useState(0);
+  const [voiceIds, setVoiceIds] = useState<string[]>([]);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const player = useAudioPlayer();
+
+  const startWithSet = (s: PronunciationSet) => {
+    setSet(s);
+    setIndex(0);
+    setRecordingUri(null);
+    setPairIndex(0);
+    setPicked(null);
+    setScore(0);
+    setPhase(s.minimalPairs && s.minimalPairs.length > 0 ? "ayirt" : "kayit");
+  };
 
   const generate = async () => {
     setLoading(true);
@@ -50,9 +77,8 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
         strugglingCards(vocab, 8).map((c) => c.arabic)
       );
       await savePronunciationSet(newSet);
-      setSet(newSet);
-      setIndex(0);
-      setRecordingUri(null);
+      setRound(0);
+      startWithSet(newSet);
     } catch (e) {
       // Alert kapanınca ekran sonsuza kadar "hazırlanıyor" yazmasın:
       // hatayı ekranda tut ve tekrar deneme yolu sun.
@@ -66,8 +92,9 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
     void (async () => {
       // Ekranı açmak tek başına para harcamamalı: kayıtlı set varsa onu aç,
       // yoksa üretmeden önce kullanıcıya sor.
-      const saved = await loadPronunciationSet();
-      if (saved && saved.items.length > 0) setSet(saved);
+      const [saved, ids] = await Promise.all([loadPronunciationSet(), getTargetVoiceIds()]);
+      setVoiceIds(ids);
+      if (saved && saved.items.length > 0) startWithSet(saved);
       setLoading(false);
     })();
     return () => stopSpeaking();
@@ -75,6 +102,43 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
   }, []);
 
   const item = set?.items[index];
+  const pairs = set?.minimalPairs ?? [];
+  const pair = pairs[pairIndex];
+  /** Bu soruda gerçekte çalınan taraf (tur sayısına göre çevrilmiş). */
+  const playSide = pair ? effectivePlayIndex(pair.playIndex, round) : 0;
+
+  const playPair = () => {
+    if (!pair) return;
+    const v = pickVoiceVariant(voiceIds, pairIndex + round * pairs.length);
+    speakTargetWith(pair[playSide === 0 ? "a" : "b"].word, { voiceId: v.voiceId, rate: v.rate });
+  };
+
+  const pickSide = (side: 0 | 1) => {
+    if (picked !== null || !pair) return;
+    setPicked(side);
+    void recordStat("discrimination");
+    if (side === playSide) {
+      setScore((s) => s + 1);
+      void recordStat("discriminationCorrect");
+    }
+    void touchLastActivity();
+  };
+
+  const nextPair = () => {
+    stopSpeaking();
+    setPicked(null);
+    if (pairIndex + 1 < pairs.length) setPairIndex(pairIndex + 1);
+    else setPhase("ozet");
+  };
+
+  const restartEarTraining = () => {
+    stopSpeaking();
+    setRound((r) => r + 1); // cevaplar çevrilir — ezberle geçilmez
+    setPairIndex(0);
+    setPicked(null);
+    setScore(0);
+    setPhase("ayirt");
+  };
 
   const toggleRecord = async () => {
     try {
@@ -122,7 +186,15 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
     <View style={styles.container}>
       <Header
         title="Telaffuz Stüdyosu"
-        subtitle={set ? `${index + 1} / ${set.items.length}` : "hazırlanıyor…"}
+        subtitle={
+          set
+            ? phase === "ayirt"
+              ? `🎧 kulak turu ${pairIndex + 1} / ${pairs.length}`
+              : phase === "ozet"
+                ? "kulak turu bitti"
+                : `🎙️ kayıt turu ${index + 1} / ${set.items.length}`
+            : "hazırlanıyor…"
+        }
         onBack={onBack}
         right={
           <TouchableOpacity onPress={newSet} style={styles.newSetButton} disabled={loading}>
@@ -149,7 +221,7 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
             {getActivePack().teacherName} telaffuz setini hazırlıyor…
           </Text>
         </View>
-      ) : !item ? (
+      ) : !set || !item ? (
         <View style={styles.loading}>
           <Text style={styles.errEmoji}>🎙️</Text>
           <Text style={styles.errTitle}>Telaffuz setin hazır değil</Text>
@@ -159,6 +231,76 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
           </Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => void generate()}>
             <Text style={styles.retryText}>Set hazırla</Text>
+          </TouchableOpacity>
+        </View>
+      ) : phase === "ayirt" && pair ? (
+        <ScrollView contentContainerStyle={styles.body}>
+          <View style={styles.tipBox}>
+            <Text style={styles.tipTitle}>🎧 {pair.focus}</Text>
+            <Text style={styles.tipText}>
+              Dinle ve hangi kelimenin çalındığını seç. Bir sesi duyup ayırt edemeyen onu
+              üretemez — önce kulak.
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.recordButton} onPress={playPair}>
+            <Text style={styles.recordText}>🔊 Dinle</Text>
+          </TouchableOpacity>
+
+          <View style={styles.pairRow}>
+            {([0, 1] as const).map((side) => {
+              const s = side === 0 ? pair.a : pair.b;
+              const isAnswer = side === playSide;
+              const chosen = picked === side;
+              const show = picked !== null;
+              return (
+                <TouchableOpacity
+                  key={side}
+                  style={[
+                    styles.pairCard,
+                    show && isAnswer && styles.pairCorrect,
+                    show && chosen && !isAnswer && styles.pairWrong,
+                  ]}
+                  disabled={picked !== null}
+                  onPress={() => pickSide(side)}
+                >
+                  <Text style={styles.pairWord}>{s.word}</Text>
+                  <Text style={styles.pairTranslit}>{s.translit}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {picked !== null && (
+            <>
+              <Text style={picked === playSide ? styles.pairResultOk : styles.pairResultNo}>
+                {picked === playSide
+                  ? "✅ Doğru!"
+                  : `❌ Çalınan: ${(playSide === 0 ? pair.a : pair.b).word}`}
+              </Text>
+              <View style={styles.tipBox}>
+                <Text style={styles.tipTitle}>💡 İpucu</Text>
+                <Text style={styles.tipText}>{pair.tip}</Text>
+              </View>
+              <TouchableOpacity style={styles.recordButton} onPress={nextPair}>
+                <Text style={styles.recordText}>Sonraki ›</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
+      ) : phase === "ozet" ? (
+        <View style={styles.loading}>
+          <Text style={styles.errEmoji}>🎧</Text>
+          <Text style={styles.errTitle}>Kulak turu bitti</Text>
+          <Text style={styles.errText}>
+            {score} / {pairs.length} doğru ayırt ettin.
+            {score < pairs.length ? " Karıştırdıkların normal — kulak tekrarla eğitilir." : " Harika kulak!"}
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => setPhase("kayit")}>
+            <Text style={styles.retryText}>🎙️ Kayıt turuna geç</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.playbackButton} onPress={restartEarTraining}>
+            <Text style={styles.playbackText}>↺ Kulak turunu tekrarla</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -318,4 +460,34 @@ const styles = StyleSheet.create({
   },
   navDisabled: { opacity: 0.4 },
   navText: { color: colors.ink, fontSize: 14, fontWeight: "600" },
+  pairRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
+  pairCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: 24,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    ...shadow,
+  },
+  pairCorrect: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  pairWrong: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
+  pairWord: { fontSize: 28, color: colors.ink, textAlign: "center", marginBottom: 8 },
+  pairTranslit: { fontSize: 14, color: colors.accent, fontWeight: "600" },
+  pairResultOk: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.accentDark,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  pairResultNo: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.danger,
+    textAlign: "center",
+    marginBottom: 10,
+  },
 });

@@ -296,7 +296,18 @@ export function pronunciationSystem(
 - Kolaydan zora sırala. ${p.pronunciationFocus}
 - ${vocabPart}
 - transliteration: Türkçe okunuşa yakın gösterim.
-- tip: Türk öğrenciye özel, 1-2 cümlelik SOMUT telaffuz ipucu.`;
+- tip: Türk öğrenciye özel, 1-2 cümlelik SOMUT telaffuz ipucu.
+
+AYIRT ETME ÇİFTLERİ (minimalPairs):
+Setin yanına 8 adet "minimal çift" hazırla — öğrencinin KULAĞINI eğitmek için birbirine çok benzeyen iki gerçek kelime/kalıp. Araştırma net: bir sesi duyup ayırt edemeyen onu üretemez; kulak turu kayıt turundan önce gelir.
+- Her çift şu zorluk odaklarından birini hedeflesin: ${p.pronunciationFocus}
+- a ve b: gerçekten var olan, öğrencinin seviyesine uygun kelimeler olsun ve YALNIZCA hedef seste (ya da ünlü uzunluğunda) ayrışsınlar. Uydurma kelime kullanma.
+- İki kelime yazılışta da farklı olmalı — sesli okununca ayrımı duyulabilen çiftler seç.
+- focus: karşıtlığın kısa etiketi (örn. "ع vs ء", "kısa a vs uzun ā").
+- tip: dinlerken NEYE dikkat edeceğini anlatan 1-2 cümlelik Türkçe ipucu; iki sesin farkını Türkçedeki seslerle kıyaslayarak somutla.
+- translit: Türkçe okunuşa yakın gösterim.
+- playIndex: bu soruda hangi kelimenin seslendirileceği (0 = a, 1 = b). Çiftler arasında dengeli dağıt — yaklaşık yarısı 0, yarısı 1 olsun ve sırada örüntü kurma (0,1,0,1 gibi değil).
+- Çiftleri kolay ayrımdan zora sırala.`;
 }
 
 /** Uyanış kontrolü: uygulama açıldığında hoca duruma bakıp panele mesaj bırakır. */

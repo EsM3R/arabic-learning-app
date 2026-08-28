@@ -119,14 +119,42 @@ export interface PronunciationItem {
   tip: string;
 }
 
+/** Minimal çiftin bir tarafı. word: hedef dil yazımı, translit: Türkçe okunuş. */
+export interface MinimalPairSide {
+  word: string;
+  translit: string;
+}
+
+/** HVPT ayırt etme öğesi — Üstaz set üretiminde hazırlar. */
+export interface MinimalPairItem {
+  a: MinimalPairSide;
+  b: MinimalPairSide;
+  /** Ses karşıtlığı etiketi, örn. "ع vs ء". */
+  focus: string;
+  /** Ayırt etme ipucu (Türkçe, dinlerken neye dikkat edilecek). */
+  tip: string;
+  /** Bu soruda hangisi çalınır: 0 = a, 1 = b. Üretimde yazılır. */
+  playIndex: 0 | 1;
+}
+
 export interface PronunciationSet {
   items: PronunciationItem[];
+  /** Ayırt etme (kulak) turu. Eski kayıtlı setlerde YOKTUR → tur atlanır. */
+  minimalPairs?: MinimalPairItem[];
   createdAt: string;
 }
 
 /** Üstaz'ın ekrana_git aracıyla önerdiği yönlendirme (zorlamaz, öneri çipi olarak gösterilir). */
 export interface NavigationSuggestion {
-  screen: "dashboard" | "review" | "quiz" | "pronunciation" | "mistakes" | "module" | "reading";
+  screen:
+    | "dashboard"
+    | "review"
+    | "quiz"
+    | "pronunciation"
+    | "mistakes"
+    | "module"
+    | "reading"
+    | "shadowing";
   moduleId?: string;
   label: string;
 }

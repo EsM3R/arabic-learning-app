@@ -5,8 +5,10 @@ import {
   answersMatch,
   arabicStemCandidates,
   coverage,
+  matchProduction,
   normalizeArabic,
   normalizeLatin,
+  normalizeTranslit,
 } from "../src/textnorm.ts";
 
 test("normalizeArabic harekeleri siler", () => {
@@ -91,4 +93,23 @@ test("coverage: Latin dilde birebir token eşleşmesi", () => {
 
 test("coverage: boş metin 1.0 döner", () => {
   assert.equal(coverage("", ["x"], true).ratio, 1);
+});
+
+test("normalizeTranslit: Türkçe gösterim, İngiliz tarzı ve chat alfabesi eşleşir", () => {
+  assert.equal(normalizeTranslit("şu ahbārak?"), normalizeTranslit("shu akhbarak"));
+  assert.equal(normalizeTranslit("mar7aba"), normalizeTranslit("marhaba"));
+  assert.equal(normalizeTranslit("ma'a"), normalizeTranslit("maa"));
+  assert.equal(normalizeTranslit("kapı"), "kapi");
+});
+
+test("matchProduction: hedef yazım > translit > none", () => {
+  assert.equal(matchProduction("مرحبا", "merhaba", "مَرْحَبًا", true), "target");
+  assert.equal(matchProduction("مرحبا", "merhaba", "merhaba", true), "translit");
+  assert.equal(matchProduction("مرحبا", "merhaba", "şükran", true), "none");
+  assert.equal(matchProduction("مرحبا", "merhaba", "  ", true), "none");
+});
+
+test("matchProduction: Latin dilde translit yolu kapalı, hedef eşleşmesi esnek", () => {
+  assert.equal(matchProduction("good morning", "gud morning", "gud morning", false), "none");
+  assert.equal(matchProduction("¿Cómo estás?", "", "como estas", false), "target");
 });
