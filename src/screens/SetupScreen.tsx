@@ -175,8 +175,8 @@ function HowItWorks() {
       </Text>
       <Step
         n="1"
-        title="Önce seviyeni ölçer"
-        text="Kısa bir tanışma sohbeti yapar, konuşma ve okuma seviyeni ayrı ayrı belirler."
+        title="Sıfırdan başlar"
+        text="Seviye sınavı yok: A0'dan başlarsın, hocan seni derslerde tanıdıkça seviyeni kendisi yükseltir."
       />
       <Step
         n="2"

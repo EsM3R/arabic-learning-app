@@ -30,8 +30,6 @@ export interface AgentContext {
   currentTrack?: Track;
   /** ekrana_git aracıyla önerilen yönlendirme (zorlamaz). */
   pendingNavigation?: NavigationSuggestion;
-  /** degerlendirmeyi_bitir aracıyla üretilen seviye raporu. */
-  assessmentResult?: Assessment;
 }
 
 export interface ToolOutcome {
@@ -343,38 +341,11 @@ const INITIATIVE_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-const ASSESSMENT_FINISH_TOOL: Anthropic.Tool = {
-  name: "degerlendirmeyi_bitir",
-  description:
-    "Seviye tespitini SEN bitirirsin. Öğrencinin konuşma ve okuma seviyesi hakkında yeterli kanıt topladığına kanaat getirdiğinde çağır — genelde 6-8 mesaj alışverişi yeter. Çağırdığın anda uygulama müfredat hazırlamaya geçer, o yüzden emin olmadan çağırma; emin olduğunda da bekletme.",
-  input_schema: {
-    type: "object",
-    properties: {
-      speakingLevel: { type: "string", enum: LEVELS, description: "Konuşma parkuru seviyesi" },
-      readingLevel: { type: "string", enum: LEVELS, description: "Okuma parkuru seviyesi" },
-      strengths: { type: "array", items: { type: "string" }, description: "Somut güçlü yönler (Türkçe)" },
-      weaknesses: { type: "array", items: { type: "string" }, description: "Somut zayıf yönler (Türkçe)" },
-      summary: {
-        type: "string",
-        description: "Öğrenciye hitaben 2-3 cümlelik cesaretlendirici Türkçe özet",
-      },
-    },
-    required: ["speakingLevel", "readingLevel", "strengths", "weaknesses", "summary"],
-  },
-};
-
 /** Ders ve serbest sohbet: tam araç seti. */
 export const TEACHER_TOOLS: Anthropic.Tool[] = [
   ...READ_TOOLS,
   ...WRITE_TOOLS,
   ...INITIATIVE_TOOLS,
-];
-
-/** Seviye tespiti: henüz müfredat/seviye yok, sadece gözlem + bitirme. */
-export const ASSESSMENT_TOOLS: Anthropic.Tool[] = [
-  WRITE_TOOLS.find((t) => t.name === "hata_kaydet")!,
-  WRITE_TOOLS.find((t) => t.name === "not_yaz")!,
-  ASSESSMENT_FINISH_TOOL,
 ];
 
 // ---------------------------------------------------------------------------
@@ -867,24 +838,6 @@ export async function executeTool(
       return {
         result: `Hatırlatıcı kuruldu: ${when.toLocaleString("tr-TR")}`,
         summary: `⏰ Hatırlatıcı kuruldu (${hours} saat sonra)`,
-      };
-    }
-
-    // ---------------- DEĞERLENDİRME ----------------
-
-    case "degerlendirmeyi_bitir": {
-      const assessment: Assessment = {
-        speakingLevel: String(input.speakingLevel ?? "A0"),
-        readingLevel: String(input.readingLevel ?? "A0"),
-        strengths: Array.isArray(input.strengths) ? input.strengths.map(String) : [],
-        weaknesses: Array.isArray(input.weaknesses) ? input.weaknesses.map(String) : [],
-        summary: String(input.summary ?? ""),
-      };
-      ctx.assessmentResult = assessment;
-      await commitProfile(ctx, { ...ctx.profile, assessment });
-      return {
-        result: `Değerlendirme tamamlandı (konuşma ${assessment.speakingLevel}, okuma ${assessment.readingLevel}). Uygulama şimdi müfredat hazırlayacak. Öğrenciye kısa bir kapanış mesajı yaz.`,
-        summary: `🎯 Seviye belirlendi: konuşma ${assessment.speakingLevel}, okuma ${assessment.readingLevel}`,
       };
     }
 

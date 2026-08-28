@@ -3,7 +3,6 @@ import { sanitizeMinimalPairs } from "./hvpt";
 import { getActivePack } from "./languages";
 import { activeSetup, Effort, ToolSpec } from "./providers";
 import {
-  assessmentAnalysisSystem,
   curriculumSystem,
   pronunciationSystem,
   readingTextSystem,
@@ -91,37 +90,6 @@ export async function agenticChat(
     model,
     apiKey,
     runTool: (name, input) => executeTool(name, input, ctx),
-  });
-}
-
-const ASSESSMENT_SCHEMA = {
-  type: "object",
-  properties: {
-    speakingLevel: { type: "string", enum: ["A0", "A1", "A2", "B1", "B2", "C1", "C2"] },
-    readingLevel: { type: "string", enum: ["A0", "A1", "A2", "B1", "B2", "C1", "C2"] },
-    strengths: { type: "array", items: { type: "string" } },
-    weaknesses: { type: "array", items: { type: "string" } },
-    summary: { type: "string" },
-  },
-  required: ["speakingLevel", "readingLevel", "strengths", "weaknesses", "summary"],
-  additionalProperties: false,
-} as const;
-
-/** Değerlendirme sohbet dökümünden yapılandırılmış seviye raporu üretir. */
-export async function analyzeAssessment(
-  profile: Profile,
-  transcript: ChatMessage[]
-): Promise<Assessment> {
-  const { provider, model, apiKey } = requireKey(profile);
-  const transcriptText = transcript
-    .map((m) => `${m.role === "user" ? "ÖĞRENCİ" : "ÖĞRETMEN"}: ${m.content}`)
-    .join("\n\n");
-  return provider.structured<Assessment>({
-    system: assessmentAnalysisSystem(),
-    userMessage: `Sohbet dökümü:\n\n${transcriptText}`,
-    schema: ASSESSMENT_SCHEMA as unknown as Record<string, unknown>,
-    model,
-    apiKey,
   });
 }
 

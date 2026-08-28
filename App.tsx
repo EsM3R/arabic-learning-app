@@ -3,7 +3,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import ErrorBoundary from "./src/components/ErrorBoundary";
 import { installGlobalErrorHandler, reportError } from "./src/errorLog";
-import AssessmentScreen from "./src/screens/AssessmentScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import LessonScreen from "./src/screens/LessonScreen";
 import LevelScreen from "./src/screens/LevelScreen";
@@ -22,6 +21,7 @@ import {
   Assessment,
   Curriculum,
   CurriculumModule,
+  defaultAssessment,
   NavigationSuggestion,
   Profile,
 } from "./src/types";
@@ -29,7 +29,6 @@ import {
 type Screen =
   | { name: "loading" }
   | { name: "setup" }
-  | { name: "assessment" }
   | { name: "dashboard" }
   | { name: "lesson"; module: CurriculumModule | null; quiz?: boolean }
   | { name: "review" }
@@ -74,9 +73,15 @@ export default function App() {
         }
         setActiveLanguage(saved.activeLanguage);
         setLang(getActiveLanguageId());
-        profileRef.current = saved;
-        setProfile(saved);
-        setScreen(saved.curriculum ? { name: "dashboard" } : { name: "assessment" });
+        // Seviye tespiti diye bir şey yok: herkes A0'dan başlar, seviyeyi
+        // zamanla hoca yükseltir. Eski kayıtta assessment yoksa sıfırla doldur.
+        const patched = saved.assessment
+          ? saved
+          : { ...saved, assessment: defaultAssessment() };
+        if (patched !== saved) await saveProfile(patched);
+        profileRef.current = patched;
+        setProfile(patched);
+        setScreen({ name: "dashboard" });
       } catch (e) {
         // Kayıtlı profil okunamazsa açılış ekranında sonsuza kadar beklemek
         // yerine kurulum ekranına düş; hata da görünür olsun.
@@ -108,30 +113,43 @@ export default function App() {
       provider: providerId,
       apiKeys: { [providerId]: apiKey },
       activeLanguage: languageId,
+      assessment: defaultAssessment(), // sıfırdan başlangıç — tespit yok
       completedModuleIds: [],
     };
     profileRef.current = fresh;
     setProfile(fresh);
     await saveProfile(fresh);
-    setScreen({ name: "assessment" });
+    setScreen({ name: "dashboard" });
   };
 
   /** Panelden dil değiştirme: mevcut ilerleme saklanır, hedef dilinki yüklenir. */
   const onSwitchLanguage = async (targetId: LanguageId) => {
     const current = profileRef.current;
     if (!current || targetId === getActiveLanguageId()) return;
-    const next = await switchLanguageProgress(current, targetId);
+    const switched = await switchLanguageProgress(current, targetId);
+    // Yeni dilin ilerlemesi boşsa o dil de sıfırdan (A0) başlar.
+    const next = switched.assessment
+      ? switched
+      : { ...switched, assessment: defaultAssessment() };
+    if (next !== switched) await saveProfile(next);
     profileRef.current = next;
     setProfile(next);
     setLang(getActiveLanguageId());
-    // Hedef dilde henüz müfredat yoksa o dilin seviye tespitiyle başlanır.
-    setScreen(next.curriculum ? { name: "dashboard" } : { name: "assessment" });
+    setScreen({ name: "dashboard" });
   };
 
-  const onAssessmentComplete = async (assessment: Assessment, curriculum: Curriculum) => {
-    if (!profileRef.current) return;
-    await persist({ ...profileRef.current, assessment, curriculum });
-    setScreen({ name: "dashboard" });
+  /**
+   * Panelden müfredat kuruldu. completedModuleIds SIFIRLANIR: yeni müfredat
+   * da "k1", "o1"... id'leri ürettiği için eski liste taşınsaydı (persist
+   * onları birleştirir) yeni modüller baştan bitmiş görünürdü.
+   */
+  const onCurriculumBuilt = async (curriculum: Curriculum) => {
+    const current = profileRef.current;
+    if (!current) return;
+    const next: Profile = { ...current, curriculum, completedModuleIds: [] };
+    profileRef.current = next;
+    setProfile(next);
+    await saveProfile(next);
   };
 
   /**
@@ -210,9 +228,6 @@ export default function App() {
         </View>
       )}
       {screen.name === "setup" && <SetupScreen onDone={onSetupDone} />}
-      {screen.name === "assessment" && profile && (
-        <AssessmentScreen key={lang} profile={profile} onComplete={onAssessmentComplete} />
-      )}
       {screen.name === "dashboard" && profile && (
         <DashboardScreen
           key={lang}
@@ -227,6 +242,7 @@ export default function App() {
           onOpenShadowing={() => setScreen({ name: "shadowing" })}
           onSwitchLanguage={(id) => void onSwitchLanguage(id)}
           onOpenLevel={() => setScreen({ name: "level" })}
+          onCurriculumBuilt={(c) => void onCurriculumBuilt(c)}
           onLevelUp={() => setScreen({ name: "levelup" })}
           onOpenSettings={() => setScreen({ name: "settings" })}
           onReset={onReset}

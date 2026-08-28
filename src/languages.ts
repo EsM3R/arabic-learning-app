@@ -52,8 +52,6 @@ export interface LanguagePack {
   readingFunctionWords: string;
   /** Türk öğrencinin bu dilde zorlandığı sesler (telaffuz stüdyosu). */
   pronunciationFocus: string;
-  /** Seviye tespitinde nelerin yoklanacağı. */
-  assessmentFocus: string;
   /** Serbest sohbet görev tarifi. */
   freeChatTask: string;
   chatPlaceholderFree: string;
@@ -104,8 +102,6 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     readingFunctionWords: "örn. في، من، إلى، على، هذا، هذه، هو، هي، و، أنّ، كان، لا",
     pronunciationFocus:
       "Türklerin zorlandığı sesler: ع، ح، خ، غ، ق، ض، ظ، ص. İpuçlarını Türkçedeki benzer seslerden yola çıkarak ver (örn. \"ع boğazın sıkışmasıyla çıkar\", \"خ Türkçedeki h'den sert, hırıltılı\").",
-    assessmentFocus:
-      "Konuşma için Şami ammicesini yokla (arkadaşlarıyla konuştuğunu biliyorsun; gerçek konuşma dili bilgisini ölç). Okuma için kısa fusha cümle/metinler göster.",
     freeChatTask:
       "Suriyeli bir arkadaş gibi Şami ammicesiyle sohbet et — günlük konular, hal hatır, hayat. Öğrenci Türkçe yazarsa cevabı yine ammice ver ve nasıl söyleyeceğini göster.",
     chatPlaceholderFree: "اكتب هون… (buraya yaz)",
@@ -150,8 +146,6 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     readingFunctionWords: "örn. the, a, is, are, and, but, in, on, this, that, have",
     pronunciationFocus:
       "Türklerin zorlandığı sesler: th (θ/ð — 'think' vs 'this'), w-v ayrımı, ship-sheep gibi kısa/uzun ünlüler, kelime vurgusu ve schwa (ə). İpuçlarını Türkçe seslerle kıyaslayarak ver.",
-    assessmentFocus:
-      "Konuşma için günlük diyalog kur (small talk, kendini anlatma); kalıp ve phrasal verb bilgisini yokla. Okuma için kısa gerçekçi metin parçaları göster.",
     freeChatTask:
       "İngilizce konuşan samimi bir arkadaş gibi sohbet et — günlük konular, iş, hayat. Öğrenci Türkçe yazarsa cevabı yine İngilizce ver ve nasıl söyleyeceğini göster.",
     chatPlaceholderFree: "Type here… (buraya yaz)",
@@ -196,8 +190,6 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     readingFunctionWords: "örn. el, la, un, una, es, está, y, pero, en, este, que, hay",
     pronunciationFocus:
       "Türklerin zorlandığı sesler: rr (titrek r), j (jota — sert h), ll/y, b-v aynılığı, c/z (İspanya'da θ), kelime vurgusu. İpuçlarını Türkçe seslerle kıyaslayarak ver.",
-    assessmentFocus:
-      "Konuşma için günlük diyalog kur (selamlaşma, kendini anlatma, basit ihtiyaçlar). Okuma için kısa gerçekçi metin parçaları göster.",
     freeChatTask:
       "İspanyol samimi bir arkadaş gibi sohbet et — günlük konular, hayat, seyahat. Öğrenci Türkçe yazarsa cevabı yine İspanyolca ver ve nasıl söyleyeceğini göster.",
     chatPlaceholderFree: "Escribe aquí… (buraya yaz)",

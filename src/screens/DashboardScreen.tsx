@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { AgentContext, TEACHER_TOOLS } from "../agent";
-import { agenticChat } from "../claude";
+import { agenticChat, generateCurriculum } from "../claude";
 import { getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { pendingReminders } from "../notifications";
 import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
@@ -24,7 +24,14 @@ import {
   saveWakeCheck,
 } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
-import { CurriculumModule, NavigationSuggestion, Profile, Track } from "../types";
+import {
+  Curriculum,
+  CurriculumModule,
+  defaultAssessment,
+  NavigationSuggestion,
+  Profile,
+  Track,
+} from "../types";
 
 interface Props {
   profile: Profile;
@@ -38,6 +45,8 @@ interface Props {
   onOpenShadowing: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
   onOpenLevel: () => void;
+  /** Panelden kurulan müfredatı profile yazar. */
+  onCurriculumBuilt: (curriculum: Curriculum) => void;
   onLevelUp: () => void;
   onOpenSettings: () => void;
   onReset: () => void;
@@ -55,6 +64,7 @@ export default function DashboardScreen({
   onOpenShadowing,
   onSwitchLanguage,
   onOpenLevel,
+  onCurriculumBuilt,
   onLevelUp,
   onOpenSettings,
   onReset,
@@ -66,6 +76,9 @@ export default function DashboardScreen({
   const [vocabDue, setVocabDue] = useState(0);
   const [mistakeCount, setMistakeCount] = useState(0);
   const [weekLine, setWeekLine] = useState<string | null>(null);
+  const [buildingCurriculum, setBuildingCurriculum] = useState(false);
+  const [buildElapsed, setBuildElapsed] = useState(0);
+  const [buildError, setBuildError] = useState<string | null>(null);
   const [teacherNote, setTeacherNote] = useState<string | null>(null);
   const [teacherSuggestion, setTeacherSuggestion] = useState<NavigationSuggestion | null>(null);
   const wakeStarted = React.useRef(false);
@@ -168,6 +181,51 @@ export default function DashboardScreen({
       const target = curriculum?.modules.find((m) => m.id === s.moduleId);
       if (target) onOpenModule(target);
     }
+  };
+
+  /**
+   * Müfredat kurulumu: seviye tespiti YOK — sıfırdan (A0) başlangıç varsayılır,
+   * hoca zamanla seviyeyi kendisi yükseltir. Tek yapılandırılmış çağrı;
+   * varsa hata defteri/notlardaki gözlemler prompta beslenir.
+   */
+  const buildCurriculum = async () => {
+    setBuildingCurriculum(true);
+    setBuildError(null);
+    setBuildElapsed(0);
+    const timer = setInterval(() => setBuildElapsed((n) => n + 1), 1000);
+    try {
+      const [mistakes, notes] = await Promise.all([loadMistakes(), loadNotes()]);
+      const observations = [
+        ...mistakes.slice(-10).map((m) => `- [${m.topic}] "${m.mistake}" → "${m.correction}"`),
+        ...notes.slice(-5).map((n) => `- ${n.note}`),
+      ].join("\n");
+      const curriculum = await generateCurriculum(
+        profile,
+        profile.assessment ?? defaultAssessment(),
+        observations || undefined
+      );
+      if ((curriculum.modules?.length ?? 0) < 4) {
+        throw new Error("Müfredat beklenenden kısa geldi. Tekrar denemek genelde çözer.");
+      }
+      onCurriculumBuilt(curriculum);
+    } catch (e) {
+      setBuildError(e instanceof Error ? e.message : String(e));
+    } finally {
+      clearInterval(timer);
+      setBuildingCurriculum(false);
+    }
+  };
+
+  const startCurriculumBuild = () => {
+    if (buildingCurriculum) return;
+    Alert.alert(
+      "Müfredatı kur",
+      `${pack.teacherName} sıfırdan başlangıç için iki parkurluk müfredat tasarlasın mı? Bu bir API isteği harcar (yaklaşık birkaç lira).`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        { text: "Evet, kursun", onPress: () => void buildCurriculum() },
+      ]
+    );
   };
 
   // Defter boşken sınav başlatmak, hocanın "tekrar edecek kelime yok" demesi
@@ -416,8 +474,37 @@ export default function DashboardScreen({
           </TouchableOpacity>
         </View>
 
+        {totalModules === 0 && (
+          <View style={styles.noCurriculumCard}>
+            <Text style={styles.noCurriculumTitle}>📚 Müfredatını kur</Text>
+            <Text style={styles.noCurriculumText}>
+              Sıfırdan başlıyorsun — {pack.teacherName} iki parkur için 12-16 derslik bir
+              başlangıç müfredatı tasarlasın. Bir API isteği harcar; sonrası panelde hazır.
+            </Text>
+            {buildError && (
+              <Text style={styles.noCurriculumError} selectable>
+                {buildError}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={styles.noCurriculumButton}
+              onPress={startCurriculumBuild}
+              disabled={buildingCurriculum}
+            >
+              <Text style={styles.noCurriculumButtonText}>
+                {buildingCurriculum
+                  ? `Hazırlanıyor… ${buildElapsed}s`
+                  : buildError
+                    ? "Tekrar dene ›"
+                    : "Müfredatı kur ›"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {tracks.map((track) => {
           const modules = curriculum?.modules.filter((m) => m.track === track) ?? [];
+          if (modules.length === 0) return null; // müfredat yokken boş başlık gösterme
           const trackDone = modules.filter((m) => completedModuleIds.includes(m.id)).length;
           return (
             <View key={track} style={styles.trackSection}>
@@ -586,6 +673,27 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   teacherNoteButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
+  noCurriculumCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 24,
+    ...shadow,
+  },
+  noCurriculumTitle: { fontSize: 15, fontWeight: "800", color: colors.ink, marginBottom: 6 },
+  noCurriculumText: { fontSize: 12.5, color: colors.inkSoft, lineHeight: 18 },
+  noCurriculumButton: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+    backgroundColor: colors.goldSoft,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  noCurriculumButtonText: { color: colors.gold, fontSize: 12.5, fontWeight: "800" },
+  noCurriculumError: { fontSize: 12, color: colors.danger, marginTop: 8, lineHeight: 17 },
   weekCard: {
     backgroundColor: colors.card,
     borderRadius: radius.md,

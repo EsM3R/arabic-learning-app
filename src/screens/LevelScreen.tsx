@@ -47,7 +47,8 @@ export default function LevelScreen({ profile, onBack }: Props) {
           <Text style={styles.emptyEmoji}>📋</Text>
           <Text style={styles.emptyTitle}>Henüz değerlendirme yok</Text>
           <Text style={styles.emptyText}>
-            {pack.teacherName} ile seviye tespiti yaptığında raporun burada görünecek.
+            Sıfırdan başlıyorsun. {pack.teacherName} seni derslerde tanıdıkça seviyeni
+            kendisi günceller; raporun burada oluşacak.
           </Text>
         </View>
       ) : (

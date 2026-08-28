@@ -16,6 +16,22 @@ export interface Assessment {
   summary: string; // Türkçe özet
 }
 
+/**
+ * Sıfırdan başlangıç: uygulamada seviye TESPİTİ yok. Herkes A0'dan başlar;
+ * seviyeyi zamanla hoca yükseltir (seviye_guncelle + seviye atlama döngüsü).
+ * Bu yüzden assessment alanı hiç boş kalmaz — boş profil bununla açılır.
+ */
+export function defaultAssessment(): Assessment {
+  return {
+    speakingLevel: "A0",
+    readingLevel: "A0",
+    strengths: [],
+    weaknesses: [],
+    summary:
+      "Sıfırdan başlıyoruz — en sağlam başlangıç. Hocan seni derslerde tanıdıkça seviyeni kendisi güncelleyecek; ilk hedef: ilk yüz kelime ve ilk gerçek cümleler.",
+  };
+}
+
 export type Track = "konusma" | "okuma";
 
 export interface CurriculumModule {
