@@ -1,4 +1,5 @@
 import type { Content, FunctionCall, GoogleGenAI, Part } from "@google/genai";
+import { parseStructuredJson } from "../structparse";
 import { recordUsage } from "../usage";
 import {
   AgenticReply,
@@ -8,6 +9,7 @@ import {
   Provider,
   ProviderMeta,
   StructuredRequest,
+  TRUNCATED_TEXT,
   withDynamic,
   wrapUpNotice,
 } from "./types";
@@ -162,9 +164,12 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     input: response.usageMetadata?.promptTokenCount ?? 0,
     output: response.usageMetadata?.candidatesTokenCount ?? 0,
   });
+  if (response.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+    throw new Error(TRUNCATED_TEXT);
+  }
   const text = (response.text ?? "").trim();
   if (!text) throw new Error(EMPTY_TEXT);
-  return JSON.parse(text) as T;
+  return parseStructuredJson<T>(text);
 }
 
 export const geminiProvider: Provider = { meta, chat, structured };

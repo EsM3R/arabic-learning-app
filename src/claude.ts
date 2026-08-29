@@ -1,5 +1,5 @@
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
-import { sanitizeMinimalPairs } from "./hvpt";
+import { normalizePronunciationItems, sanitizeMinimalPairs } from "./hvpt";
 import { getActivePack } from "./languages";
 import { activeSetup, Effort, StreamHooks, ToolSpec } from "./providers";
 import {
@@ -11,9 +11,11 @@ import {
 import {
   buildReadingRequest,
   finalizeReading,
+  normalizeReadingPayload,
   ReadingOptions,
   topicFromModule,
 } from "./reading";
+import { normalizeCurriculumModules } from "./structparse";
 import {
   Assessment,
   ChatMessage,
@@ -134,7 +136,9 @@ export async function generateCurriculum(
     model,
     apiKey,
   });
-  return { modules: parsed.modules, generatedAt: new Date().toISOString() };
+  // Şema uygulamayan sağlayıcıda eksik alan/yanlış parkur gelebilir —
+  // cihazda toparlanır; azsa çağıran (panel) "tekrar dene" der.
+  return { modules: normalizeCurriculumModules(parsed), generatedAt: new Date().toISOString() };
 }
 
 const PRONUNCIATION_SCHEMA = {
@@ -282,7 +286,13 @@ export async function generateReadingText(
     model,
     apiKey,
   });
-  return finalizeReading(raw, req, vocab, pack.scriptExtract);
+  const reading = finalizeReading(normalizeReadingPayload(raw), req, vocab, pack.scriptExtract);
+  if (reading.sentences.length === 0) {
+    throw new Error(
+      "Modelin cevabında hiç cümle yoktu (şemaya uymamış). Tekrar denemek genelde çözer."
+    );
+  }
+  return reading;
 }
 
 /** Seviyeye ve kelime defterine göre telaffuz pratik seti üretir. */
@@ -307,8 +317,14 @@ export async function generatePronunciationSet(
     model,
     apiKey,
   });
+  const items = normalizePronunciationItems(parsed.items);
+  if (items.length === 0) {
+    throw new Error(
+      "Modelin cevabında hiç telaffuz öğesi yoktu (şemaya uymamış). Tekrar denemek genelde çözer."
+    );
+  }
   return {
-    items: parsed.items,
+    items,
     minimalPairs: sanitizeMinimalPairs(parsed.minimalPairs ?? [], getActivePack().scriptExtract),
     createdAt: new Date().toISOString(),
   };

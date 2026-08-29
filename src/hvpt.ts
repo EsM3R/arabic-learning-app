@@ -10,17 +10,37 @@
  * boş alan, hep aynı playIndex. Burada temizlenir — UI temiz veri varsayar.
  */
 import { normalizeTarget } from "./textnorm.ts";
-import type { MinimalPairItem } from "./types";
+import type { MinimalPairItem, PronunciationItem } from "./types";
+
+/**
+ * Telaffuz listesi: dizi olmayan cevap boşlanır, hedef kelimesi olmayan öğe
+ * elenir, eksik string alanlar ""'a çekilir (şema uygulamayan sağlayıcıya
+ * karşı — ekran temiz veri varsayar).
+ */
+export function normalizePronunciationItems(raw: unknown): PronunciationItem[] {
+  const str = (v: unknown): string => (typeof v === "string" ? v : "");
+  return (Array.isArray(raw) ? raw : [])
+    .filter((it): it is Record<string, unknown> => !!it && typeof it === "object")
+    .filter((it) => typeof it.arabic === "string" && (it.arabic as string).trim().length > 0)
+    .map((it) => ({
+      arabic: it.arabic as string,
+      transliteration: str(it.transliteration),
+      turkish: str(it.turkish),
+      tip: str(it.tip),
+    }));
+}
 
 export function sanitizeMinimalPairs(
   pairs: MinimalPairItem[],
   arabicScript: boolean
 ): MinimalPairItem[] {
-  const cleaned = pairs.filter((p) => {
-    const a = normalizeTarget(p.a?.word ?? "", arabicScript);
-    const b = normalizeTarget(p.b?.word ?? "", arabicScript);
-    return a.length > 0 && b.length > 0 && a !== b && !!p.focus && !!p.tip;
-  });
+  const cleaned = (Array.isArray(pairs) ? pairs : [])
+    .filter((p): p is MinimalPairItem => !!p && typeof p === "object")
+    .filter((p) => {
+      const a = normalizeTarget(p.a?.word ?? "", arabicScript);
+      const b = normalizeTarget(p.b?.word ?? "", arabicScript);
+      return a.length > 0 && b.length > 0 && a !== b && !!p.focus && !!p.tip;
+    });
   // playIndex dengesi: model hepsini aynı yazdıysa cevap her zaman aynı
   // düğme olur ve alıştırma çöker → deterministik dönüşümle dengele.
   const zeros = cleaned.filter((p) => p.playIndex === 0).length;

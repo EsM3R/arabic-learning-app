@@ -9,6 +9,7 @@ import {
   knownWordList,
   LENGTH_SPECS,
   matchReviewCards,
+  normalizeReadingPayload,
   MAX_KNOWN_WORDS,
   MAX_READINGS,
   pruneReadings,
@@ -236,4 +237,47 @@ test("readingCoverage: compliance planlı yeniyi affeder, plansızı cezalandır
   assert.equal(r3.plannedNewTokens, 1);
   // boş metin
   assert.equal(readingCoverage("", ["x"], [], true).complianceRatio, 1);
+});
+
+test("normalizeReadingPayload: eksik diziler boşlanır, bozuk öğeler elenir", () => {
+  const p = normalizeReadingPayload({
+    title: "عنوان",
+    sentences: [
+      { target: "جملة", translit: "cümle", tr: "cümle" },
+      { target: "  " }, // boş hedef → elenir
+      { translit: "hedefi yok" },
+      null,
+      { target: "ثانية" }, // translit/tr eksik → "" olur
+    ],
+    newWords: [{ word: "قلم", tr: "kalem" }, { tr: "kelimesi yok" }, "düz"],
+    questions: [
+      { q: "Soru?", choices: ["a", "b", 3], answer: 0 },
+      { q: "cevapsız", choices: ["a"] },
+      { choices: ["a"], answer: 0 },
+    ],
+    usedReviewWords: ["سوق", 42, null],
+    productionTask: { instruction: "yaz" },
+  });
+  assert.equal(p.title, "عنوان");
+  assert.equal(p.titleTr, ""); // hiç gelmedi
+  assert.equal(p.sentences.length, 2);
+  assert.deepEqual(p.sentences[1], { target: "ثانية", translit: "", tr: "" });
+  assert.equal(p.newWords.length, 1);
+  assert.equal(p.newWords[0].hint, "");
+  assert.equal(p.questions.length, 1);
+  assert.deepEqual(p.questions[0].choices, ["a", "b"]); // string olmayan seçenek elendi
+  assert.deepEqual(p.usedReviewWords, ["سوق"]);
+  assert.deepEqual(p.productionTask, { instruction: "yaz", example: "" });
+});
+
+test("normalizeReadingPayload: tamamen bozuk cevap güvenli boş yüke döner", () => {
+  for (const raw of [null, undefined, "metin", 42, []]) {
+    const p = normalizeReadingPayload(raw);
+    assert.deepEqual(p.sentences, []);
+    assert.deepEqual(p.newWords, []);
+    assert.deepEqual(p.questions, []);
+    assert.deepEqual(p.usedReviewWords, []);
+    assert.equal(p.title, "");
+    assert.deepEqual(p.productionTask, { instruction: "", example: "" });
+  }
 });

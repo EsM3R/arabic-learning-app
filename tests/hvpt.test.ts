@@ -1,7 +1,7 @@
 /** HVPT ayırt etme turu saf mantık testleri. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { effectivePlayIndex, pickVoiceVariant, sanitizeMinimalPairs } from "../src/hvpt.ts";
+import { effectivePlayIndex, normalizePronunciationItems, pickVoiceVariant, sanitizeMinimalPairs } from "../src/hvpt.ts";
 import type { MinimalPairItem } from "../src/types.ts";
 
 const pair = (a: string, b: string, playIndex: 0 | 1 = 0): MinimalPairItem => ({
@@ -53,4 +53,18 @@ test("pickVoiceVariant: 2+ seste rotasyon, tek/sıfır seste hız varyasyonu", (
   const none = pickVoiceVariant([], 2);
   assert.equal(none.voiceId, undefined);
   assert.equal(none.rate, 1.1);
+});
+
+test("normalizePronunciationItems: dizi olmayan boşlanır, bozuk öğeler elenir, eksik alanlar dolar", () => {
+  assert.deepEqual(normalizePronunciationItems(undefined), []);
+  assert.deepEqual(normalizePronunciationItems("metin"), []);
+  const items = normalizePronunciationItems([
+    { arabic: "قلم", transliteration: "kalem", turkish: "kalem", tip: "ipucu" },
+    { arabic: "  " }, // boş hedef → elenir
+    { transliteration: "hedefi yok" },
+    null,
+    { arabic: "باب" }, // eksik alanlar "" olur
+  ]);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items[1], { arabic: "باب", transliteration: "", turkish: "", tip: "" });
 });

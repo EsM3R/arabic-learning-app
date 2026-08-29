@@ -212,6 +212,57 @@ export function makeReadingId(now = new Date()): string {
 }
 
 /**
+ * Ham model cevabını şemaya oturtur: eksik dizileri boşla, bozuk öğeleri ele,
+ * eksik string alanları ""'a çek. Şemayı sunucuda uygulamayan sağlayıcıda
+ * (DeepSeek json modu) "raw.sentences.filter is not a function" tarzı
+ * çökmelerin tek panzehiri bu. Cümlesi hiç olmayan cevabı çağıran ele alır.
+ */
+export function normalizeReadingPayload(raw: unknown): ReadingGenPayload {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown): string => (typeof v === "string" ? v : "");
+  const sentences = (Array.isArray(r.sentences) ? r.sentences : [])
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === "object")
+    .filter((s) => typeof s.target === "string" && (s.target as string).trim().length > 0)
+    .map((s) => ({ target: s.target as string, translit: str(s.translit), tr: str(s.tr) }));
+  const newWords = (Array.isArray(r.newWords) ? r.newWords : [])
+    .filter((w): w is Record<string, unknown> => !!w && typeof w === "object")
+    .filter((w) => typeof w.word === "string" && (w.word as string).trim().length > 0)
+    .map((w) => ({
+      word: w.word as string,
+      translit: str(w.translit),
+      tr: str(w.tr),
+      hint: str(w.hint),
+    }));
+  const questions = (Array.isArray(r.questions) ? r.questions : [])
+    .filter((q): q is Record<string, unknown> => !!q && typeof q === "object")
+    .filter(
+      (q) =>
+        typeof q.q === "string" &&
+        Array.isArray(q.choices) &&
+        typeof q.answer === "number"
+    )
+    .map((q) => ({
+      q: q.q as string,
+      choices: (q.choices as unknown[]).filter((c): c is string => typeof c === "string"),
+      answer: q.answer as number,
+    }));
+  const pt = (r.productionTask && typeof r.productionTask === "object"
+    ? r.productionTask
+    : {}) as Record<string, unknown>;
+  return {
+    title: str(r.title),
+    titleTr: str(r.titleTr),
+    sentences,
+    newWords,
+    usedReviewWords: (Array.isArray(r.usedReviewWords) ? r.usedReviewWords : []).filter(
+      (w): w is string => typeof w === "string"
+    ),
+    questions,
+    productionTask: { instruction: str(pt.instruction), example: str(pt.example) },
+  };
+}
+
+/**
  * Ham üretim → kütüphane kaydı: boş cümleleri at, yeni kelimeleri temizle,
  * bozuk soruları at, kapsamı TAM defterle ölç, kartları eşle.
  */

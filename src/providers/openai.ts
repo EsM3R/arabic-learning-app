@@ -1,6 +1,7 @@
 import type OpenAI from "openai";
 // RN fetch gövde akışını desteklemez; Expo'nunki destekler (akışlı sohbet şartı).
 import { fetch as expoFetch } from "expo/fetch";
+import { parseStructuredJson } from "../structparse";
 import { recordUsage } from "../usage";
 import {
   AgenticReply,
@@ -10,6 +11,7 @@ import {
   Provider,
   ProviderMeta,
   StructuredRequest,
+  TRUNCATED_TEXT,
   withDynamic,
   wrapUpNotice,
 } from "./types";
@@ -140,7 +142,9 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
 }
 
 async function structured<T>(req: StructuredRequest): Promise<T> {
-  const response = await client(req.apiKey).responses.create({
+  // AKIŞLA alınır: akışsız istek telefonda dakikalarca tek bayt almadan
+  // bekler ve mobil ağda bu sessiz bağlantı kopar (bkz. anthropic.ts).
+  const stream = client(req.apiKey).responses.stream({
     model: req.model,
     instructions: req.system,
     input: [{ role: "user", content: req.userMessage }],
@@ -154,15 +158,17 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     },
     max_output_tokens: 16000,
   });
+  const response = await stream.finalResponse();
   void recordUsage({
     model: req.model,
     input: response.usage?.input_tokens ?? 0,
     output: response.usage?.output_tokens ?? 0,
     cacheRead: response.usage?.input_tokens_details?.cached_tokens ?? 0,
   });
+  if (response.status === "incomplete") throw new Error(TRUNCATED_TEXT);
   const text = (response.output_text ?? "").trim();
   if (!text) throw new Error(EMPTY_TEXT);
-  return JSON.parse(text) as T;
+  return parseStructuredJson<T>(text);
 }
 
 export const openaiProvider: Provider = { meta, chat, structured };

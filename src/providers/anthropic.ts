@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 // destekler. Akışlı sohbetin çalışmasının ön şartı bu import.
 import { fetch as expoFetch } from "expo/fetch";
 import { buildMessages, cachedTools, systemBlocks } from "../caching";
+import { parseStructuredJson } from "../structparse";
 import { recordUsage } from "../usage";
 import {
   AgenticReply,
@@ -13,6 +14,7 @@ import {
   ProviderMeta,
   REFUSAL_TEXT,
   StructuredRequest,
+  TRUNCATED_TEXT,
   wrapUpNotice,
 } from "./types";
 
@@ -155,7 +157,11 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
 }
 
 async function structured<T>(req: StructuredRequest): Promise<T> {
-  const response = await client(req.apiKey).messages.create({
+  // AKIŞLA alınır (sohbetle aynı kanıtlanmış yol): akışsız istek telefonda
+  // cevap tamamlanana dek dakikalarca tek bayt almadan bekler ve mobil
+  // ağlarda bu sessiz bağlantı koparılır — müfredat/okuma üretimi tam da
+  // böyle patlıyordu. Akışta baytlar sürekli aktığı için bağlantı yaşar.
+  const stream = client(req.apiKey).messages.stream({
     model: req.model,
     max_tokens: 16000,
     thinking: { type: "adaptive" },
@@ -163,6 +169,7 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     output_config: { format: { type: "json_schema", schema: req.schema } },
     messages: [{ role: "user", content: req.userMessage }],
   });
+  const response = await stream.finalMessage();
   void recordUsage({
     model: req.model,
     input: response.usage.input_tokens,
@@ -171,13 +178,14 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
   });
   if (response.stop_reason === "refusal") throw new Error(REFUSAL_TEXT);
+  if (response.stop_reason === "max_tokens") throw new Error(TRUNCATED_TEXT);
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n")
     .trim();
   if (!text) throw new Error(EMPTY_TEXT);
-  return JSON.parse(text) as T;
+  return parseStructuredJson<T>(text);
 }
 
 export const anthropicProvider: Provider = { meta, chat, structured };

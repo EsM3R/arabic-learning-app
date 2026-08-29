@@ -1,6 +1,7 @@
 import type OpenAI from "openai";
 // RN fetch gövde akışını desteklemez; Expo'nunki destekler (akışlı sohbet şartı).
 import { fetch as expoFetch } from "expo/fetch";
+import { parseStructuredJson } from "../structparse";
 import { completedToolCalls, mergeToolCallDelta, ToolCallDraft } from "../toolstream";
 import { recordUsage } from "../usage";
 import {
@@ -11,6 +12,7 @@ import {
   Provider,
   ProviderMeta,
   StructuredRequest,
+  TRUNCATED_TEXT,
   withDynamic,
   wrapUpNotice,
 } from "./types";
@@ -195,7 +197,9 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
 }
 
 async function structured<T>(req: StructuredRequest): Promise<T> {
-  const response = await client(req.apiKey).chat.completions.create({
+  // AKIŞLA alınır: akışsız istek telefonda dakikalarca tek bayt almadan
+  // bekler ve mobil ağda bu sessiz bağlantı kopar (bkz. anthropic.ts).
+  const stream = await client(req.apiKey).chat.completions.create({
     model: req.model,
     messages: [
       {
@@ -206,15 +210,27 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     ],
     response_format: { type: "json_object" },
     max_tokens: 8000,
+    stream: true,
+    stream_options: { include_usage: true },
   });
+  let content = "";
+  let usage: OpenAI.CompletionUsage | undefined;
+  let finish: string | null = null;
+  for await (const chunk of stream) {
+    if (chunk.usage) usage = chunk.usage;
+    const choice = chunk.choices[0];
+    if (choice?.finish_reason) finish = choice.finish_reason;
+    if (choice?.delta?.content) content += choice.delta.content;
+  }
   void recordUsage({
     model: req.model,
-    input: response.usage?.prompt_tokens ?? 0,
-    output: response.usage?.completion_tokens ?? 0,
+    input: usage?.prompt_tokens ?? 0,
+    output: usage?.completion_tokens ?? 0,
   });
-  const text = (response.choices[0]?.message?.content ?? "").trim();
+  if (finish === "length") throw new Error(TRUNCATED_TEXT);
+  const text = content.trim();
   if (!text) throw new Error(EMPTY_TEXT);
-  return JSON.parse(text) as T;
+  return parseStructuredJson<T>(text);
 }
 
 export const deepseekProvider: Provider = { meta, chat, structured };

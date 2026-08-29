@@ -103,6 +103,10 @@ export const REFUSAL_TEXT =
 
 export const EMPTY_TEXT = "Modelden boş yanıt geldi, lütfen tekrar deneyin.";
 
+/** Yapılandırılmış üretim uzunluk sınırına takılıp yarım kaldığında. */
+export const TRUNCATED_TEXT =
+  "Modelin cevabı uzunluk sınırına takılıp yarım kaldı. Tekrar dene — genelde ikinci denemede tamamlanır.";
+
 /**
  * Değişken hafızayı güncel kullanıcı mesajının sonuna ekler. Önbellek
  * ön-ekinin arkasında kalması için bu şart (bkz. src/caching.ts).
