@@ -61,35 +61,50 @@ export default function App() {
   const [lang, setLang] = useState<LanguageId>("ar");
   /** En güncel profil — asenkron turların eski anlık görüntüyle yazmasını engeller. */
   const profileRef = useRef<Profile | null>(null);
+  /** Her depodan yüklemede artar; ekran anahtarına girer ki yedekten dönüşte paneller tazelensin. */
+  const [bootId, setBootId] = useState(0);
+
+  /** Depodan profili yükleyip panele geç — açılışta ve yedekten dönüşte. */
+  const bootFromStorage = async () => {
+    try {
+      const saved = await loadProfile();
+      if (!saved) {
+        profileRef.current = null;
+        setProfile(null);
+        setScreen({ name: "setup" });
+        return;
+      }
+      setActiveLanguage(saved.activeLanguage);
+      setLang(getActiveLanguageId());
+      // Seviye tespiti diye bir şey yok: herkes A0'dan başlar, seviyeyi
+      // zamanla hoca yükseltir. Eski kayıtta assessment yoksa sıfırla doldur.
+      const patched = saved.assessment
+        ? saved
+        : { ...saved, assessment: defaultAssessment() };
+      if (patched !== saved) await saveProfile(patched);
+      profileRef.current = patched;
+      setProfile(patched);
+      setBootId((n) => n + 1);
+      setScreen({ name: "dashboard" });
+    } catch (e) {
+      // Kayıtlı profil okunamazsa açılış ekranında sonsuza kadar beklemek
+      // yerine kurulum ekranına düş; hata da görünür olsun.
+      reportError(e, "profil yüklenirken", false);
+      setScreen({ name: "setup" });
+    }
+  };
 
   useEffect(() => {
     installGlobalErrorHandler();
-    void (async () => {
-      try {
-        const saved = await loadProfile();
-        if (!saved) {
-          setScreen({ name: "setup" });
-          return;
-        }
-        setActiveLanguage(saved.activeLanguage);
-        setLang(getActiveLanguageId());
-        // Seviye tespiti diye bir şey yok: herkes A0'dan başlar, seviyeyi
-        // zamanla hoca yükseltir. Eski kayıtta assessment yoksa sıfırla doldur.
-        const patched = saved.assessment
-          ? saved
-          : { ...saved, assessment: defaultAssessment() };
-        if (patched !== saved) await saveProfile(patched);
-        profileRef.current = patched;
-        setProfile(patched);
-        setScreen({ name: "dashboard" });
-      } catch (e) {
-        // Kayıtlı profil okunamazsa açılış ekranında sonsuza kadar beklemek
-        // yerine kurulum ekranına düş; hata da görünür olsun.
-        reportError(e, "profil yüklenirken", false);
-        setScreen({ name: "setup" });
-      }
-    })();
+    void bootFromStorage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Yedekten dönüldü: depo baştan yazıldı, her şey depodan yeniden yüklenir. */
+  const onRestored = () => {
+    setScreen({ name: "loading" });
+    void bootFromStorage();
+  };
 
   const persist = async (next: Profile) => {
     const merged = profileRef.current ? mergeProfile(profileRef.current, next) : next;
@@ -230,7 +245,7 @@ export default function App() {
       {screen.name === "setup" && <SetupScreen onDone={onSetupDone} />}
       {screen.name === "dashboard" && profile && (
         <DashboardScreen
-          key={lang}
+          key={`${lang}.${bootId}`}
           profile={profile}
           onOpenModule={(module) => setScreen({ name: "lesson", module })}
           onFreeChat={() => setScreen({ name: "lesson", module: null })}
@@ -263,6 +278,7 @@ export default function App() {
         <SettingsScreen
           profile={profile}
           onSave={(next) => void persist(next)}
+          onRestored={onRestored}
           onBack={() => setScreen({ name: "dashboard" })}
         />
       )}

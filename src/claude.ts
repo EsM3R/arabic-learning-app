@@ -62,7 +62,7 @@ function requireKey(profile: Profile): ReturnType<typeof activeSetup> {
   const setup = activeSetup(profile);
   if (!setup.apiKey.trim()) {
     throw new Error(
-      `${setup.provider.meta.label} için API anahtarı girilmemiş. Panelden ⋯ → Model ve Anahtarlar ekranından ekleyebilirsin.`
+      `${setup.provider.meta.label} için API anahtarı girilmemiş. Panelden ⋯ → Ayarlar ekranından ekleyebilirsin.`
     );
   }
   return setup;

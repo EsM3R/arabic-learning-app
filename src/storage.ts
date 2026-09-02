@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BackupFile, mergeDeviceSecrets } from "./backup";
 import { getActiveLanguageId, setActiveLanguage } from "./languages";
 import {
   Assessment,
@@ -166,4 +167,27 @@ export async function switchLanguageProgress(
 
 export async function resetAll(): Promise<void> {
   await AsyncStorage.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Yedek: uygulamanın bütün hafızası bu anahtarlardır (bkz. src/backup.ts).
+// ---------------------------------------------------------------------------
+
+/** Depodaki HER anahtarı ham haliyle döker. */
+export async function dumpAllEntries(): Promise<[string, string | null][]> {
+  const keys = await AsyncStorage.getAllKeys();
+  const pairs = await AsyncStorage.multiGet([...keys]);
+  return pairs.map(([k, v]) => [k, v]);
+}
+
+/**
+ * Yedekten dönüş: depo TAMAMEN yedektekiyle değiştirilir; yalnız bu cihazın
+ * API anahtarı / model seçimi korunur (yedekte anahtar yoktur).
+ */
+export async function restoreFromBackup(b: BackupFile, current: Profile | null): Promise<void> {
+  const entries = { ...b.entries };
+  const merged = mergeDeviceSecrets(entries[PROFILE_KEY], current);
+  if (merged) entries[PROFILE_KEY] = merged;
+  await AsyncStorage.clear();
+  await AsyncStorage.multiSet(Object.entries(entries));
 }

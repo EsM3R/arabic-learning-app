@@ -10,8 +10,19 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import {
+  backupFileName,
+  buildBackup,
+  parseBackup,
+  serializeBackup,
+  summarizeBackup,
+} from "../backup";
 import Header from "../components/Header";
 import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
+import { dumpAllEntries, restoreFromBackup } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Profile } from "../types";
 import { formatTry, usageSummary, UsageSummary } from "../usage";
@@ -20,10 +31,12 @@ import { buildLabel } from "../buildInfo";
 interface Props {
   profile: Profile;
   onSave: (next: Profile) => void;
+  /** Yedekten dönüldü — depo baştan yazıldı, uygulama kendini yeniden yüklemeli. */
+  onRestored: () => void;
   onBack: () => void;
 }
 
-export default function SettingsScreen({ profile, onSave, onBack }: Props) {
+export default function SettingsScreen({ profile, onSave, onRestored, onBack }: Props) {
   // Depodan gelen değer bilinmeyen bir metin olabilir (eski/bozuk kayıt).
   // Doğrulamadan kullanırsak aşağıdaki find() undefined döner ve ekran çöker.
   const initial: ProviderId = isProviderId(profile.provider)
@@ -85,13 +98,89 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
     onBack();
   };
 
+  const [busy, setBusy] = useState<"export" | "import" | null>(null);
+  const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+  /**
+   * Yedek al: depodaki her şey (API anahtarları HARİÇ) tek JSON dosyasına
+   * yazılır ve Android paylaşım sayfası açılır — Drive, WhatsApp, e-posta...
+   */
+  const exportBackup = async () => {
+    setBusy("export");
+    try {
+      const backup = buildBackup(await dumpAllEntries(), buildLabel());
+      const file = new File(Paths.cache, backupFileName());
+      if (file.exists) file.delete(); // aynı gün ikinci yedek: eskisinin üstüne
+      file.create();
+      file.write(serializeBackup(backup));
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Paylaşım kullanılamıyor", `Yedek şuraya yazıldı:\n${file.uri}`);
+        return;
+      }
+      await Sharing.shareAsync(file.uri, {
+        mimeType: "application/json",
+        dialogTitle: "Yedeği nereye kaydedelim?",
+      });
+    } catch (e) {
+      Alert.alert("Yedek alınamadı", errText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Yedekten dön: dosya seç → doğrula → özetle ve onay al → depoyu değiştir → yeniden yükle. */
+  const importBackup = async () => {
+    setBusy("import");
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ["application/json", "text/plain", "*/*"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled) return;
+      const text = await new File(picked.assets[0].uri).text();
+      const backup = parseBackup(text);
+      const s = summarizeBackup(backup);
+      const when = s.exportedAt
+        ? new Date(s.exportedAt).toLocaleDateString("tr-TR")
+        : "tarih yok";
+      Alert.alert(
+        "Yedekten dön",
+        `Yedek: ${s.name || "isimsiz"} · ${when}\n` +
+          `${s.vocab} kelime · ${s.mistakes} hata · ${s.readings} okuma metni · ${s.chats} sohbet\n` +
+          `Diller: ${s.languages.join(", ") || "—"}\n\n` +
+          "Bu cihazdaki HER ŞEY silinip yedektekiyle değiştirilecek. API anahtarın ve model seçimin bu cihazda kalır.",
+        [
+          { text: "Vazgeç", style: "cancel" },
+          {
+            text: "Evet, geri yükle",
+            style: "destructive",
+            onPress: () =>
+              void (async () => {
+                try {
+                  await restoreFromBackup(backup, profile);
+                  onRestored();
+                } catch (e) {
+                  Alert.alert("Geri yükleme başarısız", errText(e));
+                }
+              })(),
+          },
+        ]
+      );
+    } catch (e) {
+      Alert.alert("Yedek okunamadı", errText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     // Edge-to-edge modda Android pencereyi klavye için küçültmediğinden
     // behavior her iki platformda da verilmeli.
     <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <View style={styles.container}>
         <Header
-          title="Model ve Anahtarlar"
+          title="Ayarlar"
           subtitle={`Aktif: ${
             PROVIDER_LIST.find((p) => p.meta.id === initial)?.meta.label ?? "—"
           }`}
@@ -201,6 +290,38 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
           <TouchableOpacity style={styles.saveButton} onPress={save} activeOpacity={0.85}>
             <Text style={styles.saveText}>Kaydet</Text>
           </TouchableOpacity>
+
+          <View style={styles.backupCard}>
+            <Text style={styles.backupTitle}>💾 Yedek</Text>
+            <Text style={styles.backupText}>
+              Kelime defterin, hata defterin, hocanın notları, müfredatın, sohbetlerin
+              ve okuma metinlerin tek dosyaya çıkar. Dosyayı Drive'a, WhatsApp'ta kendine
+              ya da e-postana at; yeni telefonda "Yedekten dön" ile hoca seni bıraktığın
+              yerden tanır. API anahtarın yedeğe girmez.
+            </Text>
+            <View style={styles.backupRow}>
+              <TouchableOpacity
+                style={[styles.backupButton, busy && styles.backupButtonOff]}
+                onPress={() => void exportBackup()}
+                disabled={busy !== null}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.backupButtonText}>
+                  {busy === "export" ? "Hazırlanıyor…" : "Yedek al"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.backupButton, styles.backupButtonAlt, busy && styles.backupButtonOff]}
+                onPress={() => void importBackup()}
+                disabled={busy !== null}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.backupButtonText, styles.backupButtonAltText]}>
+                  {busy === "import" ? "Okunuyor…" : "Yedekten dön"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
@@ -314,4 +435,31 @@ const styles = StyleSheet.create({
     ...shadowLift,
   },
   saveText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+  backupCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginTop: 28,
+    ...shadow,
+  },
+  backupTitle: { fontSize: 15, fontWeight: "800", color: colors.ink, marginBottom: 6 },
+  backupText: { fontSize: 12.5, color: colors.inkSoft, lineHeight: 18 },
+  backupRow: { flexDirection: "row", gap: 10, marginTop: 14 },
+  backupButton: {
+    flex: 1,
+    backgroundColor: colors.goldSoft,
+    borderRadius: 999,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  backupButtonAlt: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  backupButtonOff: { opacity: 0.5 },
+  backupButtonText: { color: colors.gold, fontSize: 13, fontWeight: "800" },
+  backupButtonAltText: { color: colors.accentDark },
 });

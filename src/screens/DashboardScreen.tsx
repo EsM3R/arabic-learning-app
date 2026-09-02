@@ -243,7 +243,7 @@ export default function DashboardScreen({
 
   const openMenu = () => {
     Alert.alert("Ayarlar", undefined, [
-      { text: "Model ve Anahtarlar", onPress: onOpenSettings },
+      { text: "Ayarlar · model, anahtar, yedek", onPress: onOpenSettings },
       { text: "Sıfırla", style: "destructive", onPress: confirmReset },
       { text: "Vazgeç", style: "cancel" },
     ]);
