@@ -16,6 +16,8 @@ export type StatEvent =
   | "shadowed" // shadowing ile tamamlanan cümle
   | "discrimination" // telaffuz ayırt etme cevabı
   | "discriminationCorrect" // doğru cevaplanan ayırt etme (oran = correct/discrimination)
+  | "spoken" // mikrofonla yapılan konuşma denemesi (hedef dilde)
+  | "spokenCorrect" // ses tanımanın hedefi doğru duyduğu deneme (oran = correct/spoken)
   | "mistakeClosed"; // hocanın kapattığı hata
 
 export type DayCounts = Partial<Record<StatEvent, number>>;

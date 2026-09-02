@@ -31,6 +31,13 @@
           "microphonePermission": "Telaffuz pratiği için mikrofon erişimi gerekiyor."
         }
       ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Konuşma pratiği için mikrofon erişimi gerekiyor.",
+          "speechRecognitionPermission": "Söylediklerini yazıya çevirip değerlendirebilmek için gerekiyor."
+        }
+      ],
       "expo-notifications",
       [
         "expo-splash-screen",

@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import { agenticChat } from "../claude";
 import { getActivePack } from "../languages";
 import { extractArabic } from "../speech";
+import { markSpoken } from "../speechinput";
 import { recordStat } from "../statsStore";
 import {
   freeChatSystem,
@@ -244,16 +245,24 @@ export default function LessonScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onSend = (text: string) => {
+  const onSend = (text: string, spoken?: boolean) => {
     clearIdleTimer();
     nudgeUsed.current = false; // öğrenci yazdı → dürtme hakkı yenilenir
     // Hedef dilde yazılmış mesaj üretimdir. Yalnız ayrı alfabeli dillerde
     // güvenle tespit edilebiliyor (Latin dillerde Türkçe/hedef ayrımı yok —
     // dürüst metrik için sayılmaz; oradaki üretim sınav/okuma/gölgelemeden gelir).
-    if (getActivePack().scriptExtract && extractArabic(text).length > 0) {
-      void recordStat("produced");
+    const inTarget = getActivePack().scriptExtract && extractArabic(text).length > 0;
+    if (inTarget) void recordStat("produced");
+    if (spoken) {
+      // Mikrofonla söylendi: ses tanıma öğrenciyi hedef dilde duyduysa bu
+      // gerçek bir konuşma denemesidir — konuşma ölçümü buradan doğar.
+      void recordStat("spoken");
+      if (inTarget) void recordStat("spokenCorrect");
     }
-    const history: ChatMessage[] = [...messages, { role: "user", content: text }];
+    // Hoca yazıyla söyleneni ayırt edebilmeli: ses tanıma gürültülüdür,
+    // kelime kelime yazım düzeltmesi yapılmamalı.
+    const content = spoken ? markSpoken(text) : text;
+    const history: ChatMessage[] = [...messages, { role: "user", content }];
     setMessages(history);
     void saveChat(chatId, history);
     void runTurn(history);

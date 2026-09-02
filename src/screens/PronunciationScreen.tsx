@@ -21,6 +21,8 @@ import { effectivePlayIndex, pickVoiceVariant } from "../hvpt";
 import { getActivePack } from "../languages";
 import { strugglingCards } from "../srs";
 import { getTargetVoiceIds, speakTarget, speakTargetWith, stopSpeaking } from "../speech";
+import { judgeSpeech, SpeechAttempt } from "../speechinput";
+import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadPronunciationSet, loadVocab, savePronunciationSet, touchLastActivity } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
@@ -45,6 +47,8 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  /** Sesli denemenin cihaz hükmü. */
+  const [attempt, setAttempt] = useState<SpeechAttempt | null>(null);
   const [phase, setPhase] = useState<PronPhase>("kayit");
   const [pairIndex, setPairIndex] = useState(0);
   const [picked, setPicked] = useState<0 | 1 | null>(null);
@@ -169,9 +173,38 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
     player.play();
   };
 
+  /**
+   * Sesli deneme: cihazın tanıması söylediğini yazıya çevirir, hedefle
+   * karşılaştırılır. Bu bir telaffuz puanı değil "makine seni doğru duydu
+   * mu" ölçüsüdür — ama uygulamanın ilk kez ÖĞRENCİYİ DUYDUĞU yer burası.
+   */
+  const startCheck = () => {
+    stopSpeaking();
+    setAttempt(null);
+    dictation.start();
+  };
+
+  const dictation = useDictation({
+    onResult: (said) => {
+      const item = set?.items[index];
+      if (!item) return;
+      const verdict = judgeSpeech(
+        item.arabic,
+        item.transliteration,
+        said,
+        getActivePack().scriptExtract
+      );
+      setAttempt(verdict);
+      void recordStat("spoken");
+      if (verdict.verdict === "dogru") void recordStat("spokenCorrect");
+      void touchLastActivity();
+    },
+  });
+
   const goTo = (next: number) => {
     stopSpeaking();
     setRecordingUri(null);
+    setAttempt(null);
     setIndex(next);
   };
 
@@ -331,12 +364,47 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
             </TouchableOpacity>
           </View>
 
+          {/* Denetimli deneme: söylediğin yazıya çevrilip hedefle karşılaştırılır. */}
           <TouchableOpacity
-            style={[styles.recordButton, recorder.isRecording && styles.recording]}
-            onPress={() => void toggleRecord()}
+            style={[styles.recordButton, dictation.listening && styles.recording]}
+            onPress={() => (dictation.listening ? dictation.stop() : startCheck())}
           >
             <Text style={styles.recordText}>
-              {recorder.isRecording ? "⏹ Kaydı Durdur" : "🎙️ Kendini Kaydet"}
+              {dictation.listening ? "⏹ Bitir" : "🎙️ Söyle ve Denetlet"}
+            </Text>
+          </TouchableOpacity>
+          {dictation.listening && (
+            <Text style={styles.listeningText}>{dictation.partial || "Dinliyorum…"}</Text>
+          )}
+          {dictation.error && <Text style={styles.micErrorText}>{dictation.error}</Text>}
+          {attempt && !dictation.listening && (
+            <View
+              style={[
+                styles.verdictBox,
+                attempt.verdict === "dogru"
+                  ? styles.verdictOk
+                  : attempt.verdict === "yakin"
+                    ? styles.verdictNear
+                    : styles.verdictFar,
+              ]}
+            >
+              <Text style={styles.verdictText}>{attempt.message}</Text>
+              {attempt.verdict !== "dogru" && (
+                <Text style={styles.verdictHint}>
+                  Not: tanıma fusha ağırlıklıdır; ammice söyleyişte şaşabilir — kendi
+                  kaydını dinlemek de bir ölçüdür.
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Kendi sesini duymak ayrı bir egzersiz: kayıt yolu duruyor. */}
+          <TouchableOpacity
+            style={[styles.playbackButton, recorder.isRecording && styles.recording]}
+            onPress={() => void toggleRecord()}
+          >
+            <Text style={styles.playbackText}>
+              {recorder.isRecording ? "⏹ Kaydı Durdur" : "🎧 Kendini kaydet ve dinle"}
             </Text>
           </TouchableOpacity>
 
@@ -448,6 +516,31 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   playbackText: { color: colors.accent, fontSize: 15, fontWeight: "700" },
+  listeningText: {
+    fontSize: 14,
+    color: colors.gold,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 10,
+  },
+  micErrorText: {
+    fontSize: 12.5,
+    color: colors.danger,
+    textAlign: "center",
+    marginTop: 10,
+    lineHeight: 18,
+  },
+  verdictBox: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: 13,
+    marginTop: 12,
+  },
+  verdictOk: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  verdictNear: { backgroundColor: colors.goldSoft, borderColor: colors.goldDeep },
+  verdictFar: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
+  verdictText: { fontSize: 14, color: colors.ink, fontWeight: "700", lineHeight: 20 },
+  verdictHint: { fontSize: 11.5, color: colors.inkSoft, marginTop: 7, lineHeight: 17 },
   navRow: { flexDirection: "row", gap: 10, marginTop: 8 },
   navButton: {
     flex: 1,

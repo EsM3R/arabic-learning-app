@@ -10,7 +10,9 @@ import {
 import Header from "../components/Header";
 import { getActivePack } from "../languages";
 import { speakTarget } from "../speech";
+import { judgeSpeech, SpeechAttempt } from "../speechinput";
 import { gradeCard, sessionQueue } from "../srs";
+import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity } from "../storage";
 import { matchProduction, ProductionMatch } from "../textnorm";
@@ -43,6 +45,8 @@ export default function ReviewScreen({ onBack }: Props) {
   const [matchKind, setMatchKind] = useState<ProductionMatch>("none");
   /** Otomatik notlamadan önceki kart — "Zorlandım/Çok kolaydı" düzeltmesi bununla yeniden hesaplanır. */
   const [preGrade, setPreGrade] = useState<VocabCard | null>(null);
+  /** Sesli denemenin cihaz hükmü (söyle modunda). */
+  const [speech, setSpeech] = useState<SpeechAttempt | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -75,7 +79,40 @@ export default function ReviewScreen({ onBack }: Props) {
     setRevealed(false);
     setPreGrade(null);
     setMatchKind("none");
+    setSpeech(null);
   };
+
+  /**
+   * Söyle modu: artık öz-beyan değil. Cihazın ses tanıması söylediğini
+   * yazıya çevirir, hedefle karşılaştırılır; doğruysa "yaz" modundaki gibi
+   * otomatik "Bildim" verilir (eşleşme kanıttır).
+   */
+  const checkSpoken = async (said: string) => {
+    if (!current) return;
+    void touchLastActivity();
+    const attempt = judgeSpeech(
+      current.arabic,
+      current.transliteration,
+      said,
+      pack.scriptExtract
+    );
+    setSpeech(attempt);
+    setAnswer(said);
+    void recordStat("spoken");
+    if (attempt.verdict === "dogru") {
+      void recordStat("spokenCorrect");
+      void recordStat("reviewed");
+      void recordStat("produced"); // sesli doğru üretim
+      setMatchKind(attempt.match);
+      setPreGrade(current);
+      await applyGrade(current, 2);
+    } else {
+      setMatchKind("none");
+    }
+    setPhase("sonuc");
+  };
+
+  const dictation = useDictation({ onResult: (t) => void checkSpoken(t) });
 
   /** Tanıma yönü / söyle modu / yanlış-yazım sonrası 4'lü öz-not. */
   const grade = async (g: ReviewGrade) => {
@@ -233,7 +270,19 @@ export default function ReviewScreen({ onBack }: Props) {
                     )}
                   </>
                 ) : (
-                  <Text style={styles.prompt}>İçinden (veya sesli) söyle, sonra kontrol et.</Text>
+                  <>
+                    <Text style={styles.prompt}>
+                      Mikrofona bas ve hedef dilde söyle — hocan duyduğunu yazacak.
+                    </Text>
+                    {dictation.listening && (
+                      <Text style={styles.listeningText}>
+                        {dictation.partial || "Dinliyorum…"}
+                      </Text>
+                    )}
+                    {dictation.error && (
+                      <Text style={styles.micErrorText}>{dictation.error}</Text>
+                    )}
+                  </>
                 )}
               </>
             ) : (
@@ -264,7 +313,10 @@ export default function ReviewScreen({ onBack }: Props) {
                   </TouchableOpacity>
                 </View>
                 {current.note ? <Text style={styles.note}>{current.note}</Text> : null}
-                {matchKind === "none" && answer.trim().length > 0 && (
+                {speech && speech.verdict !== "dogru" && (
+                  <Text style={styles.speechVerdict}>{speech.message}</Text>
+                )}
+                {matchKind === "none" && !speech && answer.trim().length > 0 && (
                   <Text style={styles.yourAnswer}>Senin cevabın: {answer.trim()}</Text>
                 )}
               </>
@@ -301,15 +353,25 @@ export default function ReviewScreen({ onBack }: Props) {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity
-                style={styles.revealButton}
-                onPress={() => {
-                  setMatchKind("none");
-                  setPhase("sonuc");
-                }}
-              >
-                <Text style={styles.revealText}>Cevabı Göster</Text>
-              </TouchableOpacity>
+              <View style={styles.actionCol}>
+                <TouchableOpacity
+                  style={[styles.revealButton, dictation.listening && styles.listeningButton]}
+                  onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                >
+                  <Text style={styles.revealText}>
+                    {dictation.listening ? "⏹ Bitir" : "🎙️ Söyle"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    setMatchKind("none");
+                    setPhase("sonuc");
+                  }}
+                >
+                  <Text style={styles.secondaryText}>Cevabı göster</Text>
+                </TouchableOpacity>
+              </View>
             )
           ) : matchKind !== "none" ? (
             <View style={styles.actionCol}>
@@ -448,6 +510,22 @@ const styles = StyleSheet.create({
   correctBanner: { fontSize: 16, fontWeight: "800", color: colors.accentDark, marginBottom: 10 },
   wrongBanner: { fontSize: 14, fontWeight: "800", color: colors.danger, marginBottom: 10 },
   yourAnswer: { fontSize: 12.5, color: colors.inkFaint, marginTop: 10 },
+  listeningText: {
+    fontSize: 14,
+    color: colors.gold,
+    fontWeight: "700",
+    marginTop: 10,
+    textAlign: "center",
+  },
+  micErrorText: { fontSize: 12.5, color: colors.danger, marginTop: 10, lineHeight: 18 },
+  listeningButton: { backgroundColor: colors.danger },
+  speechVerdict: {
+    fontSize: 13,
+    color: colors.inkSoft,
+    marginTop: 12,
+    lineHeight: 19,
+    textAlign: "center",
+  },
   revealButton: {
     backgroundColor: colors.accent,
     borderRadius: radius.lg,

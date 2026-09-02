@@ -94,6 +94,22 @@ export function progressDigest(stats: StatsSummary, reading: ReadingPerformance)
     }
   }
 
+  // Konuşma: uygulamanın öğrenciyi GERÇEKTEN duyduğu tek yer.
+  const spoken = w.spoken ?? 0;
+  if (spoken > 0) {
+    const ok = w.spokenCorrect ?? 0;
+    lines.push(
+      `Konuşma (mikrofonla): bu hafta ${spoken} deneme, ${pct(ok / spoken)}'i doğru duyuldu.`
+    );
+    if (ok / spoken < 0.5) {
+      lines.push(
+        "  → Söyledikleri çoğunlukla tanınmıyor: telaffuz üzerinde çalış, konuşma seviyesini yükseltme."
+      );
+    } else if (ok / spoken >= 0.8) {
+      lines.push("  → Telaffuzu anlaşılır; konuşma seviyesinde ilerleme var.");
+    }
+  }
+
   const produced = w.produced ?? 0;
   const shadowed = w.shadowed ?? 0;
   const readSentence = w.readSentence ?? 0;
@@ -108,11 +124,16 @@ export function progressDigest(stats: StatsSummary, reading: ReadingPerformance)
       `Bu hafta üretim: ${parts.join(", ")} — ${stats.activeDays7} gün aktif (son 30 günde ${stats.activeDays30} gün).`
     );
   }
-  // Gölgeleme dürtmesi yalnız ÇALIŞAN öğrenciye anlamlı: hiç verisi olmayana
-  // "gölgeleme yapmamışsın" demek, henüz hiçbir şey yapmamış birine tek
-  // eksiğini söylemek olurdu.
+  // Eksik dürtmeleri yalnız ÇALIŞAN öğrenciye anlamlı: hiç verisi olmayana
+  // "şunu yapmamışsın" demek, henüz hiçbir şey yapmamış birine tek eksiğini
+  // söylemek olurdu.
   if (lines.length > 0 && shadowed === 0 && (stats.total.shadowed ?? 0) === 0) {
     lines.push("Gölgeleme hiç denenmemiş — konuşma akıcılığı için öner.");
+  }
+  if (lines.length > 0 && spoken === 0 && (stats.total.spoken ?? 0) === 0) {
+    lines.push(
+      "Mikrofonla hiç konuşma denemesi yok: öğrenci hep yazıyor. Sesli cevap vermeye teşvik et — konuşma ancak konuşarak gelişir."
+    );
   }
 
   if (lines.length === 0) {

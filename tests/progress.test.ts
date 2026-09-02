@@ -124,3 +124,36 @@ test("progressDigest: kural dışına taşan metinler uyarı olarak geçer", () 
   const perf = readingPerformance([reading({ complianceRatio: 0.5 })], 0.85);
   assert.match(progressDigest(stats(), perf), /kelime defterinin dışına taşmış/);
 });
+
+test("progressDigest: konuşma verisi — zayıf tanınma seviyeyi kilitler", () => {
+  const d = progressDigest(
+    stats({ week: { spoken: 20, spokenCorrect: 6 }, activeDays7: 3 }),
+    readingPerformance([], 0.85)
+  );
+  assert.match(d, /Konuşma \(mikrofonla\)/);
+  assert.match(d, /%30'i doğru duyuldu/);
+  assert.match(d, /konuşma seviyesini yükseltme/);
+});
+
+test("progressDigest: iyi tanınma ilerleme olarak bildirilir", () => {
+  const d = progressDigest(
+    stats({ week: { spoken: 10, spokenCorrect: 9 }, activeDays7: 3 }),
+    readingPerformance([], 0.85)
+  );
+  assert.match(d, /%90'i doğru duyuldu/);
+  assert.match(d, /Telaffuzu anlaşılır/);
+});
+
+test("progressDigest: çalışan ama hiç konuşmayan öğrenci sesli cevaba teşvik edilir", () => {
+  const d = progressDigest(
+    stats({ week: { produced: 8, reviewed: 20 }, activeDays7: 2 }),
+    readingPerformance([], 0.85)
+  );
+  assert.match(d, /Mikrofonla hiç konuşma denemesi yok/);
+});
+
+test("progressDigest: hiç verisi olmayana konuşma dürtmesi yapılmaz", () => {
+  const d = progressDigest(stats(), readingPerformance([], 0.85));
+  assert.match(d, /Henüz ölçülmüş veri yok/);
+  assert.doesNotMatch(d, /Mikrofonla hiç konuşma/);
+});

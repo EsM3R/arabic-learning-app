@@ -14,6 +14,8 @@ import { getActivePack } from "../languages";
 import { isEventMessage } from "../prompts";
 import RichText from "./RichText";
 import { extractArabic, speakTarget } from "../speech";
+import { isSpoken, stripSpokenMark } from "../speechinput";
+import { useDictation } from "../useDictation";
 import { colors, shadow } from "../theme";
 import { ChatMessage, NavigationSuggestion } from "../types";
 
@@ -24,7 +26,8 @@ interface Props {
   live?: string | null;
   /** "düşünüyor… / defterine bakıyor…" durum satırı (yazıyor… yerine). */
   status?: string | null;
-  onSend: (text: string) => void;
+  /** spoken=true → metin mikrofondan geldi (hoca bunu bilmeli). */
+  onSend: (text: string, spoken?: boolean) => void;
   placeholder?: string;
   /** Üstaz'ın ekrana_git önerisi — zorlamaz, tıklanabilir bir şerit olarak çıkar. */
   suggestion?: NavigationSuggestion | null;
@@ -44,12 +47,25 @@ export default function ChatView({
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const pack = getActivePack();
+  /** Mikrofondan gelen ve öğrencinin elle değiştirmediği metin. */
+  const spokenDraft = useRef<string | null>(null);
+
+  // Mikrofon: söylenen doğrudan yazı kutusuna düşer — öğrenci göndermeden
+  // önce görebilir ve düzeltebilir (ses tanıma gürültülüdür).
+  const dictation = useDictation({
+    onResult: (text) => {
+      spokenDraft.current = text;
+      setDraft(text);
+    },
+  });
 
   const send = () => {
     const text = draft.trim();
     if (!text || sending) return;
+    const spoken = spokenDraft.current !== null && spokenDraft.current.trim() === text;
+    spokenDraft.current = null;
     setDraft("");
-    onSend(text);
+    onSend(text, spoken);
   };
 
   return (
@@ -85,7 +101,12 @@ export default function ChatView({
                 ]}
               >
                 {item.role === "user" ? (
-                  <Text style={styles.userText}>{item.content}</Text>
+                  // Sesli işareti hocaya gider ama öğrenciye küçük bir rozet
+                  // olarak görünür — kendi cümlesini temiz okusun.
+                  <Text style={styles.userText}>
+                    {isSpoken(item.content) ? "🎙️ " : ""}
+                    {stripSpokenMark(item.content)}
+                  </Text>
                 ) : (
                   <RichText
                     content={item.content}
@@ -136,11 +157,37 @@ export default function ChatView({
           </View>
         </TouchableOpacity>
       )}
+      {dictation.error && (
+        <View style={styles.micError}>
+          <Text style={styles.micErrorText}>{dictation.error}</Text>
+        </View>
+      )}
+      {dictation.listening && (
+        <View style={styles.micBanner}>
+          <ActivityIndicator size="small" color={colors.gold} />
+          <Text style={styles.micBannerText} numberOfLines={2}>
+            {dictation.partial || `Dinliyorum… ${pack.label} konuş`}
+          </Text>
+        </View>
+      )}
       <View style={styles.inputRow}>
+        <TouchableOpacity
+          style={[styles.micButton, dictation.listening && styles.micButtonOn]}
+          onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
+          disabled={sending}
+          accessibilityLabel={dictation.listening ? "Dinlemeyi durdur" : "Konuşarak yaz"}
+        >
+          <Text style={styles.micText}>{dictation.listening ? "⏹" : "🎙️"}</Text>
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(t) => {
+            setDraft(t);
+            // Elle düzeltilen metin artık "söylenmiş" sayılmaz; ancak
+            // dokunulmadan gönderilirse konuşma olarak işaretlenir.
+            if (spokenDraft.current && t !== spokenDraft.current) spokenDraft.current = null;
+          }}
           placeholder={placeholder ?? "Mesajını yaz…"}
           placeholderTextColor={colors.inkFaint}
           multiline
@@ -158,6 +205,31 @@ export default function ChatView({
 }
 
 const styles = StyleSheet.create({
+  micButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.goldSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micButtonOn: { backgroundColor: colors.danger },
+  micText: { fontSize: 19 },
+  micBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.goldSoft,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  micBannerText: { flex: 1, fontSize: 13, color: colors.gold, fontWeight: "700" },
+  micError: {
+    backgroundColor: colors.dangerSoft,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  micErrorText: { fontSize: 12.5, color: colors.danger, lineHeight: 18 },
   container: { flex: 1, backgroundColor: colors.bg },
   list: { padding: 16, paddingBottom: 10 },
   userRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 12 },
