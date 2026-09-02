@@ -27,7 +27,7 @@ import {
   touchLastActivity,
 } from "../storage";
 import { normalizeTarget } from "../textnorm";
-import { colors, radius, shadow, shadowLift } from "../theme";
+import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
 
 interface Props {
   onBack: () => void;
@@ -246,8 +246,11 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
             <Text
               style={[
                 styles.itemText,
-                pack.scriptExtract && styles.rtl,
                 item.source === "telaffuz" && styles.itemTextBig,
+                // Arapça stili EN SONA gelmeli: dizide sonraki kazanır, yoksa
+                // itemTextBig'in dar lineHeight'ı harekeleri kırpar.
+                pack.scriptExtract &&
+                  (item.source === "telaffuz" ? styles.rtlBig : styles.rtl),
               ]}
             >
               {item.text}
@@ -363,7 +366,11 @@ const styles = StyleSheet.create({
   sourceBadge: { fontSize: 11.5, color: colors.inkFaint, fontWeight: "700", marginBottom: 12 },
   itemText: { fontSize: 24, lineHeight: 40, color: colors.ink, textAlign: "center" },
   itemTextBig: { fontSize: 32, lineHeight: 52 },
-  rtl: { writingDirection: "rtl" },
+  // writingDirection Android'de ölü koddu (yön BiDi ile içerikten çıkar);
+  // yerine gerçek Arapça fontu ve kırpmayan satır yüksekliği. Hizalama
+  // kartta ortalı kalır.
+  rtl: { ...arabicText(24), textAlign: "center" },
+  rtlBig: { ...arabicText(32), textAlign: "center" },
   translit: { fontSize: 15, color: colors.accent, fontWeight: "600", marginTop: 8 },
   turkish: { fontSize: 14, color: colors.inkSoft, marginTop: 6, textAlign: "center" },
   tipBox: {

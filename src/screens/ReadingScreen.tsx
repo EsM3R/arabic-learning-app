@@ -17,7 +17,7 @@ import { newCard } from "../srs";
 import { SequenceHandle, speakSequence, speakTarget, stopSpeaking } from "../speech";
 import { recordStat } from "../statsStore";
 import { loadReadings, loadVocab, saveReadings, saveVocab, touchLastActivity } from "../storage";
-import { colors, radius, shadow, shadowLift } from "../theme";
+import { ARABIC_FONT, arabicText, colors, radius, shadow, shadowLift } from "../theme";
 import { Profile, ReadingLength, ReadingText } from "../types";
 import { normalizeTarget } from "../textnorm";
 
@@ -588,8 +588,11 @@ const styles = StyleSheet.create({
   body: { padding: 16, paddingBottom: 40 },
   loadingTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
   loadingText: { fontSize: 13, color: colors.inkSoft, textAlign: "center", lineHeight: 20 },
-  rtl: { textAlign: "right", writingDirection: "rtl" },
-  rtlBig: { textAlign: "right", writingDirection: "rtl", fontSize: 26, lineHeight: 44 },
+  // writingDirection Android'de etkisizdir; yön BiDi ile içerikten çıkar.
+  // Arapça fontu ve letterSpacing:0 burada verilir (bitişik yazı kopmasın).
+  rtl: { textAlign: "right", fontFamily: ARABIC_FONT, letterSpacing: 0 },
+  // 26/44 oranı (1.69) harekeleri kırpıyordu; arabicText 2.25 kuralını uygular.
+  rtlBig: { ...arabicText(26), textAlign: "right" },
   warnBand: {
     backgroundColor: colors.goldSoft,
     borderRadius: radius.md,

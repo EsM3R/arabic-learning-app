@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, Text, TextStyle, View } from "react-native";
 import { Block, classifyLine, InlineToken, splitInline, splitScript } from "../richtext";
-import { colors } from "../theme";
+import { arabicText, colors } from "../theme";
 
 /**
  * Hocanın mesajlarını okunabilir biçimde basar.
@@ -22,11 +22,21 @@ interface Props {
   scaleScript?: boolean;
 }
 
+/**
+ * Arapça parçaları ayrı <Text> olarak basar.
+ *
+ * İki tuzak burada kapatılıyor:
+ * 1) lineHeight çarpanı 1.6 idi; harekeli metnin ihtiyacı 2.25 (bkz. theme.ts).
+ *    1.6 ile `أَلْلَّٰهُ` gibi yığılmalı biçimler tepeden kırpılıyordu.
+ * 2) Kalın gövdede fontWeight mirası Arapça fontu düşürüyordu; kalın için
+ *    fontWeight değil ayrı aile adı (SemiBold) verilir.
+ */
 function renderRuns(
   text: string,
   baseSize: number,
   scaleScript: boolean,
-  key: string
+  key: string,
+  bold = false
 ): React.ReactNode {
   if (!scaleScript) return text;
   const runs = splitScript(text);
@@ -35,10 +45,12 @@ function renderRuns(
     run.arabic ? (
       <Text
         key={`${key}r${i}`}
-        style={{
-          fontSize: baseSize * SCRIPT_SCALE,
-          lineHeight: baseSize * SCRIPT_SCALE * 1.6,
-        }}
+        style={[
+          arabicText(Math.round(baseSize * SCRIPT_SCALE), bold),
+          // Kalın sarmalayıcıdan miras kalan fontWeight'i açıkça sıfırla:
+          // Android'de 700+ özel Arapça fontu sistem fontuna düşürür.
+          styles.arabicWeightReset,
+        ]}
       >
         {run.text}
       </Text>
@@ -56,7 +68,7 @@ function renderInline(
 ): React.ReactNode[] {
   return splitInline(text).map((token: InlineToken, i) => {
     const k = `${key}i${i}`;
-    const inner = renderRuns(token.text, baseSize, scaleScript, k);
+    const inner = renderRuns(token.text, baseSize, scaleScript, k, token.kind === "bold");
     if (token.kind === "bold") {
       return (
         <Text key={k} style={styles.bold}>
@@ -140,6 +152,8 @@ export default function RichText({ content, style, scaleScript = false }: Props)
 const styles = StyleSheet.create({
   gap: { height: 9 },
   bold: { fontWeight: "800" },
+  /** Arapça run'ı, kalın sarmalayıcının fontWeight mirasından korur. */
+  arabicWeightReset: { fontWeight: "400" },
   italic: { fontStyle: "italic" },
   code: { color: colors.accentDark },
   heading: { fontWeight: "800", marginTop: 2, marginBottom: 1 },

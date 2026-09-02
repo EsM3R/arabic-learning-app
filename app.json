@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
@@ -36,6 +36,36 @@
         {
           "microphonePermission": "Konuşma pratiği için mikrofon erişimi gerekiyor.",
           "speechRecognitionPermission": "Söylediklerini yazıya çevirip değerlendirebilmek için gerekiyor."
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "NotoNaskhArabic",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/NotoNaskhArabic-Regular.ttf",
+                    "weight": 400,
+                    "style": "normal"
+                  },
+                  {
+                    "path": "./assets/fonts/NotoNaskhArabic-SemiBold.ttf",
+                    "weight": 600,
+                    "style": "normal"
+                  }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./assets/fonts/NotoNaskhArabic-Regular.ttf",
+              "./assets/fonts/NotoNaskhArabic-SemiBold.ttf"
+            ]
+          }
         }
       ],
       "expo-notifications",

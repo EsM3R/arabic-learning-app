@@ -16,7 +16,7 @@ import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity } from "../storage";
 import { matchProduction, ProductionMatch } from "../textnorm";
-import { colors, radius, shadow, shadowLift } from "../theme";
+import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
 import { ReviewGrade, VocabCard } from "../types";
 
 interface Props {
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   modeChipText: { fontSize: 11, fontWeight: "800", color: colors.inkSoft },
   modeChipTextActive: { color: colors.onDeep },
   newBadge: { fontSize: 12, color: colors.gold, fontWeight: "700", marginBottom: 10 },
-  arabic: { fontSize: 40, color: colors.ink, textAlign: "center", marginBottom: 12 },
+  arabic: { ...arabicText(40), color: colors.ink, textAlign: "center", marginBottom: 12 },
   listenRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
   listenChip: {
     backgroundColor: colors.accentSoft,

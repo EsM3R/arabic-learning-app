@@ -25,7 +25,7 @@ import { judgeSpeech, SpeechAttempt } from "../speechinput";
 import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadPronunciationSet, loadVocab, savePronunciationSet, touchLastActivity } from "../storage";
-import { colors, radius, shadow, shadowLift } from "../theme";
+import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
 import { Profile, PronunciationSet } from "../types";
 
 interface Props {
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     ...shadowLift,
   },
-  arabic: { fontSize: 42, color: colors.ink, textAlign: "center", marginBottom: 12 },
+  arabic: { ...arabicText(42), color: colors.ink, textAlign: "center", marginBottom: 12 },
   translit: { fontSize: 18, color: colors.accent, fontWeight: "600", marginBottom: 6 },
   turkish: { fontSize: 16, color: colors.inkSoft },
   tipBox: {
