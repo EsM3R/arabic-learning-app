@@ -103,7 +103,7 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
       model: req.model,
       messages,
       tools,
-      max_tokens: 8000,
+      max_tokens: 16000,
       stream: true,
       stream_options: { include_usage: true },
     });
@@ -209,7 +209,7 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
       { role: "user", content: req.userMessage },
     ],
     response_format: { type: "json_object" },
-    max_tokens: 8000,
+    max_tokens: 16000,
     stream: true,
     stream_options: { include_usage: true },
   });

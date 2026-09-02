@@ -10,6 +10,9 @@ import {
   easeFromDifficulty,
   gradeCard,
   newCard,
+  NEW_PER_SESSION,
+  SESSION_CAP,
+  sessionQueue,
   strugglingCards,
 } from "../src/srs.ts";
 import type { VocabCard } from "../src/types.ts";
@@ -212,4 +215,41 @@ test("deckStats ve strugglingCards", () => {
 test("determinizm", () => {
   const c = legacyCard({ intervalDays: 7, ease: 2.4, reps: 2, lastReviewedAt: daysAgo(7) });
   assert.deepEqual(gradeCard(c, 1, NOW), gradeCard(c, 1, NOW));
+});
+
+test("sessionQueue: oturum tavanı ve yeni kart kotası uygulanır", () => {
+  const now = new Date("2026-09-02T12:00:00.000Z");
+  const old = (i: number) =>
+    legacyCard({ id: `o${i}`, due: new Date(now.getTime() - (100 - i) * 86_400_000).toISOString(), reps: 3 });
+  const fresh = (i: number) =>
+    legacyCard({ id: `n${i}`, due: now.toISOString(), reps: 0, lapses: 0, intervalDays: 0 });
+  const cards = [...Array.from({ length: 30 }, (_, i) => old(i)), ...Array.from({ length: 30 }, (_, i) => fresh(i))];
+
+  const q = sessionQueue(cards, {}, now);
+  assert.equal(q.length, SESSION_CAP);
+  assert.equal(q.filter((c) => c.reps === 0).length, NEW_PER_SESSION);
+  // Gecikmiş kartlar önce: kuyruğun başı en eski due
+  assert.equal(q[0].id, "o0");
+});
+
+test("sessionQueue: az kart varken hepsi gelir, sınırlar özelleştirilebilir", () => {
+  const now = new Date("2026-09-02T12:00:00.000Z");
+  const cards = [
+    legacyCard({ id: "a", due: new Date(now.getTime() - 86_400_000).toISOString(), reps: 2 }),
+    legacyCard({ id: "b", due: now.toISOString(), reps: 0, lapses: 0 }),
+    legacyCard({ id: "c", due: new Date(now.getTime() + 86_400_000).toISOString(), reps: 1 }), // due değil
+  ];
+  assert.deepEqual(sessionQueue(cards, {}, now).map((c) => c.id), ["a", "b"]);
+  assert.deepEqual(sessionQueue(cards, { cap: 1 }, now).map((c) => c.id), ["a"]);
+  assert.deepEqual(sessionQueue(cards, { newCap: 0 }, now).map((c) => c.id), ["a"]);
+});
+
+test("sessionQueue: unutulmuş kart (lapses>0, reps=0) yeni sayılmaz", () => {
+  const now = new Date("2026-09-02T12:00:00.000Z");
+  const cards = [
+    legacyCard({ id: "lapsed", due: now.toISOString(), reps: 0, lapses: 2 }),
+    legacyCard({ id: "new", due: now.toISOString(), reps: 0, lapses: 0 }),
+  ];
+  const q = sessionQueue(cards, { newCap: 0 }, now);
+  assert.deepEqual(q.map((c) => c.id), ["lapsed"]);
 });

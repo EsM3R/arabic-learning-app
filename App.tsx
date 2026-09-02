@@ -15,7 +15,13 @@ import ShadowingScreen from "./src/screens/ShadowingScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import SetupScreen from "./src/screens/SetupScreen";
 import { getActiveLanguageId, LanguageId, setActiveLanguage } from "./src/languages";
-import { loadProfile, resetAll, saveProfile, switchLanguageProgress } from "./src/storage";
+import {
+  clearModuleChats,
+  loadProfile,
+  resetAll,
+  saveProfile,
+  switchLanguageProgress,
+} from "./src/storage";
 import { colors } from "./src/theme";
 import {
   Assessment,
@@ -165,6 +171,8 @@ export default function App() {
     profileRef.current = next;
     setProfile(next);
     await saveProfile(next);
+    // Modül id'leri yeniden kullanıldığı için eski sohbetler yeni derse sızar.
+    await clearModuleChats();
   };
 
   /**
@@ -179,6 +187,7 @@ export default function App() {
     profileRef.current = next;
     setProfile(next);
     await saveProfile(next);
+    await clearModuleChats(); // bkz. onCurriculumBuilt
     setScreen({ name: "dashboard" });
   };
 

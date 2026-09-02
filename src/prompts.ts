@@ -73,6 +73,7 @@ function AGENT_TOOLS_GUIDE(): string {
 
 ÖNCE BAK, SONRA YAZ — araçlarının bir kısmı okuma araçlarıdır, veriyi görmek için onları kullan:
 - tekrar_durumu: Öğrencinin kelime tekrar performansı. Derse başlarken ve seviye_guncelle'den ÖNCE bak; hangi kelimeleri unuttuğunu ancak böyle bilebilirsin.
+- ilerleme_durumu: Cihazın ölçtüğü yeterlilik verisi — okuduğunu anlama skorları, ses ayırt etme doğruluğu, haftalık üretim. seviye_guncelle'den ÖNCE tekrar_durumu ile BİRLİKTE bak: kelime hatırlamak tek başına seviye demek değildir. Seviyeyi bir kademeden fazla yükseltemezsin; uygulama reddeder.
 - kelime_ara: Bir kelimeyi daha önce öğretmiş miyim? Defterdeki kelimelerle alıştırma kurayım mı?
 - hafiza_oku: Sana aşağıda sadece son kayıtlar veriliyor; daha eskiye veya belirli bir konuya bakmak için çağır.
 - mufredat_oku: Modül id'lerini ve tamamlanma durumunu görür. modul_tamamla/modul_ekle'den ÖNCE çağır — id tahmin etme.

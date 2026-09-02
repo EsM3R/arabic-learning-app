@@ -204,6 +204,49 @@ export function dueCards(cards: VocabCard[], now = new Date()): VocabCard[] {
   return cards.filter((c) => ts(c) <= now.getTime()).sort((a, b) => ts(a) - ts(b));
 }
 
+/** Bir tekrar oturumunda gösterilecek en fazla kart. */
+export const SESSION_CAP = 40;
+/** Bir oturumda ilk kez görülecek en fazla YENİ kart. */
+export const NEW_PER_SESSION = 10;
+
+export interface SessionOptions {
+  cap?: number;
+  newCap?: number;
+}
+
+/**
+ * Tekrar oturumunun kuyruğu. Neden sınır: tekrarı gelen kart sayısı
+ * sınırsızdı; iki hafta ara veren öğrencinin önüne 200 kart geliyordu ve
+ * oturum bitirilemeyecek göründüğü için hiç başlanmıyordu. Araştırmanın
+ * söylediği de bu: tamamlanabilir günlük yük, tamamlanamayan büyük yükten
+ * çok daha fazla kart tutturur.
+ *
+ * Öncelik: gecikmiş kartlar (due sırasıyla) önce; yeni kartlar hem kendi
+ * kotasıyla hem de toplam tavanla sınırlı — yeni kelime akını, hatırlanması
+ * gereken eski kelimelerin önüne geçmemeli.
+ */
+export function sessionQueue(
+  cards: VocabCard[],
+  opts: SessionOptions = {},
+  now = new Date()
+): VocabCard[] {
+  const cap = opts.cap ?? SESSION_CAP;
+  const newCap = opts.newCap ?? NEW_PER_SESSION;
+  const due = dueCards(cards, now);
+  const isNew = (c: VocabCard) => c.reps === 0 && (c.lapses ?? 0) === 0;
+  const out: VocabCard[] = [];
+  let taken = 0;
+  for (const c of due) {
+    if (out.length >= cap) break;
+    if (isNew(c)) {
+      if (taken >= newCap) continue;
+      taken += 1;
+    }
+    out.push(c);
+  }
+  return out;
+}
+
 /** Öğrencinin en çok zorlandığı kartlar (unutulan / FSRS zorluğu ortalamanın üstünde). */
 export function strugglingCards(cards: VocabCard[], limit = 10): VocabCard[] {
   return cards

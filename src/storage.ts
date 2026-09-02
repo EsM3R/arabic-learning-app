@@ -169,6 +169,19 @@ export async function resetAll(): Promise<void> {
   await AsyncStorage.clear();
 }
 
+/**
+ * Modül sohbetlerini siler. Yeni müfredat da "k1", "o1"... id'lerini
+ * ürettiği için eski sohbetler silinmezse A1'in "k1" dersi A0'ın "k1"
+ * transkriptiyle açılır ve hoca eski dersin üstüne konuşur.
+ */
+export async function clearModuleChats(): Promise<void> {
+  const lang = getActiveLanguageId();
+  const prefix = lang === "ar" ? "chat.v1.module." : `chat.v1.${lang}.module.`;
+  const keys = await AsyncStorage.getAllKeys();
+  const targets = keys.filter((k) => k.startsWith(prefix));
+  if (targets.length > 0) await AsyncStorage.multiRemove(targets);
+}
+
 // ---------------------------------------------------------------------------
 // Yedek: uygulamanın bütün hafızası bu anahtarlardır (bkz. src/backup.ts).
 // ---------------------------------------------------------------------------

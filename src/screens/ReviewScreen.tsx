@@ -10,7 +10,7 @@ import {
 import Header from "../components/Header";
 import { getActivePack } from "../languages";
 import { speakTarget } from "../speech";
-import { dueCards, gradeCard } from "../srs";
+import { gradeCard, sessionQueue } from "../srs";
 import { recordStat } from "../statsStore";
 import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity } from "../storage";
 import { matchProduction, ProductionMatch } from "../textnorm";
@@ -48,7 +48,8 @@ export default function ReviewScreen({ onBack }: Props) {
     void (async () => {
       const [cards, savedMode] = await Promise.all([loadVocab(), loadReviewMode()]);
       setAllCards(cards);
-      setQueue(dueCards(cards));
+      // Tamamlanabilir oturum: tavan + yeni kart kotası (bkz. srs.sessionQueue).
+      setQueue(sessionQueue(cards));
       setMode(savedMode === "soyle" ? "soyle" : "yaz");
       setLoaded(true);
     })();

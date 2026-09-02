@@ -1,11 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getActivePack } from "./languages";
+import { validateLevelChange } from "./levels";
+import { findOpenSameTopic } from "./mistakes";
 import { scheduleReminder } from "./notifications";
-import { recordStat } from "./statsStore";
+import { progressDigest, readingPerformance } from "./progress";
+import { COMPLIANCE_WARN } from "./reading";
+import { loadStatsSummary, recordStat } from "./statsStore";
 import { cardMemory, deckStats, Difficulty, dueCards, gradeCard, newCard, strugglingCards } from "./srs";
 import {
   loadMistakes,
   loadNotes,
+  loadReadings,
   loadVocab,
   saveMistakes,
   saveNotes,
@@ -95,6 +100,12 @@ const READ_TOOLS: Anthropic.Tool[] = [
       },
       required: [],
     },
+  },
+  {
+    name: "ilerleme_durumu",
+    description:
+      "Cihazın TUTTUĞU objektif yeterlilik verisini gösterir: okuduğunu anlama soru skorları, sesbirim ayırt etme doğruluğu, haftalık üretim (kaç cümle üretti, okudu, gölgeledi) ve aktif gün sayısı. Bunlar öğrencinin beyanı değil, ölçülmüş sonuçlardır. seviye_guncelle çağırmadan ÖNCE tekrar_durumu ile birlikte MUTLAKA bak: kelime hatırlama tek başına seviye demek değildir; anlama ve kulak verisi olmadan verilen seviye kararı temelsizdir.",
+    input_schema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "mufredat_oku",
@@ -494,6 +505,12 @@ export async function executeTool(
       return { result: parts.join("\n\n") };
     }
 
+    case "ilerleme_durumu": {
+      const [stats, readings] = await Promise.all([loadStatsSummary(), loadReadings()]);
+      const digest = progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN));
+      return { result: digest.trim(), summary: "📊 ilerleme verine baktı" };
+    }
+
     case "mufredat_oku": {
       const curriculum = ctx.profile.curriculum;
       if (!curriculum || curriculum.modules.length === 0) {
@@ -619,8 +636,9 @@ export async function executeTool(
       // Aynı konuda AÇIK bir kayıt varsa yeni kayıt açılmaz: sayaç artar.
       // Tekrarlayan hata fosilleşme sinyalidir; sayaç 3'e ulaşınca hafıza
       // bağlamı bu hatayı "derste açıkça işle" diye öne çıkarır.
-      const norm = (s: string) => s.trim().toLowerCase();
-      const existing = entries.find((m) => !m.resolved && norm(m.topic) === norm(topic));
+      // Eşleşme birebir metin değil, anlamlı köklerin örtüşmesi: model konuyu
+      // her seferinde birazcık farklı yazdığında sayaç boşa gitmesin.
+      const existing = findOpenSameTopic(entries, topic);
       if (existing) {
         const timesSeen = (existing.timesSeen ?? 1) + 1;
         await saveMistakes(
@@ -712,12 +730,28 @@ export async function executeTool(
     case "seviye_guncelle": {
       const a = ctx.profile.assessment;
       if (!a) return { result: "Hata: henüz seviye değerlendirmesi yok." };
-      const speaking = input.speakingLevel ? String(input.speakingLevel) : undefined;
-      const reading = input.readingLevel ? String(input.readingLevel) : undefined;
+      // Seviye kapısı: şemayı her sağlayıcı sunucuda zorlamıyor; geçersiz
+      // yazım ve tek turda çok kademe sıçrama burada durdurulur.
+      const rejections: string[] = [];
+      let speaking: string | undefined;
+      let reading: string | undefined;
+      if (input.speakingLevel !== undefined) {
+        const v = validateLevelChange(a.speakingLevel, input.speakingLevel);
+        if (v.error) rejections.push(`Konuşma seviyesi yazılmadı — ${v.error}`);
+        else speaking = v.value;
+      }
+      if (input.readingLevel !== undefined) {
+        const v = validateLevelChange(a.readingLevel, input.readingLevel);
+        if (v.error) rejections.push(`Okuma seviyesi yazılmadı — ${v.error}`);
+        else reading = v.value;
+      }
       const strengths = Array.isArray(input.strengths) ? input.strengths.map(String) : undefined;
       const weaknesses = Array.isArray(input.weaknesses) ? input.weaknesses.map(String) : undefined;
       const summary = input.summary ? String(input.summary) : undefined;
       if (!speaking && !reading && !strengths && !weaknesses && !summary) {
+        // Tek isteği reddedilen seviye değişimiyse modele NEDEN'ini söyle;
+        // yoksa "hiçbir alan verilmedi" diye yanıltıcı bir hata döner.
+        if (rejections.length > 0) return { result: rejections.join(" ") };
         return { result: "Hata: en az bir alan (seviye, güçlü/zayıf yönler veya özet) vermelisin." };
       }
       await commitProfile(ctx, {
@@ -750,8 +784,9 @@ export async function executeTool(
         weaknesses ? "zayıf yönler güncellendi" : null,
         strengths ? "güçlü yönler güncellendi" : null,
       ].filter(Boolean);
+      const note = rejections.length > 0 ? ` ${rejections.join(" ")}` : "";
       return {
-        result: `Güncellendi: ${parts.join(", ")}. Gerekçe not defterine işlendi.`,
+        result: `Güncellendi: ${parts.join(", ")}. Gerekçe not defterine işlendi.${note}`,
         summary: `📈 ${parts.join(", ")}`,
       };
     }

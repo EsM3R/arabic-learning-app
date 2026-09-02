@@ -18,7 +18,10 @@ import {
   memoryContext,
   retentionDigest,
 } from "../prompts";
-import { loadMistakes, loadNotes, loadVocab } from "../storage";
+import { progressDigest, readingPerformance } from "../progress";
+import { COMPLIANCE_WARN } from "../reading";
+import { loadStatsSummary } from "../statsStore";
+import { loadMistakes, loadNotes, loadReadings, loadVocab } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Assessment, Curriculum, Profile } from "../types";
 
@@ -52,16 +55,23 @@ export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
     started.current = true;
     void (async () => {
       try {
-        const [mistakes, notes, vocab] = await Promise.all([
+        // Seviye kararının girdisi yalnız kelime tekrarı olmasın: cihazda
+        // ölçülen anlama ve kulak verisi de hocanın önüne konur.
+        const [mistakes, notes, vocab, stats, readings] = await Promise.all([
           loadMistakes(),
           loadNotes(),
           loadVocab(),
+          loadStatsSummary(),
+          loadReadings(),
         ]);
         const ctx: AgentContext = { profile, profileChanged: false };
         const reply = await agenticChat(
           {
             stable: levelUpSystem(profile),
-            dynamic: memoryContext(mistakes, notes) + retentionDigest(vocab),
+            dynamic:
+              memoryContext(mistakes, notes) +
+              retentionDigest(vocab) +
+              progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN)),
           },
           [{ role: "user", content: KICKOFF_LEVELUP }],
           ctx,
