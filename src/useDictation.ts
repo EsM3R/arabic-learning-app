@@ -2,6 +2,12 @@
  * Mikrofon kancası: cihazın kendi ses tanımasıyla konuşmayı yazıya çevirir.
  * API maliyeti YOKTUR — tanıma telefonda/Google servisinde yapılır.
  *
+ * BASILI TUT — BIRAK düzeni: tanıma "sürekli" kipte açılır ve öğrenci
+ * düğmeyi bırakana kadar kapanmaz. Sebebi gerçek kullanımdan geldi:
+ * varsayılan kipte Android, kısa bir duraksamayı "cümle bitti" sayıp
+ * tanımayı sonlandırıyor; yabancı dilde yavaş konuşan biri cümlesini
+ * bitiremeden kesiliyordu. Bitişe artık makine değil öğrenci karar verir.
+ *
  * Saf mantık src/speechinput.ts'te; burada yalnız izin, başlat/durdur ve
  * olay tesisatı var.
  */
@@ -25,9 +31,9 @@ export interface DictationState {
 }
 
 export interface DictationOptions {
-  /** Kesin sonuç geldiğinde — asıl teslim noktası. */
+  /** Konuşma bittiğinde (öğrenci bıraktığında) toplanan metin. */
   onResult: (text: string) => void;
-  /** Hedef dil yerine Türkçe dinlemek için (kullanılmıyor ama açık kapı). */
+  /** Hedef dil yerine başka bir dili dinlemek için. */
   lang?: string;
 }
 
@@ -50,56 +56,88 @@ function errorText(code: string): string {
   }
 }
 
+/** Basılı tutma bu süreden kısaysa yine de bu kadar dinlenir. */
+const MIN_LISTEN_MS = 600;
+
 export function useDictation(opts: DictationOptions): DictationState {
   const [listening, setListening] = useState(false);
   const [partial, setPartial] = useState("");
   const [error, setError] = useState<string | null>(null);
-  /** Son duyulan metin: bazı cihazlarda "end" olayı final sonuçtan sonra gelir. */
-  const lastText = useRef("");
+  /**
+   * Sürekli kipte tanıma birden çok parça döndürebilir: kesinleşenler
+   * biriktirilir, kesinleşmemiş son parça ayrı tutulur. Teslim yalnız
+   * "end" olayında yapılır — yani öğrenci düğmeyi bıraktığında.
+   */
+  const finals = useRef<string[]>([]);
+  const interim = useRef("");
   const delivered = useRef(false);
+  const startedAt = useRef(0);
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reset = () => {
+    finals.current = [];
+    interim.current = "";
+    delivered.current = false;
+  };
+
+  /** Toplanan her şeyi tek metne çevirir. */
+  const collected = (): string => {
+    const parts = [...finals.current];
+    // Son ara metin bir kesinleşmiş parçanın tekrarı olabilir; öyleyse ekleme.
+    const tail = interim.current.trim();
+    if (tail && !parts.some((p) => p.trim() === tail)) parts.push(tail);
+    return parts.join(" ").replace(/\s+/g, " ").trim();
+  };
+
+  const deliver = () => {
+    if (delivered.current) return;
+    const text = collected();
+    if (!text) return;
+    delivered.current = true;
+    opts.onResult(text);
+  };
 
   useSpeechRecognitionEvent("start", () => {
     setListening(true);
     setPartial("");
-    lastText.current = "";
-    delivered.current = false;
+    reset();
   });
 
   useSpeechRecognitionEvent("result", (ev) => {
     const text = ev.results?.[0]?.transcript ?? "";
-    lastText.current = text;
     if (ev.isFinal) {
-      setPartial("");
-      if (!delivered.current && text.trim()) {
-        delivered.current = true;
-        opts.onResult(text.trim());
-      }
+      if (text.trim()) finals.current.push(text.trim());
+      interim.current = "";
+      // Sürekli kipte teslim ETME: öğrenci hâlâ konuşuyor olabilir.
+      setPartial(collected());
     } else {
-      setPartial(text);
+      interim.current = text;
+      setPartial(collected());
     }
   });
 
   useSpeechRecognitionEvent("end", () => {
     setListening(false);
     setPartial("");
-    // Kesin sonuç gelmeden bittiyse (kimi Android sürümü böyle davranıyor)
-    // elimizdeki son ara metni teslim et — yoksa öğrencinin konuşması kaybolur.
-    if (!delivered.current && lastText.current.trim()) {
-      delivered.current = true;
-      opts.onResult(lastText.current.trim());
-    }
+    deliver(); // bitiş kararı öğrencinin: düğmeyi bıraktı
   });
 
   useSpeechRecognitionEvent("error", (ev) => {
     setListening(false);
     setPartial("");
-    // Kullanıcı bitirdiğinde de "no-speech" gelebiliyor; sonuç teslim
-    // edildiyse hata göstermeye gerek yok.
-    if (!delivered.current) setError(errorText(String(ev.error)));
+    const code = String(ev.error);
+    // Elinde metin varken gelen "no-speech" gürültüdür: teslim et, hata gösterme.
+    if (collected()) {
+      deliver();
+      return;
+    }
+    if (code !== "aborted") setError(errorText(code));
   });
 
   const start = () => {
     setError(null);
+    reset();
+    startedAt.current = Date.now();
     void (async () => {
       try {
         const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
@@ -110,7 +148,8 @@ export function useDictation(opts: DictationOptions): DictationState {
         ExpoSpeechRecognitionModule.start({
           lang: opts.lang ?? speechLocale(getActiveLanguageId()),
           interimResults: true,
-          continuous: false,
+          // Bırakana kadar dinle — duraksama "bitti" sayılmasın.
+          continuous: true,
           maxAlternatives: 1,
         });
       } catch (e) {
@@ -120,7 +159,24 @@ export function useDictation(opts: DictationOptions): DictationState {
   };
 
   const stop = () => {
+    // Kazara kısa dokunuş: tanıma daha açılmadan kapatılırsa hiçbir şey
+    // duyulmaz ve öğrenci "çalışmıyor" sanır. En az bu kadar dinle.
+    const elapsed = Date.now() - startedAt.current;
+    if (elapsed < MIN_LISTEN_MS) {
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+      stopTimer.current = setTimeout(() => doStop(), MIN_LISTEN_MS - elapsed);
+      return;
+    }
+    doStop();
+  };
+
+  const doStop = () => {
+    if (stopTimer.current) {
+      clearTimeout(stopTimer.current);
+      stopTimer.current = null;
+    }
     try {
+      // stop(): son sonucu isteyerek bitirir (abort değil — abort metni atar).
       ExpoSpeechRecognitionModule.stop();
     } catch {
       // durdurma hatası önemsiz: "end" olayı yine de gelir

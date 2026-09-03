@@ -166,18 +166,20 @@ export default function ChatView({
         <View style={styles.micBanner}>
           <ActivityIndicator size="small" color={colors.gold} />
           <Text style={styles.micBannerText} numberOfLines={2}>
-            {dictation.partial || `Dinliyorum… ${pack.label} konuş`}
+            {dictation.partial || `Dinliyorum… bitince parmağını kaldır`}
           </Text>
         </View>
       )}
       <View style={styles.inputRow}>
         <TouchableOpacity
           style={[styles.micButton, dictation.listening && styles.micButtonOn]}
-          onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
+          // Basılı tut - konuş - bırak: bitişe makine değil öğrenci karar verir.
+          onPressIn={() => dictation.start()}
+          onPressOut={() => dictation.stop()}
           disabled={sending}
-          accessibilityLabel={dictation.listening ? "Dinlemeyi durdur" : "Konuşarak yaz"}
+          accessibilityLabel="Basılı tutarak konuş"
         >
-          <Text style={styles.micText}>{dictation.listening ? "⏹" : "🎙️"}</Text>
+          <Text style={styles.micText}>{dictation.listening ? "●" : "🎙️"}</Text>
         </TouchableOpacity>
         <TextInput
           style={styles.input}

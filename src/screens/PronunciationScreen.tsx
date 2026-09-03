@@ -367,10 +367,13 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
           {/* Denetimli deneme: söylediğin yazıya çevrilip hedefle karşılaştırılır. */}
           <TouchableOpacity
             style={[styles.recordButton, dictation.listening && styles.recording]}
-            onPress={() => (dictation.listening ? dictation.stop() : startCheck())}
+            onPressIn={startCheck}
+            onPressOut={() => dictation.stop()}
           >
             <Text style={styles.recordText}>
-              {dictation.listening ? "⏹ Bitir" : "🎙️ Söyle ve Denetlet"}
+              {dictation.listening
+                ? "● Dinliyorum — bırakınca biter"
+                : "🎙️ Basılı tut ve söyle"}
             </Text>
           </TouchableOpacity>
           {dictation.listening && (

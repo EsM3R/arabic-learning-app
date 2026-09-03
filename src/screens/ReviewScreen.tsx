@@ -253,7 +253,8 @@ export default function ReviewScreen({ onBack }: Props) {
                       denemesidir: sayaçlara işler ama kartı notlamaz. */}
                   <TouchableOpacity
                     style={[styles.listenChip, dictation.listening && styles.listeningButton]}
-                    onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                    onPressIn={() => dictation.start()}
+                    onPressOut={() => dictation.stop()}
                   >
                     <Text
                       style={[
@@ -261,7 +262,7 @@ export default function ReviewScreen({ onBack }: Props) {
                         dictation.listening && styles.listenChipTextOn,
                       ]}
                     >
-                      {dictation.listening ? "⏹ Bitir" : "🎙️ Söyle"}
+                      {dictation.listening ? "● Dinliyorum" : "🎙️ Basılı tut"}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -318,7 +319,7 @@ export default function ReviewScreen({ onBack }: Props) {
                   </>
                 ) : (
                   <Text style={styles.prompt}>
-                    Mikrofona bas ve hedef dilde söyle — hocan duyduğunu yazacak.
+                    Mikrofonu BASILI TUT, hedef dilde söyle, sonra bırak.
                   </Text>
                 )}
                 {/* Mikrofon durumu artık kipten bağımsız: "yaz" modunda da
@@ -392,10 +393,11 @@ export default function ReviewScreen({ onBack }: Props) {
                   {/* Yaz kipinde de söyleyebilmeli: mikrofon artık burada da var. */}
                   <TouchableOpacity
                     style={[styles.micSquare, dictation.listening && styles.listeningButton]}
-                    onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
-                    accessibilityLabel={dictation.listening ? "Dinlemeyi bitir" : "Söyleyerek cevapla"}
+                    onPressIn={() => dictation.start()}
+                    onPressOut={() => dictation.stop()}
+                    accessibilityLabel="Basılı tutarak söyle"
                   >
-                    <Text style={styles.micSquareText}>{dictation.listening ? "⏹" : "🎙️"}</Text>
+                    <Text style={styles.micSquareText}>{dictation.listening ? "●" : "🎙️"}</Text>
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity
@@ -412,10 +414,11 @@ export default function ReviewScreen({ onBack }: Props) {
               <View style={styles.actionCol}>
                 <TouchableOpacity
                   style={[styles.revealButton, dictation.listening && styles.listeningButton]}
-                  onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                  onPressIn={() => dictation.start()}
+                  onPressOut={() => dictation.stop()}
                 >
                   <Text style={styles.revealText}>
-                    {dictation.listening ? "⏹ Bitir" : "🎙️ Söyle"}
+                    {dictation.listening ? "● Dinliyorum — bırakınca biter" : "🎙️ Basılı tut ve söyle"}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
