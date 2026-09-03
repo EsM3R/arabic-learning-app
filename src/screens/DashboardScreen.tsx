@@ -10,7 +10,9 @@ import {
 } from "react-native";
 import { AgentContext, TEACHER_TOOLS } from "../agent";
 import { agenticChat, generateCurriculum } from "../claude";
+import { Card, Pill, ProgressRing, SectionHeader, Skeleton } from "../components/ui";
 import { getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
+import { nextAction, NextAction } from "../nextaction";
 import { pendingReminders } from "../notifications";
 import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
 import { dueCards } from "../srs";
@@ -19,11 +21,13 @@ import {
   loadLastActivity,
   loadMistakes,
   loadNotes,
+  loadReadings,
   loadVocab,
   loadWakeCheck,
   saveWakeCheck,
 } from "../storage";
-import { colors, radius, shadow, shadowLift } from "../theme";
+import { colors, radius, shadow, shadowLift, spacing } from "../theme";
+import { useTheme } from "../useTheme";
 import {
   Curriculum,
   CurriculumModule,
@@ -81,7 +85,12 @@ export default function DashboardScreen({
   const [buildError, setBuildError] = useState<string | null>(null);
   const [teacherNote, setTeacherNote] = useState<string | null>(null);
   const [teacherSuggestion, setTeacherSuggestion] = useState<NavigationSuggestion | null>(null);
+  /** Veriler yüklenene kadar sıfır gösterme — iskelet çiz. */
+  const [loaded, setLoaded] = useState(false);
+  /** "Şimdi ne yapmalıyım" kartının içeriği. */
+  const [today, setToday] = useState<NextAction | null>(null);
   const wakeStarted = React.useRef(false);
+  const c = useTheme();
 
   const totalModules = curriculum?.modules.length ?? 0;
   const doneModules =
@@ -90,14 +99,41 @@ export default function DashboardScreen({
 
   useEffect(() => {
     void (async () => {
-      const [cards, mistakes, stats] = await Promise.all([
+      const [cards, mistakes, stats, readings, lastActivity] = await Promise.all([
         loadVocab(),
         loadMistakes(),
         loadStatsSummary(),
+        loadReadings(),
+        loadLastActivity(),
       ]);
+      const due = dueCards(cards).length;
+      const open = mistakes.filter((m) => !m.resolved).length;
       setVocabTotal(cards.length);
-      setVocabDue(dueCards(cards).length);
-      setMistakeCount(mistakes.filter((m) => !m.resolved).length);
+      setVocabDue(due);
+      setMistakeCount(open);
+
+      // "Bugün" kartı: uygulamanın tuttuğu veriden tek bir öneri (src/nextaction.ts).
+      const modules = curriculum?.modules ?? [];
+      const nextMod = modules.find((m) => !completedModuleIds.includes(m.id));
+      setToday(
+        nextAction({
+          vocabTotal: cards.length,
+          dueCount: due,
+          openMistakes: open,
+          hasCurriculum: modules.length > 0,
+          nextModule: nextMod
+            ? { id: nextMod.id, title: nextMod.title, track: nextMod.track }
+            : undefined,
+          curriculumDone: modules.length > 0 && !nextMod,
+          spokenTotal: stats.total.spoken ?? 0,
+          shadowedTotal: stats.total.shadowed ?? 0,
+          readingsFinished: readings.filter((r) => r.finishedAt).length,
+          daysSinceActivity: lastActivity
+            ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86_400_000)
+            : 0,
+        })
+      );
+      setLoaded(true);
       // Üretim odaklı hafta özeti — gün serisi değil: ne ÜRETTİN?
       const w = stats.week;
       const produced = w.produced ?? 0;
@@ -167,6 +203,32 @@ export default function DashboardScreen({
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** "Bugün" kartındaki öneriyi ilgili ekrana bağlar. */
+  const openToday = () => {
+    if (!today) return;
+    switch (today.screen) {
+      case "review":
+        return onOpenReview();
+      case "reading":
+        return onOpenReading();
+      case "pronunciation":
+        return onOpenPronunciation();
+      case "shadowing":
+        return onOpenShadowing();
+      case "mistakes":
+        return onOpenMistakes();
+      case "lesson":
+        return onFreeChat();
+      case "curriculum":
+        return totalModules === 0 ? startCurriculumBuild() : onLevelUp();
+      case "module": {
+        const m = curriculum?.modules.find((x) => x.id === today.moduleId);
+        if (m) onOpenModule(m);
+        return;
+      }
+    }
+  };
 
   const onSuggestionPress = () => {
     const s = teacherSuggestion;
@@ -309,20 +371,64 @@ export default function DashboardScreen({
         </TouchableOpacity>
         <Text style={styles.levelHint}>Seviye raporun için dokun ›</Text>
 
-        <View style={styles.progressBlock}>
-          <View style={styles.progressLabelRow}>
-            <Text style={styles.progressLabel}>Müfredat ilerlemesi</Text>
-            <Text style={styles.progressValue}>
-              {doneModules}/{totalModules} modül
-            </Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.max(progress * 100, 2)}%` }]} />
-          </View>
-        </View>
       </LinearGradient>
 
       <View style={styles.body}>
+        {/* ---------------- BUGÜN: "şimdi ne yapmalıyım" sorusunun tek cevabı.
+            Panelin geri kalanından belirgin biçimde ağır olmalı; denetimde
+            14 bloğun aynı görsel ağırlıkta olması en büyük kusurdu. */}
+        {!loaded ? (
+          <View style={styles.todayCard}>
+            <Skeleton width="40%" height={11} />
+            <Skeleton width="85%" height={20} style={{ marginTop: 12 }} />
+            <Skeleton width="65%" height={13} style={{ marginTop: 10 }} />
+          </View>
+        ) : today ? (
+          <TouchableOpacity onPress={openToday} activeOpacity={0.86}>
+            <LinearGradient
+              colors={[colors.accent, colors.accentDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.todayCard}
+            >
+              <View style={styles.todayTopRow}>
+                <Text style={styles.todayKicker}>BUGÜN</Text>
+                {today.badge ? (
+                  <View style={styles.todayBadge}>
+                    <Text style={styles.todayBadgeText}>{today.badge}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.todayTitle}>{today.label}</Text>
+              <Text style={styles.todayReason}>{today.reason}</Text>
+              <View style={styles.todayGo}>
+                <Text style={styles.todayGoText}>Başla ›</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Müfredat ilerlemesi artık halka olarak — tek bakışta okunur. */}
+        {totalModules > 0 && (
+          <Card style={styles.curriculumRow}>
+            <ProgressRing
+              progress={progress}
+              label={`${Math.round(progress * 100)}%`}
+              sublabel="MÜFREDAT"
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.curriculumTitle, { color: c.ink }]}>
+                {doneModules}/{totalModules} modül tamam
+              </Text>
+              <Text style={[styles.curriculumSub, { color: c.inkSoft }]}>
+                {assessment?.speakingLevel ?? "A0"} konuşma · {assessment?.readingLevel ?? "A0"} okuma
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onOpenLevel} hitSlop={10}>
+              <Pill text="Rapor ›" tone="accent" />
+            </TouchableOpacity>
+          </Card>
+        )}
         {totalModules > 0 && doneModules === totalModules && (
           <TouchableOpacity style={styles.levelUpCard} onPress={onLevelUp} activeOpacity={0.85}>
             <Text style={styles.levelUpEmoji}>🎓</Text>
@@ -360,22 +466,25 @@ export default function DashboardScreen({
           </View>
         )}
 
+        {/* Açılışta "0 / 0 / 0" yanıp sönüyordu — yüklenene kadar iskelet. */}
         <View style={styles.statsRow}>
-          <View style={styles.statTile}>
-            <Text style={styles.statValue}>{vocabTotal}</Text>
-            <Text style={styles.statLabel}>kelime</Text>
-          </View>
-          <View style={styles.statTile}>
-            <Text style={[styles.statValue, vocabDue > 0 && { color: colors.danger }]}>
-              {vocabDue}
-            </Text>
-            <Text style={styles.statLabel}>tekrar bekliyor</Text>
-          </View>
-          <View style={styles.statTile}>
-            <Text style={styles.statValue}>{mistakeCount}</Text>
-            <Text style={styles.statLabel}>açık hata</Text>
-          </View>
+          {[
+            { v: vocabTotal, l: "kelime", danger: false },
+            { v: vocabDue, l: "tekrar bekliyor", danger: vocabDue > 0 },
+            { v: mistakeCount, l: "açık hata", danger: false },
+          ].map((s) => (
+            <View key={s.l} style={styles.statTile}>
+              {loaded ? (
+                <Text style={[styles.statValue, s.danger && { color: colors.danger }]}>{s.v}</Text>
+              ) : (
+                <Skeleton width={28} height={20} />
+              )}
+              <Text style={styles.statLabel}>{s.l}</Text>
+            </View>
+          ))}
         </View>
+
+        <SectionHeader title="Çalış" hint="Hocanla konuş, oku, telaffuz et" />
 
         <TouchableOpacity onPress={onFreeChat} activeOpacity={0.85}>
           <LinearGradient
@@ -409,28 +518,6 @@ export default function DashboardScreen({
             <Text style={styles.cardArrow}>›</Text>
           )}
         </TouchableOpacity>
-
-        <View style={styles.toolsRow}>
-          <TouchableOpacity style={styles.toolCard} onPress={onOpenReview} activeOpacity={0.85}>
-            <View style={[styles.iconSquare, { backgroundColor: colors.accentSoft }]}>
-              <Text style={styles.iconSquareText}>📇</Text>
-            </View>
-            <Text style={styles.cardTitle}>Kelime Defteri</Text>
-            <Text style={styles.cardMeta}>{vocabTotal} kelime</Text>
-            {vocabDue > 0 && (
-              <View style={styles.dueBadge}>
-                <Text style={styles.dueBadgeText}>{vocabDue}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.toolCard} onPress={onOpenMistakes} activeOpacity={0.85}>
-            <View style={[styles.iconSquare, { backgroundColor: colors.dangerSoft }]}>
-              <Text style={styles.iconSquareText}>📒</Text>
-            </View>
-            <Text style={styles.cardTitle}>Hata Defteri</Text>
-            <Text style={styles.cardMeta}>{mistakeCount} açık kayıt</Text>
-          </TouchableOpacity>
-        </View>
 
         <TouchableOpacity
           style={styles.readingCard}
@@ -471,6 +558,30 @@ export default function DashboardScreen({
             </View>
             <Text style={styles.cardTitle}>Gölgeleme</Text>
             <Text style={styles.cardMeta}>Dinle, üstüne konuş — akıcılık antrenmanı</Text>
+          </TouchableOpacity>
+        </View>
+
+        <SectionHeader title="Defterlerin" hint="Kelimeler ve hatalar burada birikiyor" />
+
+        <View style={styles.toolsRow}>
+          <TouchableOpacity style={styles.toolCard} onPress={onOpenReview} activeOpacity={0.85}>
+            <View style={[styles.iconSquare, { backgroundColor: colors.accentSoft }]}>
+              <Text style={styles.iconSquareText}>📇</Text>
+            </View>
+            <Text style={styles.cardTitle}>Kelime Defteri</Text>
+            <Text style={styles.cardMeta}>{vocabTotal} kelime</Text>
+            {vocabDue > 0 && (
+              <View style={styles.dueBadge}>
+                <Text style={styles.dueBadgeText}>{vocabDue}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolCard} onPress={onOpenMistakes} activeOpacity={0.85}>
+            <View style={[styles.iconSquare, { backgroundColor: colors.dangerSoft }]}>
+              <Text style={styles.iconSquareText}>📒</Text>
+            </View>
+            <Text style={styles.cardTitle}>Hata Defteri</Text>
+            <Text style={styles.cardMeta}>{mistakeCount} açık kayıt</Text>
           </TouchableOpacity>
         </View>
 
@@ -607,22 +718,62 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "right",
   },
-  progressBlock: { marginTop: 18 },
-  progressLabelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 7,
-  },
-  progressLabel: { color: colors.onDeepSoft, fontSize: 12 },
-  progressValue: { color: colors.onDeep, fontSize: 12, fontWeight: "800" },
-  progressTrack: {
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "rgba(243,239,228,0.15)",
-    overflow: "hidden",
-  },
-  progressFill: { height: "100%", borderRadius: 4, backgroundColor: colors.goldDeep },
   body: { paddingHorizontal: 18, marginTop: -24 },
+  // "Bugün" kartı: panelin en ağır öğesi olmalı — tek cevap burada.
+  todayCard: {
+    borderRadius: radius.lg,
+    padding: 18,
+    marginBottom: 14,
+    minHeight: 132,
+    ...shadowLift,
+  },
+  todayTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  todayKicker: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+  },
+  todayBadge: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 999,
+    minWidth: 26,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    alignItems: "center",
+  },
+  todayBadgeText: { color: "#FFFFFF", fontSize: 12.5, fontWeight: "800" },
+  todayTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    marginTop: 10,
+    lineHeight: 29,
+  },
+  todayReason: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 13.5,
+    lineHeight: 20,
+    marginTop: 6,
+  },
+  todayGo: {
+    alignSelf: "flex-start",
+    marginTop: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  todayGoText: { color: "#FFFFFF", fontSize: 13.5, fontWeight: "800" },
+  curriculumRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.lg,
+    marginBottom: 14,
+  },
+  curriculumTitle: { fontSize: 15.5, fontWeight: "800" },
+  curriculumSub: { fontSize: 12.5, marginTop: 2 },
   levelUpCard: {
     flexDirection: "row",
     alignItems: "center",
