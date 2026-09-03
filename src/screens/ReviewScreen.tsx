@@ -8,6 +8,8 @@ import {
   View,
 } from "react-native";
 import Header from "../components/Header";
+import { ProgressBar } from "../components/ui";
+import { feedback } from "../feedback";
 import { getActivePack } from "../languages";
 import { speakTarget } from "../speech";
 import { judgeSpeech, SpeechAttempt } from "../speechinput";
@@ -98,6 +100,7 @@ export default function ReviewScreen({ onBack }: Props) {
     );
     setSpeech(attempt);
     setAnswer(said);
+    void feedback(attempt.verdict === "dogru");
     void recordStat("spoken");
     if (attempt.verdict === "dogru") {
       void recordStat("spokenCorrect");
@@ -139,10 +142,13 @@ export default function ReviewScreen({ onBack }: Props) {
     );
     setMatchKind(kind);
     if (kind !== "none") {
+      void feedback(true); // doğru cevap elde hissedilsin
       setPreGrade(current);
       await applyGrade(current, 2);
       void recordStat("reviewed");
       void recordStat("produced"); // yazılı doğru üretim — panelin "ürettiğin" sayacı
+    } else {
+      void feedback(false);
     }
     setPhase("sonuc");
   };
@@ -208,6 +214,13 @@ export default function ReviewScreen({ onBack }: Props) {
         </View>
       ) : (
         <View style={styles.cardArea}>
+          {/* Oturum ilerlemesi: kaç kart kaldığı görünmüyordu, bitiş belirsizdi. */}
+          <View style={styles.sessionRow}>
+            <ProgressBar progress={doneCount / Math.max(doneCount + queue.length, 1)} />
+            <Text style={styles.sessionText}>
+              {doneCount} / {doneCount + queue.length}
+            </Text>
+          </View>
           <View style={styles.card}>
             {direction === "tanima" ? (
               // ------------------------- TANIMA (yeni kart ilk görüş)
@@ -262,6 +275,8 @@ export default function ReviewScreen({ onBack }: Props) {
                       placeholderTextColor={colors.inkFaint}
                       onSubmitEditing={() => void checkAnswer()}
                       returnKeyType="done"
+                      // Her kartta fazladan bir dokunuş gerekiyordu.
+                      autoFocus
                     />
                     {pack.scriptExtract && (
                       <Text style={styles.translitNote}>
@@ -510,6 +525,8 @@ const styles = StyleSheet.create({
   correctBanner: { fontSize: 16, fontWeight: "800", color: colors.accentDark, marginBottom: 10 },
   wrongBanner: { fontSize: 14, fontWeight: "800", color: colors.danger, marginBottom: 10 },
   yourAnswer: { fontSize: 12.5, color: colors.inkFaint, marginTop: 10 },
+  sessionRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  sessionText: { fontSize: 11.5, fontWeight: "800", color: colors.inkFaint, minWidth: 44, textAlign: "right" },
   listeningText: {
     fontSize: 14,
     color: colors.gold,

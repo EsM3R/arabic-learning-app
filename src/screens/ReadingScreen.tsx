@@ -55,6 +55,9 @@ export default function ReadingScreen({ profile, onBack }: Props) {
   const [showExample, setShowExample] = useState(false);
   const [addedWords, setAddedWords] = useState<Set<string>>(new Set());
   const handleRef = useRef<SequenceHandle | null>(null);
+  /** Okuyucu kaydırma alanı ve her cümlenin dikey konumu — otomatik takip için. */
+  const readerScroll = useRef<ScrollView | null>(null);
+  const sentenceY = useRef<number[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -132,6 +135,12 @@ export default function ReadingScreen({ profile, onBack }: Props) {
         onSentence: (i) => {
           setActiveIndex(i);
           void recordStat("readSentence");
+          // Okunan cümle ekrandan kaçmasın: üstte bir tutam boşluk bırakarak
+          // ona kaydır (denetimdeki en kritik okuma kusuru buydu).
+          const y = sentenceY.current[i];
+          if (typeof y === "number") {
+            readerScroll.current?.scrollTo({ y: Math.max(y - 90, 0), animated: true });
+          }
         },
         onDone: () => setActiveIndex(-1),
       }
@@ -232,7 +241,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
             setView("list");
           }}
         />
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView ref={readerScroll} contentContainerStyle={styles.body}>
           {error && (
             <View style={styles.warnBand}>
               <Text style={styles.warnText}>{error}</Text>
@@ -271,6 +280,11 @@ export default function ReadingScreen({ profile, onBack }: Props) {
               <TouchableOpacity
                 key={i}
                 style={[styles.sentenceCard, activeIndex === i && styles.sentenceActive]}
+                // Dinlerken okunan cümleye kendiliğinden kaydırabilmek için
+                // her cümlenin dikey konumu ölçülür.
+                onLayout={(e) => {
+                  sentenceY.current[i] = e.nativeEvent.layout.y;
+                }}
                 activeOpacity={0.9}
                 onPress={() =>
                   setRevealed((prev) => {
