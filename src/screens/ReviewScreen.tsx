@@ -85,9 +85,15 @@ export default function ReviewScreen({ onBack }: Props) {
   };
 
   /**
-   * Söyle modu: artık öz-beyan değil. Cihazın ses tanıması söylediğini
-   * yazıya çevirir, hedefle karşılaştırılır; doğruysa "yaz" modundaki gibi
-   * otomatik "Bildim" verilir (eşleşme kanıttır).
+   * Sesli cevap. Cihazın tanıması söylediğini yazıya çevirir, hedefle
+   * karşılaştırılır — öz-beyan değil, kanıt.
+   *
+   * İki farklı bağlamda çağrılır ve davranışı ayrılır:
+   * - ÜRETİM yönünde kelime gizlidir; doğru söylemek hatırlamanın kanıtıdır,
+   *   bu yüzden otomatik "Bildim" verilir.
+   * - TANIMA yönünde kelime EKRANDA DURUYOR; okuyup söylemek hatırlama
+   *   değil telaffuz denemesidir. Kart notlanmaz, yalnız sayaçlara işler;
+   *   notu öğrenci "Cevabı Göster"den sonra kendisi verir.
    */
   const checkSpoken = async (said: string) => {
     if (!current) return;
@@ -99,11 +105,13 @@ export default function ReviewScreen({ onBack }: Props) {
       pack.scriptExtract
     );
     setSpeech(attempt);
-    setAnswer(said);
     void feedback(attempt.verdict === "dogru");
     void recordStat("spoken");
+    if (attempt.verdict === "dogru") void recordStat("spokenCorrect");
+
+    if (direction === "tanima") return; // telaffuz provası: notlama yok
+    setAnswer(said);
     if (attempt.verdict === "dogru") {
-      void recordStat("spokenCorrect");
       void recordStat("reviewed");
       void recordStat("produced"); // sesli doğru üretim
       setMatchKind(attempt.match);
@@ -240,7 +248,30 @@ export default function ReviewScreen({ onBack }: Props) {
                   >
                     <Text style={styles.listenChipText}>🐢 Yavaş</Text>
                   </TouchableOpacity>
+                  {/* Yeni kelimenin doğal alıştırması "dinle ve tekrarla"dır.
+                      Kelime görünür olduğu için bu hatırlama değil TELAFFUZ
+                      denemesidir: sayaçlara işler ama kartı notlamaz. */}
+                  <TouchableOpacity
+                    style={[styles.listenChip, dictation.listening && styles.listeningButton]}
+                    onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                  >
+                    <Text
+                      style={[
+                        styles.listenChipText,
+                        dictation.listening && styles.listenChipTextOn,
+                      ]}
+                    >
+                      {dictation.listening ? "⏹ Bitir" : "🎙️ Söyle"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+                {dictation.listening && (
+                  <Text style={styles.listeningText}>{dictation.partial || "Dinliyorum…"}</Text>
+                )}
+                {dictation.error && <Text style={styles.micErrorText}>{dictation.error}</Text>}
+                {speech && !dictation.listening && (
+                  <Text style={styles.speechVerdict}>{speech.message}</Text>
+                )}
                 {revealed ? (
                   <>
                     <Text style={styles.translit}>{current.transliteration}</Text>
@@ -280,25 +311,25 @@ export default function ReviewScreen({ onBack }: Props) {
                     />
                     {pack.scriptExtract && (
                       <Text style={styles.translitNote}>
-                        Arap klavyen yoksa Latin okunuşuyla yazabilirsin — o da sayılır.
+                        Arap klavyen yoksa Latin okunuşuyla yazabilirsin — yazabilir ya da
+                        söyleyebilirsin, ikisi de sayılır.
                       </Text>
                     )}
                   </>
                 ) : (
-                  <>
-                    <Text style={styles.prompt}>
-                      Mikrofona bas ve hedef dilde söyle — hocan duyduğunu yazacak.
-                    </Text>
-                    {dictation.listening && (
-                      <Text style={styles.listeningText}>
-                        {dictation.partial || "Dinliyorum…"}
-                      </Text>
-                    )}
-                    {dictation.error && (
-                      <Text style={styles.micErrorText}>{dictation.error}</Text>
-                    )}
-                  </>
+                  <Text style={styles.prompt}>
+                    Mikrofona bas ve hedef dilde söyle — hocan duyduğunu yazacak.
+                  </Text>
                 )}
+                {/* Mikrofon durumu artık kipten bağımsız: "yaz" modunda da
+                    söyleyebilirsin. Eskiden mikrofon yalnız "söyle" kipinde
+                    vardı ve öğrenci ekranda mikrofon bulamıyordu. */}
+                {dictation.listening && (
+                  <Text style={styles.listeningText}>
+                    {dictation.partial || "Dinliyorum…"}
+                  </Text>
+                )}
+                {dictation.error && <Text style={styles.micErrorText}>{dictation.error}</Text>}
               </>
             ) : (
               // ------------------------- ÜRETİM — SONUÇ
@@ -350,13 +381,23 @@ export default function ReviewScreen({ onBack }: Props) {
           ) : phase === "sor" ? (
             showProduction ? (
               <View style={styles.actionCol}>
-                <TouchableOpacity
-                  style={[styles.revealButton, !answer.trim() && styles.disabled]}
-                  disabled={!answer.trim()}
-                  onPress={() => void checkAnswer()}
-                >
-                  <Text style={styles.revealText}>Kontrol Et</Text>
-                </TouchableOpacity>
+                <View style={styles.answerRow}>
+                  <TouchableOpacity
+                    style={[styles.revealButton, styles.grow, !answer.trim() && styles.disabled]}
+                    disabled={!answer.trim()}
+                    onPress={() => void checkAnswer()}
+                  >
+                    <Text style={styles.revealText}>Kontrol Et</Text>
+                  </TouchableOpacity>
+                  {/* Yaz kipinde de söyleyebilmeli: mikrofon artık burada da var. */}
+                  <TouchableOpacity
+                    style={[styles.micSquare, dictation.listening && styles.listeningButton]}
+                    onPress={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                    accessibilityLabel={dictation.listening ? "Dinlemeyi bitir" : "Söyleyerek cevapla"}
+                  >
+                    <Text style={styles.micSquareText}>{dictation.listening ? "⏹" : "🎙️"}</Text>
+                  </TouchableOpacity>
+                </View>
                 <TouchableOpacity
                   style={styles.secondaryButton}
                   onPress={() => {
@@ -526,6 +567,18 @@ const styles = StyleSheet.create({
   wrongBanner: { fontSize: 14, fontWeight: "800", color: colors.danger, marginBottom: 10 },
   yourAnswer: { fontSize: 12.5, color: colors.inkFaint, marginTop: 10 },
   sessionRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  answerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  grow: { flex: 1 },
+  micSquare: {
+    width: 54,
+    height: 54,
+    borderRadius: radius.md,
+    backgroundColor: colors.goldSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micSquareText: { fontSize: 22 },
+  listenChipTextOn: { color: "#FFFFFF" },
   sessionText: { fontSize: 11.5, fontWeight: "800", color: colors.inkFaint, minWidth: 44, textAlign: "right" },
   listeningText: {
     fontSize: 14,
