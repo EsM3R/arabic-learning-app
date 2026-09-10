@@ -11,6 +11,7 @@ import {
 import { AgentContext, TEACHER_TOOLS } from "../agent";
 import { agenticChat, generateCurriculum } from "../claude";
 import { Card, Pill, ProgressRing, SectionHeader, Skeleton } from "../components/ui";
+import { migrationScope, migrationSummary, MigrationScope, withoutColloquial } from "../fusha";
 import { getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { nextAction, NextAction } from "../nextaction";
 import { pendingReminders } from "../notifications";
@@ -18,12 +19,16 @@ import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from 
 import { dueCards } from "../srs";
 import { loadStatsSummary } from "../statsStore";
 import {
+  clearModuleChats,
+  loadFushaMigrated,
   loadLastActivity,
   loadMistakes,
   loadNotes,
   loadReadings,
   loadVocab,
   loadWakeCheck,
+  saveFushaMigrated,
+  saveVocab,
   saveWakeCheck,
 } from "../storage";
 import { colors, radius, shadow, shadowLift, spacing } from "../theme";
@@ -89,6 +94,8 @@ export default function DashboardScreen({
   const [loaded, setLoaded] = useState(false);
   /** "Şimdi ne yapmalıyım" kartının içeriği. */
   const [today, setToday] = useState<NextAction | null>(null);
+  /** Ammice → fusha geçişi (tek seferlik); null = gerekmiyor. */
+  const [fusha, setFusha] = useState<MigrationScope | null>(null);
   const wakeStarted = React.useRef(false);
   const c = useTheme();
 
@@ -134,6 +141,13 @@ export default function DashboardScreen({
         })
       );
       setLoaded(true);
+
+      // Ammice → fusha geçişi: tek seferlik, bayrakla kilitli (bkz. src/fusha.ts).
+      const migrated = await loadFushaMigrated();
+      const scope = migrationScope(cards, curriculum, migrated);
+      if (scope.needed) setFusha(scope);
+      else if (!migrated) await saveFushaMigrated(); // temizlenecek bir şey yok
+
       // Üretim odaklı hafta özeti — gün serisi değil: ne ÜRETTİN?
       const w = stats.week;
       const produced = w.produced ?? 0;
@@ -278,6 +292,33 @@ export default function DashboardScreen({
     }
   };
 
+  /**
+   * Ammice → fusha geçişi. Sessiz göç YAPILMAZ: kaç kartın gideceği
+   * söylenir, onay alınır, sonra defter temizlenir ve müfredat sıfırlanır.
+   * Bayrak konur — bir daha asla kart silinmez (bkz. src/fusha.ts).
+   */
+  const runFushaMigration = async () => {
+    const cards = await loadVocab();
+    await saveVocab(withoutColloquial(cards));
+    await saveFushaMigrated();
+    await clearModuleChats();
+    setFusha(null);
+    // Müfredatı sıfırla: ammiceye göre kurulmuştu, artık geçersiz.
+    onCurriculumBuilt({ modules: [], generatedAt: new Date().toISOString() });
+  };
+
+  const confirmFushaMigration = () => {
+    if (!fusha) return;
+    Alert.alert("Fushaya geç", migrationSummary(fusha), [
+      { text: "Vazgeç", style: "cancel" },
+      {
+        text: "Evet, temizle",
+        style: "destructive",
+        onPress: () => void runFushaMigration(),
+      },
+    ]);
+  };
+
   const startCurriculumBuild = () => {
     if (buildingCurriculum) return;
     Alert.alert(
@@ -374,6 +415,25 @@ export default function DashboardScreen({
       </LinearGradient>
 
       <View style={styles.body}>
+        {fusha && (
+          <View style={styles.fushaCard}>
+            <Text style={styles.fushaTitle}>🕌 Fushaya geçiş</Text>
+            <Text style={styles.fushaText}>
+              Artık yalnız fusha öğreniyorsun; ammice dersleri kaldırıldı. Defterindeki
+              eski ammice kartların ve ammiceye göre kurulmuş müfredatın temizlenmesi
+              gerekiyor — sonrasında hocan sıfırdan fusha müfredatı kuracak.
+            </Text>
+            <Text style={styles.fushaCount}>
+              {fusha.cardsToRemove > 0
+                ? `${fusha.cardsToRemove} ammice kart · ${fusha.modulesToClear} modül`
+                : `${fusha.modulesToClear} modül`}
+            </Text>
+            <TouchableOpacity style={styles.fushaButton} onPress={confirmFushaMigration}>
+              <Text style={styles.fushaButtonText}>Temizle ve fushaya geç ›</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ---------------- BUGÜN: "şimdi ne yapmalıyım" sorusunun tek cevabı.
             Panelin geri kalanından belirgin biçimde ağır olmalı; denetimde
             14 bloğun aynı görsel ağırlıkta olması en büyük kusurdu. */}
@@ -719,6 +779,27 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   body: { paddingHorizontal: 18, marginTop: -24 },
+  fushaCard: {
+    backgroundColor: colors.goldSoft,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.goldDeep,
+    padding: 16,
+    marginBottom: 14,
+    ...shadow,
+  },
+  fushaTitle: { fontSize: 16, fontWeight: "800", color: colors.gold, marginBottom: 6 },
+  fushaText: { fontSize: 13, color: colors.ink, lineHeight: 19 },
+  fushaCount: { fontSize: 12.5, fontWeight: "800", color: colors.gold, marginTop: 10 },
+  fushaButton: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+    backgroundColor: colors.gold,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  fushaButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
   // "Bugün" kartı: panelin en ağır öğesi olmalı — tek cevap burada.
   todayCard: {
     borderRadius: radius.lg,

@@ -394,8 +394,9 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
               <Text style={styles.verdictText}>{attempt.message}</Text>
               {attempt.verdict !== "dogru" && (
                 <Text style={styles.verdictHint}>
-                  Not: tanıma fusha ağırlıklıdır; ammice söyleyişte şaşabilir — kendi
-                  kaydını dinlemek de bir ölçüdür.
+                  Not: tanıma fusha ağırlıklıdır — ama ammice alışkanlığı (ق'ın hemzeye,
+                  ث'nin t/s'ye kayması) tanınmamana yol açabilir. Kendi kaydını dinlemek
+                  de bir ölçüdür.
                 </Text>
               )}
             </View>

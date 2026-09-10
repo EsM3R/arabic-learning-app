@@ -7,10 +7,10 @@ export interface ChatMessage {
   actions?: string[];
 }
 
-/** Seviye değerlendirme sonucu — konuşma (ammice) ve okuma (fusha) ayrı ölçülür. */
+/** Seviye değerlendirme sonucu — sözlü ve yazılı fusha ayrı ölçülür. */
 export interface Assessment {
-  speakingLevel: string; // A0–C2, Şami ammicesi (konuşma)
-  readingLevel: string; // A0–C2, fusha (okuma)
+  speakingLevel: string; // A0–C2, fushayı sözlü kullanma
+  readingLevel: string; // A0–C2, yazılı fusha
   strengths: string[];
   weaknesses: string[];
   summary: string; // Türkçe özet

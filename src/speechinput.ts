@@ -15,7 +15,7 @@ import type { ProductionMatch } from "./textnorm.ts";
 
 /** Ses tanımanın hedef dili — BCP-47. Latin dillerde ülke kodu da gerekir. */
 export const SPEECH_LOCALES: Record<string, string> = {
-  ar: "ar-SA", // Android'in Arapça tanıması fusha/Körfez ağırlıklı; ammicede şaşabilir
+  ar: "ar-SA", // Android'in Arapça tanıması fusha ağırlıklı — fusha öğrenirken bu bir AVANTAJ
   en: "en-US",
   es: "es-ES",
 };
@@ -93,9 +93,9 @@ export const NEAR_THRESHOLD = 0.7;
  * benzerlikle "yakın mı, uzak mı" ayrımı yapılır.
  *
  * NOT: bu bir telaffuz PUANI değildir — ses tanımanın duyduğu şeydir.
- * Makine ع'ını duyamadıysa bu da bir bilgidir, ama Şam ammicesinde tanıma
- * zayıf olabileceği için "uzak" sonucu tek başına suç delili sayılmamalı;
- * ekran bunu öğrenciye böyle söyler.
+ * Fusha öğrenirken tanıma bizden yana: Android'in Arapçası fusha ağırlıklı.
+ * Yine de "uzak" sonucu tek başına suç delili değildir (gürültü, mikrofon,
+ * ağız yapısı); ekran bunu öğrenciye böyle söyler.
  */
 export function judgeSpeech(
   target: string,

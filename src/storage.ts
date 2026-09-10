@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BackupFile, mergeDeviceSecrets } from "./backup";
+import { FUSHA_MIGRATION_KEY } from "./fusha";
 import { getActiveLanguageId, setActiveLanguage } from "./languages";
 import {
   Assessment,
@@ -167,6 +168,19 @@ export async function switchLanguageProgress(
 
 export async function resetAll(): Promise<void> {
   await AsyncStorage.clear();
+}
+
+/**
+ * Ammice → fusha geçişi yapıldı mı. Tek seferlik: bayrak konduktan sonra
+ * "konusma" parkuru artık SÖZLÜ FUSHA demektir ve o kartlar silinmez
+ * (bkz. src/fusha.ts).
+ */
+export async function loadFushaMigrated(): Promise<boolean> {
+  return (await AsyncStorage.getItem(FUSHA_MIGRATION_KEY)) === "1";
+}
+
+export async function saveFushaMigrated(): Promise<void> {
+  await AsyncStorage.setItem(FUSHA_MIGRATION_KEY, "1");
 }
 
 /**
