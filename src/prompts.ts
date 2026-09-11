@@ -262,7 +262,7 @@ Setin yanına 8 adet "minimal çift" hazırla — öğrencinin KULAĞINI eğitme
 - Her çift şu zorluk odaklarından birini hedeflesin: ${p.pronunciationFocus}
 - a ve b: gerçekten var olan, öğrencinin seviyesine uygun kelimeler olsun ve YALNIZCA hedef seste (ya da ünlü uzunluğunda) ayrışsınlar. Uydurma kelime kullanma.
 - İki kelime yazılışta da farklı olmalı — sesli okununca ayrımı duyulabilen çiftler seç.
-- focus: karşıtlığın kısa etiketi (örn. "ع vs ء", "kısa a vs uzun ā").
+- focus: karşıtlığın kısa etiketi — hedef dilin kendi karşıtlığıyla yaz (örn. "kısa ünlü vs uzun ünlü", "vurgu yeri", "yumuşak vs sert ünsüz").
 - tip: dinlerken NEYE dikkat edeceğini anlatan 1-2 cümlelik Türkçe ipucu; iki sesin farkını Türkçedeki seslerle kıyaslayarak somutla.
 - translit: Türkçe okunuşa yakın gösterim.
 - playIndex: bu soruda hangi kelimenin seslendirileceği (0 = a, 1 = b). Çiftler arasında dengeli dağıt — yaklaşık yarısı 0, yarısı 1 olsun ve sırada örüntü kurma (0,1,0,1 gibi değil).
