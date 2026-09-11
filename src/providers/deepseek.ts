@@ -22,18 +22,21 @@ import {
  * farklı baseURL). OpenAI'ın Responses API'si burada yok, klasik
  * messages/tool_calls şekli kullanılıyor.
  *
- * Önbellek: DeepSeek bağlam önbelleğini otomatik uygular.
- * Fiyat: hafta içi 01:00–04:00 ve 06:00–10:00 UTC'de (TR 04:00–07:00 ve
- * 09:00–13:00) iki katına çıkar.
+ * Önbellek: DeepSeek bağlam önbelleğini otomatik uygular ve önbellekten
+ * okuma neredeyse bedavadır ($0.003/M) — bu uygulamanın maliyetini belirleyen
+ * asıl kalem o, çünkü uzun sistem promptu her turda yeniden okunuyor.
+ * Fiyat yoğun saatlerde iki katına çıkar.
  */
 const meta: ProviderMeta = {
   id: "deepseek",
   label: "DeepSeek",
   keyHint: "platform.deepseek.com → API keys",
   keyPrefix: "sk-",
-  defaultModel: "deepseek-v4-pro",
-  models: ["deepseek-v4-pro", "deepseek-v4-flash"],
-  costNote: "V4 Pro ≈ 7 TL/ders · V4 Flash ≈ 2,4 TL (yoğun saatte 2 katı)",
+  defaultModel: "deepseek-flash",
+  // V4-Pro ve V4-Flash emekliye ayrıldı (Eylül 2026); o adlara giden istekler
+  // V4.1-Flash'a yönleniyor. Eski adlar listede tutulmuyor ama elle yazılabilir.
+  models: ["deepseek-flash"],
+  costNote: "V4.1 Flash ≈ 1 TL/ders (yoğun saatte 2 katı)",
   experimental: true,
 };
 

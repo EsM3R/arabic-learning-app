@@ -35,8 +35,10 @@ const PRICES: { match: RegExp; price: Price }[] = [
   { match: /^gpt-5\.6-luna/, price: { input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 0.2 } },
   { match: /^gemini.*pro/, price: { input: 2, output: 12, cacheRead: 2, cacheWrite: 2 } },
   { match: /^gemini.*flash/, price: { input: 0.75, output: 3.75, cacheRead: 0.75, cacheWrite: 0.75 } },
-  { match: /^deepseek.*pro/, price: { input: 0.66, output: 1.98, cacheRead: 0.004, cacheWrite: 0.66 } },
-  { match: /^deepseek.*flash/, price: { input: 0.22, output: 0.66, cacheRead: 0.003, cacheWrite: 0.22 } },
+  // V4.1-Flash (model adı "deepseek-flash"). V4-Pro ve V4-Flash emekliye
+  // ayrıldı ve istekleri BU modele, BU fiyatlardan yönleniyor — o yüzden tek
+  // kural bütün deepseek adlarını kapsıyor. Yoğun saatte gerçek fatura 2 katı.
+  { match: /^deepseek/, price: { input: 0.15, output: 0.6, cacheRead: 0.003, cacheWrite: 0.15 } },
 ];
 
 /** Bilinmeyen model: sessizce sıfır saymak yerine orta bir tahmin kullan. */
