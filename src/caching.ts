@@ -1,5 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { ChatMessage } from "./types";
+// Tip-yalnız importlar: node --experimental-strip-types bunları siler, böylece
+// önbellek yerleşimi SDK yüklemeden test edilebilir (tests/caching.test.ts).
+// Bu dosya maliyeti belirliyor — işaret yanlış yere konursa fatura sessizce
+// katlanır ve kimse fark etmez.
+import type Anthropic from "@anthropic-ai/sdk";
+import type { ChatMessage } from "./types.ts";
 
 /**
  * Önbellek düzeni — saf (React Native bağımlılığı yok) olduğu için test edilebilir.

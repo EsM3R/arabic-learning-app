@@ -1,8 +1,11 @@
-import { getActivePack } from "./languages";
-import { listSeparator, needsTranslit } from "./scripts";
-import { LENGTH_SPECS, ReadingRequest } from "./reading";
-import { deckStats, strugglingCards } from "./srs";
-import {
+// Uzantılı importlar: bu dosyanın hafıza/tekrar özeti mantığı node altında
+// test edilebilsin diye (tests/prompts.test.ts). Bkz. tsconfig yorumu.
+import { getActivePack } from "./languages.ts";
+import { LENGTH_SPECS } from "./reading.ts";
+import type { ReadingRequest } from "./reading.ts";
+import { listSeparator, needsTranslit } from "./scripts.ts";
+import { deckStats, strugglingCards } from "./srs.ts";
+import type {
   Assessment,
   CurriculumModule,
   MistakeEntry,
@@ -10,7 +13,7 @@ import {
   TeacherNote,
   Track,
   VocabCard,
-} from "./types";
+} from "./types.ts";
 
 /**
  * Tüm öğretmen kişiliğinin temeli. Dil paketi (persona, içerik biçimi,
