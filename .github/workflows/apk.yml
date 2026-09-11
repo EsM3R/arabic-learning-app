@@ -119,16 +119,21 @@ jobs:
               | grep -i "SHA-256 digest" >> "$GITHUB_STEP_SUMMARY" || true
           fi
 
-      # Artifact'a TEK dosya konur: sabit adlı kopya yalnızca release'in
-      # değişmeyen indirme adresi için var, zip'in içinde iki aynı APK
-      # görünmesi kafa karıştırıyor.
+      # Artifact yalnızca kısa süreli bir güvenlik ağıdır; ASIL teslim aşağıdaki
+      # release'tir (indirme adresi sabit ve Actions kotasına yazılmaz).
+      #
+      # Derleme #33 bu adımda öldü: 90 günlük saklama × ~38 MB × onlarca derleme
+      # Actions depolama kotasını doldurdu ve release adımı hiç çalışamadı.
+      # İki ders: saklama 3 güne indirildi ve adım artık işi ÖLDÜRMÜYOR —
+      # kota dolsa bile APK release'e çıkar.
       - name: APK'yı yükle (artifact)
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: lisan-hocasi-apk
           path: out/${{ steps.apk.outputs.name }}
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 3
 
       # Kalıcı ve telefondan tek dokunuşla indirilebilir sürüm. Etiket hep aynı
       # ("apk-latest") olduğu için indirme adresi de sabit kalır:
