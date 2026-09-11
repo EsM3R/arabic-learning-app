@@ -8,8 +8,9 @@
  * yorumu) — çalışma-zamanı importları .ts uzantılı, tip importları
  * import type ile yazılır (silinir).
  */
+import type { ScriptId } from "./scripts.ts";
 import { dueCards, strugglingCards } from "./srs.ts";
-import { arabicStemCandidates, normalizeTarget, readingCoverage } from "./textnorm.ts";
+import { normalizeTarget, readingCoverage, stemCandidates } from "./textnorm.ts";
 import type {
   ReadingGenPayload,
   ReadingLength,
@@ -164,26 +165,26 @@ export function matchReviewCards(
   reviewCards: VocabCard[],
   declared: string[],
   sentenceTargets: string[],
-  arabicScript: boolean
+  script: ScriptId
 ): string[] {
   const singleWord = new Map<string, string>(); // norm → id
   const multiWord: { norm: string; id: string }[] = [];
   for (const c of reviewCards) {
-    const n = normalizeTarget(c.arabic, arabicScript);
+    const n = normalizeTarget(c.arabic, script);
     if (!n) continue;
     if (n.includes(" ")) multiWord.push({ norm: n, id: c.id });
     else singleWord.set(n, c.id);
   }
   const ids = new Set<string>();
   const tryToken = (tok: string) => {
-    const cands = arabicScript ? arabicStemCandidates(tok) : [tok];
+    const cands = stemCandidates(tok, script);
     for (const cand of cands) {
       const id = singleWord.get(cand);
       if (id) ids.add(id);
     }
   };
-  for (const d of declared) tryToken(normalizeTarget(d, arabicScript));
-  const fullNorm = sentenceTargets.map((s) => normalizeTarget(s, arabicScript)).join(" ");
+  for (const d of declared) tryToken(normalizeTarget(d, script));
+  const fullNorm = sentenceTargets.map((s) => normalizeTarget(s, script)).join(" ");
   for (const tok of fullNorm.split(" ")) if (tok) tryToken(tok);
   for (const m of multiWord) if (fullNorm.includes(m.norm)) ids.add(m.id);
   return Array.from(ids);
@@ -193,14 +194,14 @@ export function matchReviewCards(
 export function dedupeNewWords(
   newWords: ReadingNewWord[],
   vocab: VocabCard[],
-  arabicScript: boolean
+  script: ScriptId
 ): ReadingNewWord[] {
   const known = new Set(
-    vocab.map((c) => normalizeTarget(c.arabic, arabicScript)).filter(Boolean)
+    vocab.map((c) => normalizeTarget(c.arabic, script)).filter(Boolean)
   );
   const seen = new Set<string>();
   return newWords.filter((w) => {
-    const n = normalizeTarget(w.word, arabicScript);
+    const n = normalizeTarget(w.word, script);
     if (!n || known.has(n) || seen.has(n)) return false;
     seen.add(n);
     return true;
@@ -270,11 +271,11 @@ export function finalizeReading(
   raw: ReadingGenPayload,
   req: ReadingRequest,
   vocab: VocabCard[],
-  arabicScript: boolean,
+  script: ScriptId,
   now = new Date()
 ): ReadingText {
   const sentences = raw.sentences.filter((s) => s.target.trim().length > 0);
-  const newWords = dedupeNewWords(raw.newWords, vocab, arabicScript);
+  const newWords = dedupeNewWords(raw.newWords, vocab, script);
   const questions = raw.questions
     .filter((q) => q.choices.length >= 2 && q.answer >= 0 && q.answer < q.choices.length)
     .slice(0, 5);
@@ -283,7 +284,7 @@ export function finalizeReading(
     targets.join(" "),
     vocab.map((c) => c.arabic), // her zaman TAM defter — kırpılmış prompt listesi değil
     newWords.map((w) => w.word),
-    arabicScript
+    script
   );
   return {
     ...raw,
@@ -300,7 +301,7 @@ export function finalizeReading(
     knownRatio: cov.knownRatio,
     complianceRatio: cov.complianceRatio,
     unplannedUnknown: cov.unplannedUnknown.slice(0, 20),
-    reviewCardIds: matchReviewCards(req.reviewCards, raw.usedReviewWords, targets, arabicScript),
+    reviewCardIds: matchReviewCards(req.reviewCards, raw.usedReviewWords, targets, script),
     addedWordIds: [],
   };
 }

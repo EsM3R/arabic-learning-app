@@ -192,7 +192,7 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
         item.arabic,
         item.transliteration,
         said,
-        getActivePack().scriptExtract
+        getActivePack().script
       );
       setAttempt(verdict);
       void recordStat("spoken");

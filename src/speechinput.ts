@@ -10,6 +10,8 @@
  * Buradaki mantık saf tutulur; modülün kendisi (mikrofon, izinler, olaylar)
  * ekran tarafında.
  */
+import { needsTranslit } from "./scripts.ts";
+import type { ScriptId } from "./scripts.ts";
 import { matchProduction, normalizeTarget, normalizeTranslit } from "./textnorm.ts";
 import type { ProductionMatch } from "./textnorm.ts";
 
@@ -18,6 +20,11 @@ export const SPEECH_LOCALES: Record<string, string> = {
   ar: "ar-SA", // Android'in Arapça tanıması fusha ağırlıklı — fusha öğrenirken bu bir AVANTAJ
   en: "en-US",
   es: "es-ES",
+  fr: "fr-FR",
+  de: "de-DE",
+  it: "it-IT",
+  ru: "ru-RU",
+  fa: "fa-IR", // cihazda Farsça tanıma yoksa mikrofon Türkçe hata mesajıyla düşer
 };
 
 export function speechLocale(languageId: string): string {
@@ -101,7 +108,7 @@ export function judgeSpeech(
   target: string,
   translit: string,
   heard: string,
-  arabicScript: boolean
+  script: ScriptId
 ): SpeechAttempt {
   const said = (heard ?? "").trim();
   if (!said) {
@@ -112,7 +119,7 @@ export function judgeSpeech(
       message: "Ses alınamadı — bir daha dene.",
     };
   }
-  const match = matchProduction(target, translit, said, arabicScript);
+  const match = matchProduction(target, translit, said, script);
   if (match !== "none") {
     return {
       verdict: "dogru",
@@ -122,10 +129,10 @@ export function judgeSpeech(
     };
   }
   // Hem hedef yazımla hem okunuşla karşılaştır; iyi olanı al.
-  const normTarget = normalizeTarget(target, arabicScript);
-  const normSaid = normalizeTarget(said, arabicScript);
+  const normTarget = normalizeTarget(target, script);
+  const normSaid = normalizeTarget(said, script);
   const scoreTarget = similarity(normTarget, normSaid);
-  const scoreTranslit = arabicScript
+  const scoreTranslit = needsTranslit(script)
     ? similarity(normalizeTranslit(translit), normalizeTranslit(said))
     : 0;
   const score = Math.max(scoreTarget, scoreTranslit);

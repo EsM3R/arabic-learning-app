@@ -20,6 +20,7 @@ import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity
 import { matchProduction, ProductionMatch } from "../textnorm";
 import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
 import { ReviewGrade, VocabCard } from "../types";
+import { needsTranslit } from "../scripts";
 
 interface Props {
   onBack: () => void;
@@ -102,7 +103,7 @@ export default function ReviewScreen({ onBack }: Props) {
       current.arabic,
       current.transliteration,
       said,
-      pack.scriptExtract
+      pack.script
     );
     setSpeech(attempt);
     void feedback(attempt.verdict === "dogru");
@@ -146,7 +147,7 @@ export default function ReviewScreen({ onBack }: Props) {
       current.arabic,
       current.transliteration,
       answer,
-      pack.scriptExtract
+      pack.script
     );
     setMatchKind(kind);
     if (kind !== "none") {
@@ -300,9 +301,9 @@ export default function ReviewScreen({ onBack }: Props) {
                       autoCorrect={false}
                       autoCapitalize="none"
                       placeholder={
-                        pack.scriptExtract
-                          ? "Arapçasını yaz (okunuşuyla da olur)…"
-                          : "Cevabını yaz…"
+                        needsTranslit(pack.script)
+                          ? `${pack.targetAccusative} yaz (okunuşuyla da olur)…`
+                          : `${pack.targetAccusative} yaz…`
                       }
                       placeholderTextColor={colors.inkFaint}
                       onSubmitEditing={() => void checkAnswer()}
@@ -310,10 +311,10 @@ export default function ReviewScreen({ onBack }: Props) {
                       // Her kartta fazladan bir dokunuş gerekiyordu.
                       autoFocus
                     />
-                    {pack.scriptExtract && (
+                    {needsTranslit(pack.script) && (
                       <Text style={styles.translitNote}>
-                        Arap klavyen yoksa Latin okunuşuyla yazabilirsin — yazabilir ya da
-                        söyleyebilirsin, ikisi de sayılır.
+                        {pack.label} klavyen yoksa Latin okunuşuyla yazabilirsin — yazabilir
+                        ya da söyleyebilirsin, ikisi de sayılır.
                       </Text>
                     )}
                   </>

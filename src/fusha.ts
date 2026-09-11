@@ -33,13 +33,18 @@ export interface MigrationScope {
  * Geçişin kapsamını hesaplar. `migrated` true ise kapsam HER ZAMAN boştur:
  * geçiş bir kez yapılır, sonrasında "konusma" kartları yeni fusha kartlarıdır
  * ve silinmemelidir.
+ *
+ * DİL KİLİDİ: bu temizlik YALNIZ Arapça içindir. Uygulamada başka diller de
+ * var ve onların "konusma" kartları ammiceyle hiç ilgili değil — dil kontrolü
+ * olmasaydı Fransızca panelinde "ammice kartların silinecek" diye sorulurdu.
  */
 export function migrationScope(
   vocab: VocabCard[],
   curriculum: Curriculum | undefined,
-  migrated: boolean
+  migrated: boolean,
+  languageId: string
 ): MigrationScope {
-  if (migrated) {
+  if (languageId !== "ar" || migrated) {
     return { cardsToRemove: 0, cardsKept: vocab.length, modulesToClear: 0, needed: false };
   }
   const remove = vocab.filter((c) => c.track === "konusma").length;

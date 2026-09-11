@@ -29,6 +29,7 @@ import {
 } from "../storage";
 import { colors } from "../theme";
 import { ChatMessage, CurriculumModule, NavigationSuggestion, Profile } from "../types";
+import { containsTargetScript } from "../scripts";
 
 interface Props {
   profile: Profile;
@@ -251,7 +252,7 @@ export default function LessonScreen({
     // Hedef dilde yazılmış mesaj üretimdir. Yalnız ayrı alfabeli dillerde
     // güvenle tespit edilebiliyor (Latin dillerde Türkçe/hedef ayrımı yok —
     // dürüst metrik için sayılmaz; oradaki üretim sınav/okuma/gölgelemeden gelir).
-    const inTarget = getActivePack().scriptExtract && extractArabic(text).length > 0;
+    const inTarget = containsTargetScript(text, getActivePack().script);
     if (inTarget) void recordStat("produced");
     if (spoken) {
       // Mikrofonla söylendi: ses tanıma öğrenciyi hedef dilde duyduysa bu

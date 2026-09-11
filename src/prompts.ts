@@ -1,4 +1,5 @@
 import { getActivePack } from "./languages";
+import { listSeparator, needsTranslit } from "./scripts";
 import { LENGTH_SPECS, ReadingRequest } from "./reading";
 import { deckStats, strugglingCards } from "./srs";
 import {
@@ -346,9 +347,9 @@ export function readingTextSystem(
 ): string {
   const p = getActivePack();
   const spec = LENGTH_SPECS[req.length];
-  const sep = p.scriptExtract ? "، " : ", ";
-  const translitRule = p.scriptExtract
-    ? `- Her cümlenin ve her yeni kelimenin translit alanına Türkçe okunuşa yakın Latin transkripsiyon yaz (örnek biçim: "şu ahbārak").`
+  const sep = listSeparator(p.script);
+  const translitRule = needsTranslit(p.script)
+    ? `- Bu dil Latin alfabesiyle YAZILMIYOR: her cümlenin ve her yeni kelimenin translit alanına Türkçe okunuşa yakın Latin transkripsiyon yaz (örnek biçim: "şu ahbārak").`
     : `- Bu dil Latin alfabelidir: bütün translit alanlarına boş string ("") yaz.`;
 
   const coverageBlock = req.coldStart
@@ -391,12 +392,12 @@ ANLAMA SORULARI — tam ${spec.questionCount} soru:
 Alan kuralları:
 - title: hedef dilde kısa, merak uyandıran bir başlık; titleTr: Türkçe karşılığı.
 - sentences[i].tr: cümlenin doğal Türkçe çevirisi (kelimesi kelimesine değil).
-- newWords[i]: word (metindeki yazımıyla${p.scriptExtract ? ", her zaman TAM harekeli" : ""}), translit, tr (Türkçe anlam), hint (anlamın bağlamdan nasıl çıkarılacağına dair 1 cümlelik Türkçe ipucu — anlamı doğrudan söyleme, yolu göster).
+- newWords[i]: word (metindeki yazımıyla${p.newWordNote}), translit, tr (Türkçe anlam), hint (anlamın bağlamdan nasıl çıkarılacağına dair 1 cümlelik Türkçe ipucu — anlamı doğrudan söyleme, yolu göster).
 ${translitRule}`;
 }
 
 export function readingTextUserMessage(req: ReadingRequest): string {
-  const sep = getActivePack().scriptExtract ? "، " : ", ";
+  const sep = listSeparator(getActivePack().script);
   const review = req.reviewCards.map((c) => c.arabic);
   return `Konu: ${req.topic}
 

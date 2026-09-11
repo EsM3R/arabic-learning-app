@@ -1,16 +1,14 @@
 import * as Speech from "expo-speech";
 import { getActivePack } from "./languages";
+import { extractScript } from "./scripts";
 
-/** Bir metindeki Arapça bölümleri ayıklar (harf aralıkları + Arapça noktalama). */
+/**
+ * Geriye dönük ad — hedef alfabe bölümlerini ayıklar. Ayıklama mantığı artık
+ * yazı sistemine göre src/scripts.ts'te; burası aktif paketin alfabesini
+ * kullanan ince bir sarmalayıcı.
+ */
 export function extractArabic(text: string): string {
-  const matches = text.match(
-    /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿](?:[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿\s،؛؟ـ]*[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿؟])?/g
-  );
-  if (!matches) return "";
-  return matches
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .join("، ");
+  return extractScript(text, getActivePack().script);
 }
 
 /**
@@ -20,7 +18,7 @@ export function extractArabic(text: string): string {
  */
 export function speakTarget(text: string, slow = false): void {
   const pack = getActivePack();
-  const toSpeak = pack.scriptExtract ? extractArabic(text) || text : text;
+  const toSpeak = extractScript(text, pack.script) || text;
   if (!toSpeak.trim()) return;
   Speech.stop();
   Speech.speak(toSpeak, {
@@ -67,7 +65,7 @@ export function speakTargetWith(
   opts: { voiceId?: string; rate?: number; onDone?: () => void; onError?: () => void } = {}
 ): void {
   const pack = getActivePack();
-  const toSpeak = pack.scriptExtract ? extractArabic(text) || text : text;
+  const toSpeak = extractScript(text, pack.script) || text;
   if (!toSpeak.trim()) {
     opts.onDone?.();
     return;

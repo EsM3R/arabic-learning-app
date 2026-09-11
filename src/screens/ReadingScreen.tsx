@@ -20,6 +20,7 @@ import { loadReadings, loadVocab, saveReadings, saveVocab, touchLastActivity } f
 import { ARABIC_FONT, arabicText, colors, radius, shadow, shadowLift } from "../theme";
 import { Profile, ReadingLength, ReadingText } from "../types";
 import { normalizeTarget } from "../textnorm";
+import { isRtl, needsTranslit } from "../scripts";
 
 interface Props {
   profile: Profile;
@@ -158,8 +159,8 @@ export default function ReadingScreen({ profile, onBack }: Props) {
     const cards = await loadVocab();
     const dup = cards.find(
       (c) =>
-        normalizeTarget(c.arabic, pack.scriptExtract) ===
-        normalizeTarget(w.word, pack.scriptExtract)
+        normalizeTarget(c.arabic, pack.script) ===
+        normalizeTarget(w.word, pack.script)
     );
     if (!dup) {
       const card = newCard(w.word, w.translit, w.tr, "okuma", w.hint, "orta");
@@ -262,7 +263,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
             </View>
           )}
 
-          <Text style={[styles.title, pack.scriptExtract && styles.rtl]}>{current.title}</Text>
+          <Text style={[styles.title, isRtl(pack.script) && styles.rtl]}>{current.title}</Text>
           <Text style={styles.badgeLine}>{badge(current)}</Text>
 
           <View style={styles.listenRow}>
@@ -295,12 +296,12 @@ export default function ReadingScreen({ profile, onBack }: Props) {
                   })
                 }
               >
-                <Text style={[styles.sentenceTarget, pack.scriptExtract && styles.rtlBig]}>
+                <Text style={[styles.sentenceTarget, isRtl(pack.script) && styles.rtlBig]}>
                   {s.target}
                 </Text>
                 {open ? (
                   <View style={styles.revealBlock}>
-                    {pack.scriptExtract && !!s.translit && (
+                    {needsTranslit(pack.script) && !!s.translit && (
                       <Text style={styles.sentenceTranslit}>{s.translit}</Text>
                     )}
                     <Text style={styles.sentenceTr}>🇹🇷 {s.tr}</Text>
@@ -330,7 +331,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
             <View style={styles.sectionBox}>
               <Text style={styles.sectionTitle}>🔁 Bu metinde tekrar ettiklerin</Text>
               <Text style={styles.sectionMeta}>
-                {current.usedReviewWords.join(pack.scriptExtract ? " · " : " · ") ||
+                {current.usedReviewWords.join(" · ") ||
                   `${current.reviewCardIds.length} kelime`}
               </Text>
             </View>
@@ -344,11 +345,11 @@ export default function ReadingScreen({ profile, onBack }: Props) {
                 return (
                   <View key={i} style={styles.newWordRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.newWordTarget, pack.scriptExtract && styles.rtl]}>
+                      <Text style={[styles.newWordTarget, isRtl(pack.script) && styles.rtl]}>
                         {w.word}
                       </Text>
                       <Text style={styles.newWordMeta}>
-                        {pack.scriptExtract && w.translit ? `${w.translit} — ` : ""}
+                        {needsTranslit(pack.script) && w.translit ? `${w.translit} — ` : ""}
                         {w.tr}
                       </Text>
                       <Text style={styles.newWordHint}>💡 {w.hint}</Text>
@@ -415,7 +416,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
             <Text style={styles.sectionTitle}>✍️ Şimdi sen</Text>
             <Text style={styles.productionInstruction}>{current.productionTask.instruction}</Text>
             <TextInput
-              style={[styles.productionInput, pack.scriptExtract && styles.rtl]}
+              style={[styles.productionInput, isRtl(pack.script) && styles.rtl]}
               value={production}
               onChangeText={setProduction}
               onEndEditing={() => {
@@ -432,7 +433,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
               </Text>
             </TouchableOpacity>
             {showExample && (
-              <Text style={[styles.exampleText, pack.scriptExtract && styles.rtl]}>
+              <Text style={[styles.exampleText, isRtl(pack.script) && styles.rtl]}>
                 {current.productionTask.example}
               </Text>
             )}
@@ -579,7 +580,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.libTitleTr}>{r.titleTr}</Text>
-                <Text style={[styles.libTitle, pack.scriptExtract && styles.rtl]}>{r.title}</Text>
+                <Text style={[styles.libTitle, isRtl(pack.script) && styles.rtl]}>{r.title}</Text>
                 <Text style={styles.libMeta}>
                   {LENGTH_SPECS[r.length].label} · {r.level} · {r.createdAt.slice(0, 10)}
                 </Text>

@@ -135,13 +135,13 @@ test("matchReviewCards: klitik, hareke ve çok kelimeli eşleşme", () => {
     cards,
     ["سُوق"], // harekeli beyan
     ["رحت عالسوق مبارح", "صباح الخير يا أستاذ"],
-    true
+    "arabic"
   );
   assert.ok(ids.includes("m1")); // klitik soymayla da yakalanır
   assert.ok(ids.includes("m2")); // çok kelimeli substring
   assert.ok(!ids.includes("m3")); // metinde yok
   // defterde olmayan beyan id üretmez
-  const none = matchReviewCards(cards, ["مدرسة"], ["لا شيء"], true);
+  const none = matchReviewCards(cards, ["مدرسة"], ["لا شيء"], "arabic");
   assert.equal(none.length, 0);
 });
 
@@ -155,7 +155,7 @@ test("dedupeNewWords: defter ve liste içi mükerrer elenir", () => {
       { word: "", translit: "", tr: "", hint: "" }, // boş
     ],
     vocab,
-    true
+    "arabic"
   );
   assert.equal(out.length, 1);
   assert.equal(out[0].word, "قلم");
@@ -187,7 +187,7 @@ test("finalizeReading: temizlik, kapsam TAM defterle, taşıma alanları", () =>
       { q: "bozuk", choices: ["a", "b"], answer: 5 }, // aralık dışı → atılır
     ],
   });
-  const fin = finalizeReading(raw, req, vocab, true, NOW);
+  const fin = finalizeReading(raw, req, vocab, "arabic", NOW);
   assert.equal(fin.sentences.length, 1);
   assert.equal(fin.questions.length, 1);
   assert.ok(fin.id.startsWith("r"));
@@ -203,7 +203,7 @@ test("pruneReadings: önce en eski bitmişler düşer", () => {
   const texts: ReadingText[] = [];
   const req = buildReadingRequest([card({})], { length: "kisa" }, "A1", undefined, "a", false, NOW);
   for (let i = 0; i < MAX_READINGS + 3; i++) {
-    const t = finalizeReading(payload({}), req, [], false, new Date(NOW.getTime() + i * 60000));
+    const t = finalizeReading(payload({}), req, [], "latin", new Date(NOW.getTime() + i * 60000));
     texts.push({ ...t, id: `r${i}`, finishedAt: i < 5 ? iso(0) : undefined });
   }
   const pruned = pruneReadings(texts);
@@ -224,19 +224,19 @@ test("pruneReadings: önce en eski bitmişler düşer", () => {
 test("readingCoverage: compliance planlı yeniyi affeder, plansızı cezalandırır", () => {
   const known = ["راح", "سوق", "بيت", "يوم", "اكل", "شرب", "كتب", "قرا"];
   const text = "راح سوق بيت يوم اكل شرب كتب قرا خضرة فواكه";
-  const r1 = readingCoverage(text, known, ["خضرة", "فواكه"], true);
+  const r1 = readingCoverage(text, known, ["خضرة", "فواكه"], "arabic");
   assert.equal(r1.complianceRatio, 1);
   assert.ok(Math.abs(r1.knownRatio - 0.8) < 1e-9);
   assert.equal(r1.unplannedUnknown.length, 0);
-  const r2 = readingCoverage(text, known, ["خضرة"], true); // فواكه plansız
+  const r2 = readingCoverage(text, known, ["خضرة"], "arabic"); // فواكه plansız
   assert.ok(r2.complianceRatio < 1);
   assert.ok(r2.unplannedUnknown.includes("فواكه"));
   // klitikli bilinen ve klitikli planlı
-  const r3 = readingCoverage("والبيت بالخضرة", ["بيت"], ["خضرة"], true);
+  const r3 = readingCoverage("والبيت بالخضرة", ["بيت"], ["خضرة"], "arabic");
   assert.equal(r3.knownTokens, 1);
   assert.equal(r3.plannedNewTokens, 1);
   // boş metin
-  assert.equal(readingCoverage("", ["x"], [], true).complianceRatio, 1);
+  assert.equal(readingCoverage("", ["x"], [], "arabic").complianceRatio, 1);
 });
 
 test("normalizeReadingPayload: eksik diziler boşlanır, bozuk öğeler elenir", () => {

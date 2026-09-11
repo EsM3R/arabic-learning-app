@@ -18,6 +18,7 @@ import { isSpoken, stripSpokenMark } from "../speechinput";
 import { useDictation } from "../useDictation";
 import { colors, shadow } from "../theme";
 import { ChatMessage, NavigationSuggestion } from "../types";
+import { containsTargetScript, isRtl } from "../scripts";
 
 interface Props {
   messages: ChatMessage[];
@@ -111,12 +112,11 @@ export default function ChatView({
                   <RichText
                     content={item.content}
                     style={styles.assistantText}
-                    scaleScript={pack.scriptExtract}
+                    scaleScript={isRtl(pack.script)}
                   />
                 )}
                 {item.role === "assistant" &&
-                  pack.scriptExtract &&
-                  extractArabic(item.content).length > 0 && (
+                  containsTargetScript(item.content, pack.script) && (
                   <TouchableOpacity
                     style={styles.speakButton}
                     onPress={() => speakTarget(item.content)}

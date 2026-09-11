@@ -20,21 +20,21 @@ test("sanitize: boş, aynı-kelimeli ve alansız çiftler elenir", () => {
       pair("سُوق", "سوق"), // normalize sonrası aynı (hareke farkı)
       { ...pair("a", "b"), focus: "" }, // focus yok
     ],
-    true
+    "arabic"
   );
   assert.equal(out.length, 1);
   assert.equal(out[0].a.word, "عَلَم");
 });
 
 test("sanitize: hepsi aynı playIndex ise dengelenir", () => {
-  const allZero = sanitizeMinimalPairs([pair("a", "b", 0), pair("c", "d", 0), pair("e", "f", 0)], false);
+  const allZero = sanitizeMinimalPairs([pair("a", "b", 0), pair("c", "d", 0), pair("e", "f", 0)], "latin");
   assert.deepEqual(allZero.map((p) => p.playIndex), [0, 1, 0]);
-  const allOne = sanitizeMinimalPairs([pair("a", "b", 1), pair("c", "d", 1)], false);
+  const allOne = sanitizeMinimalPairs([pair("a", "b", 1), pair("c", "d", 1)], "latin");
   assert.deepEqual(allOne.map((p) => p.playIndex), [0, 1]);
 });
 
 test("sanitize: karışık playIndex'e dokunulmaz", () => {
-  const mixed = sanitizeMinimalPairs([pair("a", "b", 1), pair("c", "d", 0)], false);
+  const mixed = sanitizeMinimalPairs([pair("a", "b", 1), pair("c", "d", 0)], "latin");
   assert.deepEqual(mixed.map((p) => p.playIndex), [1, 0]);
 });
 

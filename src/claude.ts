@@ -286,7 +286,7 @@ export async function generateReadingText(
     model,
     apiKey,
   });
-  const reading = finalizeReading(normalizeReadingPayload(raw), req, vocab, pack.scriptExtract);
+  const reading = finalizeReading(normalizeReadingPayload(raw), req, vocab, pack.script);
   if (reading.sentences.length === 0) {
     throw new Error(
       "Modelin cevabında hiç cümle yoktu (şemaya uymamış). Tekrar denemek genelde çözer."
@@ -325,7 +325,7 @@ export async function generatePronunciationSet(
   }
   return {
     items,
-    minimalPairs: sanitizeMinimalPairs(parsed.minimalPairs ?? [], getActivePack().scriptExtract),
+    minimalPairs: sanitizeMinimalPairs(parsed.minimalPairs ?? [], getActivePack().script),
     createdAt: new Date().toISOString(),
   };
 }

@@ -41,41 +41,41 @@ test("editDistance ve similarity temel davranış", () => {
 });
 
 test("judgeSpeech: hedef yazımla birebir söylendi → doğru", () => {
-  const r = judgeSpeech("سوق", "suk", "سوق", true);
+  const r = judgeSpeech("سوق", "suk", "سوق", "arabic");
   assert.equal(r.verdict, "dogru");
   assert.equal(r.match, "target");
   assert.equal(r.similarity, 1);
 });
 
 test("judgeSpeech: okunuşla söylendi → doğru (okunuş etiketiyle)", () => {
-  const r = judgeSpeech("سوق", "suk", "suk", true);
+  const r = judgeSpeech("سوق", "suk", "suk", "arabic");
   assert.equal(r.verdict, "dogru");
   assert.equal(r.match, "translit");
   assert.match(r.message, /okunuş/);
 });
 
 test("judgeSpeech: yakın söyleyiş 'yakin', duyulanı gösterir", () => {
-  const r = judgeSpeech("كتاب", "kitab", "كتام", true);
+  const r = judgeSpeech("كتاب", "kitab", "كتام", "arabic");
   assert.equal(r.verdict, "yakin");
   assert.ok(r.similarity >= NEAR_THRESHOLD);
   assert.match(r.message, /كتام/); // duyulan metin öğrenciye gösterilir
 });
 
 test("judgeSpeech: alakasız söyleyiş 'uzak'", () => {
-  const r = judgeSpeech("مدرسة", "medrese", "طاولة", true);
+  const r = judgeSpeech("مدرسة", "medrese", "طاولة", "arabic");
   assert.equal(r.verdict, "uzak");
   assert.ok(r.similarity < NEAR_THRESHOLD);
 });
 
 test("judgeSpeech: boş sonuç 'bos' ve suçlayıcı olmayan mesaj", () => {
-  const r = judgeSpeech("سوق", "suk", "   ", true);
+  const r = judgeSpeech("سوق", "suk", "   ", "arabic");
   assert.equal(r.verdict, "bos");
   assert.equal(r.similarity, 0);
   assert.match(r.message, /bir daha dene/i);
 });
 
 test("judgeSpeech: Latin dilde okunuş yolu kapalı, hedefle karşılaştırılır", () => {
-  assert.equal(judgeSpeech("casa", "", "casa", false).verdict, "dogru");
-  const near = judgeSpeech("escuela", "", "escuala", false);
+  assert.equal(judgeSpeech("casa", "", "casa", "latin").verdict, "dogru");
+  const near = judgeSpeech("escuela", "", "escuala", "latin");
   assert.equal(near.verdict, "yakin");
 });

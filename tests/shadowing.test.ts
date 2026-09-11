@@ -53,14 +53,14 @@ test("kuyruk: kelime sayısı filtresi (2-14) ve tekilleştirme", () => {
       ],
     }),
   ];
-  const q = buildShadowQueue(texts, null, {}, true);
+  const q = buildShadowQueue(texts, null, {}, "arabic");
   assert.equal(q.length, 1);
   assert.equal(q[0].text, "رحت عالسوق مبارح");
 });
 
 test("kuyruk: kaynaklar dönüşümlü dizilir, telaffuz da girer", () => {
   const texts = [reading({ sentences: [sent("جملة اولى هنا"), sent("جملة ثانية هنا")] })];
-  const q = buildShadowQueue(texts, PRON, {}, true);
+  const q = buildShadowQueue(texts, PRON, {}, "arabic");
   assert.equal(q[0].source, "okuma");
   assert.equal(q[1].source, "telaffuz");
   assert.ok(q.some((i) => i.text === "شكراً جزيلاً"));
@@ -76,7 +76,7 @@ test("kuyruk: bitirilmiş metinler öncelikli", () => {
       sentences: [sent("منتهية جملة هنا")],
     }),
   ];
-  const q = buildShadowQueue(texts, null, {}, true);
+  const q = buildShadowQueue(texts, null, {}, "arabic");
   assert.equal(q[0].text, "منتهية جملة هنا"); // bitirilmiş (anlaşılmış) önce
 });
 
@@ -87,9 +87,9 @@ test("kuyruk: 'tekrar lazım' notlular başa alınır, limit çalışır", () =>
   const notes: ShadowNotesMap = {
     "جمله ثانيه هنا": { tries: 1, lastNote: 0, lastAt: iso(0) }, // normalize: ة→ه
   };
-  const q = buildShadowQueue(texts, null, notes, true);
+  const q = buildShadowQueue(texts, null, notes, "arabic");
   assert.equal(q[0].text, "جملة ثانية هنا");
-  assert.equal(buildShadowQueue(texts, null, {}, true, 2).length, 2);
+  assert.equal(buildShadowQueue(texts, null, {}, "arabic", 2).length, 2);
 });
 
 test("noteShadow: tries artar, immutable, 300 budaması", () => {

@@ -38,7 +38,7 @@ function curriculum(n: number): Curriculum {
 
 test("kapsam: ammice kartlar ve müfredat sayılır", () => {
   const vocab = [card("konusma"), card("konusma"), card("okuma")];
-  const s = migrationScope(vocab, curriculum(12), false);
+  const s = migrationScope(vocab, curriculum(12), false, "ar");
   assert.equal(s.cardsToRemove, 2);
   assert.equal(s.cardsKept, 1);
   assert.equal(s.modulesToClear, 12);
@@ -46,14 +46,14 @@ test("kapsam: ammice kartlar ve müfredat sayılır", () => {
 });
 
 test("kapsam: silinecek kart yoksa ama müfredat varsa yine gerekli", () => {
-  const s = migrationScope([card("okuma")], curriculum(8), false);
+  const s = migrationScope([card("okuma")], curriculum(8), false, "ar");
   assert.equal(s.cardsToRemove, 0);
   assert.equal(s.modulesToClear, 8);
   assert.equal(s.needed, true);
 });
 
 test("kapsam: hiçbiri yoksa gerekli değil", () => {
-  const s = migrationScope([card("okuma")], undefined, false);
+  const s = migrationScope([card("okuma")], undefined, false, "ar");
   assert.equal(s.needed, false);
 });
 
@@ -61,11 +61,23 @@ test("GEÇİŞ YAPILDIYSA kapsam her zaman boş — yeni fusha kartları silinme
   // Geçişten sonra "konusma" parkuru SÖZLÜ FUSHA demektir; bu kartlar
   // yeni ve korunmalıdır. Bayrak bunu garanti eder.
   const vocab = [card("konusma"), card("konusma"), card("okuma")];
-  const s = migrationScope(vocab, curriculum(16), true);
+  const s = migrationScope(vocab, curriculum(16), true, "ar");
   assert.equal(s.cardsToRemove, 0);
   assert.equal(s.cardsKept, 3);
   assert.equal(s.modulesToClear, 0);
   assert.equal(s.needed, false);
+});
+
+test("BAŞKA DİLDE kapsam her zaman boş — Fransızca kartlar ammice değildir", () => {
+  // Dil kilidi olmasaydı Fransızca panelinde "ammice kartların silinecek"
+  // diye sorulur, öğrencinin konuşma kartları yok edilirdi.
+  const vocab = [card("konusma"), card("konusma"), card("okuma")];
+  for (const lang of ["fr", "de", "it", "ru", "fa", "en", "es"]) {
+    const s = migrationScope(vocab, curriculum(10), false, lang);
+    assert.equal(s.needed, false, `${lang}: geçiş sorulmamalı`);
+    assert.equal(s.cardsToRemove, 0);
+    assert.equal(s.cardsKept, 3);
+  }
 });
 
 test("withoutColloquial: yalnız konuşma parkuru düşer, sıra bozulmaz", () => {
@@ -80,7 +92,7 @@ test("withoutColloquial: yalnız konuşma parkuru düşer, sıra bozulmaz", () =
 });
 
 test("özet: sayıları söyler ve geri alınamazlığı uyarır", () => {
-  const s = migrationScope([card("konusma"), card("okuma")], curriculum(4), false);
+  const s = migrationScope([card("konusma"), card("okuma")], curriculum(4), false, "ar");
   const text = migrationSummary(s);
   assert.match(text, /1 ammice kart silinecek/);
   assert.match(text, /1 kart kalacak/);
@@ -89,7 +101,7 @@ test("özet: sayıları söyler ve geri alınamazlığı uyarır", () => {
 });
 
 test("özet: silinecek kart yokken kart cümlesi hiç geçmez", () => {
-  const s = migrationScope([card("okuma")], curriculum(4), false);
+  const s = migrationScope([card("okuma")], curriculum(4), false, "ar");
   const text = migrationSummary(s);
   assert.doesNotMatch(text, /kart silinecek/);
   assert.match(text, /müfredat/);

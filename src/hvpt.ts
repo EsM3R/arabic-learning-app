@@ -9,6 +9,7 @@
  * Model çıktısı güvenilmez alanlar içerebilir: aynı kelime iki tarafta,
  * boş alan, hep aynı playIndex. Burada temizlenir — UI temiz veri varsayar.
  */
+import type { ScriptId } from "./scripts.ts";
 import { normalizeTarget } from "./textnorm.ts";
 import type { MinimalPairItem, PronunciationItem } from "./types";
 
@@ -32,13 +33,13 @@ export function normalizePronunciationItems(raw: unknown): PronunciationItem[] {
 
 export function sanitizeMinimalPairs(
   pairs: MinimalPairItem[],
-  arabicScript: boolean
+  script: ScriptId
 ): MinimalPairItem[] {
   const cleaned = (Array.isArray(pairs) ? pairs : [])
     .filter((p): p is MinimalPairItem => !!p && typeof p === "object")
     .filter((p) => {
-      const a = normalizeTarget(p.a?.word ?? "", arabicScript);
-      const b = normalizeTarget(p.b?.word ?? "", arabicScript);
+      const a = normalizeTarget(p.a?.word ?? "", script);
+      const b = normalizeTarget(p.b?.word ?? "", script);
       return a.length > 0 && b.length > 0 && a !== b && !!p.focus && !!p.tip;
     });
   // playIndex dengesi: model hepsini aynı yazdıysa cevap her zaman aynı

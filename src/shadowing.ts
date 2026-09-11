@@ -10,6 +10,7 @@
  *
  * SRS DEĞİLDİR: öz-not yalnızca "tekrar lazım" işaretiyle sıralamayı etkiler.
  */
+import type { ScriptId } from "./scripts.ts";
 import { normalizeTarget } from "./textnorm.ts";
 import type { PronunciationSet, ReadingText } from "./types";
 
@@ -29,7 +30,7 @@ export interface ShadowNoteEntry {
   lastAt: string; // ISO
 }
 
-/** Anahtar: normalizeTarget(text, arabicScript). */
+/** Anahtar: normalizeTarget(text, script). */
 export type ShadowNotesMap = Record<string, ShadowNoteEntry>;
 
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
@@ -52,7 +53,7 @@ export function buildShadowQueue(
   texts: ReadingText[],
   pron: PronunciationSet | null,
   notes: ShadowNotesMap,
-  arabicScript: boolean,
+  script: ScriptId,
   limit = 20
 ): ShadowItem[] {
   const rank = (t: ReadingText) => (t.finishedAt ? 0 : 1);
@@ -88,14 +89,14 @@ export function buildShadowQueue(
   for (let i = 0; i < max; i++) {
     for (const item of [fromReading[i], fromPron[i]]) {
       if (!item) continue;
-      const key = normalizeTarget(item.text, arabicScript);
+      const key = normalizeTarget(item.text, script);
       if (!key || seen.has(key)) continue;
       seen.add(key);
       interleaved.push(item);
     }
   }
   const needsRepeat = (it: ShadowItem) =>
-    notes[normalizeTarget(it.text, arabicScript)]?.lastNote === 0 ? 0 : 1;
+    notes[normalizeTarget(it.text, script)]?.lastNote === 0 ? 0 : 1;
   return interleaved
     .map((it, i) => ({ it, i }))
     .sort((a, b) => needsRepeat(a.it) - needsRepeat(b.it) || a.i - b.i)

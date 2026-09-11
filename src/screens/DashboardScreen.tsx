@@ -12,7 +12,7 @@ import { AgentContext, TEACHER_TOOLS } from "../agent";
 import { agenticChat, generateCurriculum } from "../claude";
 import { Card, Pill, ProgressRing, SectionHeader, Skeleton } from "../components/ui";
 import { migrationScope, migrationSummary, MigrationScope, withoutColloquial } from "../fusha";
-import { getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
+import { getActiveLanguageId, getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { nextAction, NextAction } from "../nextaction";
 import { pendingReminders } from "../notifications";
 import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
@@ -143,10 +143,13 @@ export default function DashboardScreen({
       setLoaded(true);
 
       // Ammice → fusha geçişi: tek seferlik, bayrakla kilitli (bkz. src/fusha.ts).
+      const lang = getActiveLanguageId();
       const migrated = await loadFushaMigrated();
-      const scope = migrationScope(cards, curriculum, migrated);
+      const scope = migrationScope(cards, curriculum, migrated, lang);
       if (scope.needed) setFusha(scope);
-      else if (!migrated) await saveFushaMigrated(); // temizlenecek bir şey yok
+      // Bayrağı yalnız Arapça panelindeyken koy: başka bir dilde "temizlenecek
+      // bir şey yok" diye bayrak konsaydı Arapça geçişi hiç sorulmazdı.
+      else if (!migrated && lang === "ar") await saveFushaMigrated();
 
       // Üretim odaklı hafta özeti — gün serisi değil: ne ÜRETTİN?
       const w = stats.week;

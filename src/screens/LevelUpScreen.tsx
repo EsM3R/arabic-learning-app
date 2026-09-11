@@ -24,6 +24,7 @@ import { loadStatsSummary } from "../statsStore";
 import { loadMistakes, loadNotes, loadReadings, loadVocab } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Assessment, Curriculum, Profile } from "../types";
+import { isRtl } from "../scripts";
 
 interface Props {
   profile: Profile;
@@ -186,7 +187,7 @@ export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
           )}
 
           <View style={styles.verdictCard}>
-            <RichText content={verdict} style={styles.verdictText} scaleScript={pack.scriptExtract} />
+            <RichText content={verdict} style={styles.verdictText} scaleScript={isRtl(pack.script)} />
           </View>
 
           <Text style={styles.note}>

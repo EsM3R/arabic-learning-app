@@ -28,6 +28,7 @@ import {
 } from "../storage";
 import { normalizeTarget } from "../textnorm";
 import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
+import { isRtl, needsTranslit } from "../scripts";
 
 interface Props {
   onBack: () => void;
@@ -67,7 +68,7 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
         loadShadowNotes<ShadowNotesMap>(),
       ]);
       setNotes(savedNotes);
-      setQueue(buildShadowQueue(texts, pron, savedNotes, pack.scriptExtract));
+      setQueue(buildShadowQueue(texts, pron, savedNotes, pack.script));
       setLoaded(true);
     })();
     return () => {
@@ -167,7 +168,7 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
 
   const giveNote = async (n: ShadowNote) => {
     if (!item) return;
-    const key = normalizeTarget(item.text, pack.scriptExtract);
+    const key = normalizeTarget(item.text, pack.script);
     const next = noteShadow(notes, key, n);
     setNotes(next);
     await saveShadowNotes(next);
@@ -182,7 +183,7 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
     void (async () => {
       const [texts, pron] = await Promise.all([loadReadings(), loadPronunciationSet()]);
       // Kuyruk notlarla yeniden kurulur — "tekrar lazım" dedikleri öne gelir.
-      setQueue(buildShadowQueue(texts, pron, notes, pack.scriptExtract));
+      setQueue(buildShadowQueue(texts, pron, notes, pack.script));
       setIndex(0);
       setPass(1);
       setStep("hazir");
@@ -249,13 +250,13 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
                 item.source === "telaffuz" && styles.itemTextBig,
                 // Arapça stili EN SONA gelmeli: dizide sonraki kazanır, yoksa
                 // itemTextBig'in dar lineHeight'ı harekeleri kırpar.
-                pack.scriptExtract &&
+                isRtl(pack.script) &&
                   (item.source === "telaffuz" ? styles.rtlBig : styles.rtl),
               ]}
             >
               {item.text}
             </Text>
-            {!!item.translit && pack.scriptExtract && (
+            {!!item.translit && needsTranslit(pack.script) && (
               <Text style={styles.translit}>{item.translit}</Text>
             )}
             {!!item.turkish && <Text style={styles.turkish}>{item.turkish}</Text>}
