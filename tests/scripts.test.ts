@@ -40,7 +40,12 @@ test("ayıklama: karışık metinden yalnız hedef alfabe çıkar", () => {
 
 test("ayıklama: aradaki boşluk parçayı bölmez — seslendirme kesik olmasın", () => {
   assert.equal(extractScript("مرحبا يا صديقي", "arabic"), "مرحبا يا صديقي");
-  assert.equal(extractScript("Merhaba: Привет, как дела?", "cyrillic"), "Привет, как дела");
+  assert.equal(extractScript("Merhaba: Привет, как дела?", "cyrillic"), "Привет, как дела?");
+});
+
+test("ayıklama: soru işareti korunur — seslendirme tonlamayı ondan alır", () => {
+  assert.equal(extractScript("Söyle: ماذا تفعل؟ dedi.", "arabic"), "ماذا تفعل؟");
+  assert.equal(extractScript("Sonra: Как дела? diye sordu", "cyrillic"), "Как дела?");
 });
 
 test("ayıklama: Latin dillerde her zaman boş — metin olduğu gibi okunur", () => {

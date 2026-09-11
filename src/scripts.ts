@@ -63,7 +63,16 @@ const LETTERS: Record<ScriptId, string> = {
  * kelime kelime doğranıp seslendirme kesik kesik olmaz.
  */
 function joiners(script: ScriptId): string {
-  return isArabicFamily(script) ? "\\s،؛ـ\\u200C" : "\\s,;:!?«»\\-";
+  return isArabicFamily(script) ? "\\s،؛ـ\\u200C" : "\\s,;:«»\\-";
+}
+
+/**
+ * Parçanın sonunda kalabilen işaretler. Soru işareti ayıklamada ATILMAMALI:
+ * seslendirme motoru tonlamayı ondan çıkarır ve soru cümlesi düz cümle gibi
+ * okunursa telaffuz provası yanlış modeli öğretir.
+ */
+function terminators(script: ScriptId): string {
+  return isArabicFamily(script) ? "؟!" : "?!";
 }
 
 /**
@@ -74,7 +83,11 @@ function joiners(script: ScriptId): string {
 export function extractScript(text: string, script: ScriptId): string {
   const letters = LETTERS[script];
   if (!letters) return "";
-  const re = new RegExp(`[${letters}](?:[${letters}${joiners(script)}]*[${letters}])?`, "g");
+  const term = terminators(script);
+  const re = new RegExp(
+    `[${letters}](?:[${letters}${joiners(script)}${term}]*[${letters}${term}])?`,
+    "g"
+  );
   const matches = text.match(re);
   if (!matches) return "";
   return matches
