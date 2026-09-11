@@ -7,7 +7,9 @@ import { agenticChat } from "../claude";
 import { getActivePack } from "../languages";
 import { extractArabic } from "../speech";
 import { markSpoken } from "../speechinput";
-import { recordStat } from "../statsStore";
+import { progressDigest, readingPerformance } from "../progress";
+import { COMPLIANCE_WARN } from "../reading";
+import { loadStatsSummary, recordStat } from "../statsStore";
 import {
   freeChatSystem,
   idleNudgeEvent,
@@ -23,6 +25,7 @@ import {
   loadChat,
   loadMistakes,
   loadNotes,
+  loadReadings,
   loadVocab,
   saveChat,
   touchLastActivity,
@@ -115,10 +118,15 @@ export default function LessonScreen({
    * Sabit kısım (ders promptu) önbelleklenir; değişken kısım (hafıza) sona gider.
    */
   const buildSystem = async (current: Profile) => {
-    const [mistakes, notes, vocab] = await Promise.all([
+    // ÖLÇÜLEN veri de buraya girer. Eskiden yalnız bir ARAÇ olarak vardı
+    // (ilerleme_durumu) ve model onu çağırmadıkça hoca öğrencinin konuşup
+    // konuşmadığını GÖREMİYORDU — uygulamanın asıl hedefine kör kalıyordu.
+    const [mistakes, notes, vocab, stats, readings] = await Promise.all([
       loadMistakes(),
       loadNotes(),
       loadVocab(),
+      loadStatsSummary(),
+      loadReadings(),
     ]);
     const stable = quiz
       ? quizSystem(current)
@@ -127,7 +135,10 @@ export default function LessonScreen({
         : freeChatSystem(current);
     return {
       stable,
-      dynamic: memoryContext(mistakes, notes, module?.track) + retentionDigest(vocab),
+      dynamic:
+        memoryContext(mistakes, notes, module?.track) +
+        retentionDigest(vocab) +
+        progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN)),
     };
   };
 

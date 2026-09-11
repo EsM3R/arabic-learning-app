@@ -1,7 +1,7 @@
 /** Hocaya sunulan ölçülmüş ilerleme özeti testleri. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { progressDigest, readingPerformance } from "../src/progress.ts";
+import { progressDigest, readingPerformance, speakingBalance } from "../src/progress.ts";
 import type { StatsSummary } from "../src/stats.ts";
 import type { ReadingText } from "../src/types.ts";
 
@@ -149,11 +149,51 @@ test("progressDigest: çalışan ama hiç konuşmayan öğrenci sesli cevaba te�
     stats({ week: { produced: 8, reviewed: 20 }, activeDays7: 2 }),
     readingPerformance([], 0.85)
   );
-  assert.match(d, /Mikrofonla hiç konuşma denemesi yok/);
+  assert.match(d, /Mikrofonla HİÇ konuşma denemesi yok/);
+  assert.match(d, /SESLİ söylemesini iste/);
 });
 
 test("progressDigest: hiç verisi olmayana konuşma dürtmesi yapılmaz", () => {
   const d = progressDigest(stats(), readingPerformance([], 0.85));
   assert.match(d, /Henüz ölçülmüş veri yok/);
-  assert.doesNotMatch(d, /Mikrofonla hiç konuşma/);
+  assert.doesNotMatch(d, /konuşma denemesi yok/);
+});
+
+test("progressDigest: bir kez konuşmuş ama HEP YAZAN öğrenci de uyarılır", () => {
+  // Asıl kusur buydu: uyarı yalnız 'hiç konuşmamış' hâline bakıyordu, yani
+  // öğrenci bir kez mikrofona basınca hoca bir daha uyarılmıyordu.
+  const d = progressDigest(
+    stats({
+      week: { reviewed: 60, readSentence: 30, spoken: 2 },
+      total: { spoken: 3, shadowed: 1 },
+      activeDays7: 5,
+    }),
+    readingPerformance([], 0.85)
+  );
+  assert.match(d, /KONUŞMA DENGESİ BOZUK/);
+  assert.match(d, /%98/); // 90 sessiz / 92 toplam iş
+});
+
+test("progressDigest: dengeli çalışan öğrenciye konuşma uyarısı yapılmaz", () => {
+  const d = progressDigest(
+    stats({
+      week: { reviewed: 20, readSentence: 10, spoken: 15, shadowed: 10 },
+      total: { spoken: 40, shadowed: 20 },
+      activeDays7: 5,
+    }),
+    readingPerformance([], 0.85)
+  );
+  assert.doesNotMatch(d, /DENGESİ BOZUK/);
+  assert.doesNotMatch(d, /HİÇ konuşma/);
+});
+
+test("speakingBalance: 'produced' sayacı dengeye KARIŞMAZ", () => {
+  // produced hem yazılı hem sözlü doğru üretimde artıyor; dengeye katılsaydı
+  // aynı iş iki tarafa birden yazılır ve ölçüm anlamsızlaşırdı.
+  const b = speakingBalance(
+    stats({ week: { produced: 100, reviewed: 10, spoken: 10 }, activeDays7: 3 })
+  );
+  assert.equal(b.voiceWork, 10);
+  assert.equal(b.silentWork, 10);
+  assert.equal(b.ratio, 0.5);
 });

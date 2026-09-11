@@ -1,7 +1,14 @@
 /** "Şimdi ne yapmalıyım" karar mantığı testleri. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DUE_URGENT, nextAction } from "../src/nextaction.ts";
+import {
+  BALANCE_MIN_DAYS,
+  DUE_URGENT,
+  nextAction,
+  SILENT_WORK_FLOOR,
+  speakingGap,
+  VOICE_RATIO_MIN,
+} from "../src/nextaction.ts";
 import type { StudyState } from "../src/nextaction.ts";
 
 function state(over: Partial<StudyState> = {}): StudyState {
@@ -16,6 +23,11 @@ function state(over: Partial<StudyState> = {}): StudyState {
     shadowedTotal: 5,
     readingsFinished: 2,
     daysSinceActivity: 0,
+    // Varsayılan: dengeli çalışan öğrenci — konuşma kapısı kapalı kalsın ki
+    // diğer kuralların testi ona takılmasın.
+    voiceWorkWeek: 20,
+    silentWorkWeek: 20,
+    activeDays7: 4,
     ...over,
   };
 }
@@ -94,11 +106,90 @@ test("açık hatalar birikince hocayla çalışma önerilir", () => {
   assert.match(a.reason, /4 açık hata/);
 });
 
-test("hiç okuma bitmemişse okuma salonu, sonra gölgeleme", () => {
+test("hiç okuma bitmemişse okuma salonu önerilir", () => {
   const r = nextAction(state({ nextModule: undefined, readingsFinished: 0 }));
   assert.equal(r.screen, "reading");
-  const s = nextAction(state({ nextModule: undefined, shadowedTotal: 0 }));
+});
+
+test("hiç gölgeleme yapmamışsa modülün ÖNÜNE geçer", () => {
+  // Eskiden gölgeleme listenin en sonundaydı ve sırası haftalarca gelmiyordu;
+  // akıcılığın motoru olduğu için artık konuşma kapısının içinde.
+  const s = nextAction(state({ shadowedTotal: 0 }));
   assert.equal(s.screen, "shadowing");
+});
+
+// ---------------------------------------------------------------------------
+// Konuşma kapısı — tek seferlik değil, SÜREKLİ
+// ---------------------------------------------------------------------------
+
+test("bir kez konuşmuş olmak kapıyı SONSUZA KADAR kapatmaz", () => {
+  // Eski kusur tam buydu: spokenTotal === 0 tek seferlik bir kapıydı, öğrenci
+  // hayatında bir kez mikrofona basınca uygulama onu bir daha itmiyordu.
+  const a = nextAction(
+    state({ spokenTotal: 1, shadowedTotal: 1, voiceWorkWeek: 1, silentWorkWeek: 60, activeDays7: 5 })
+  );
+  assert.ok(["pronunciation", "shadowing"].includes(a.screen), `beklenmedik ekran: ${a.screen}`);
+  assert.match(a.reason, /sessiz geçti/);
+});
+
+test("denge bozuksa oran gerekçede yüzde olarak söylenir", () => {
+  const a = nextAction(
+    state({ spokenTotal: 5, shadowedTotal: 5, voiceWorkWeek: 5, silentWorkWeek: 95, activeDays7: 5 })
+  );
+  assert.match(a.reason, /%95/);
+});
+
+test("bu hafta hiç sesli iş yoksa telaffuza, biraz varsa gölgelemeye", () => {
+  const hic = speakingGap(
+    state({ spokenTotal: 9, shadowedTotal: 9, voiceWorkWeek: 0, silentWorkWeek: 50, activeDays7: 3 })
+  );
+  assert.equal(hic?.screen, "pronunciation");
+  const az = speakingGap(
+    state({ spokenTotal: 9, shadowedTotal: 9, voiceWorkWeek: 3, silentWorkWeek: 50, activeDays7: 3 })
+  );
+  assert.equal(az?.screen, "shadowing");
+});
+
+test("tek günlük çalışma dengesizlik sayılmaz", () => {
+  // Bir oturumda 40 kelime tekrar eden biri 'hep yazıyor' değildir; ölçüm
+  // en az iki aktif gün ister.
+  const a = speakingGap(
+    state({
+      spokenTotal: 9,
+      shadowedTotal: 9,
+      voiceWorkWeek: 0,
+      silentWorkWeek: 50,
+      activeDays7: BALANCE_MIN_DAYS - 1,
+    })
+  );
+  assert.equal(a, null);
+});
+
+test("az hacimli hafta dengesizlik sayılmaz", () => {
+  const a = speakingGap(
+    state({
+      spokenTotal: 9,
+      shadowedTotal: 9,
+      voiceWorkWeek: 0,
+      silentWorkWeek: SILENT_WORK_FLOOR - 1,
+      activeDays7: 5,
+    })
+  );
+  assert.equal(a, null);
+});
+
+test("eşiğin üstünde sesli çalışan öğrenci rahat bırakılır", () => {
+  const oran = Math.ceil(VOICE_RATIO_MIN * 100) + 5;
+  const a = speakingGap(
+    state({
+      spokenTotal: 9,
+      shadowedTotal: 9,
+      voiceWorkWeek: oran,
+      silentWorkWeek: 100 - oran,
+      activeDays7: 5,
+    })
+  );
+  assert.equal(a, null);
 });
 
 test("her şey güncelse serbest sohbet önerilir", () => {

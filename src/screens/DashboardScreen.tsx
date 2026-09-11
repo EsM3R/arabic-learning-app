@@ -15,8 +15,10 @@ import { migrationScope, migrationSummary, MigrationScope, withoutColloquial } f
 import { getActiveLanguageId, getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { nextAction, NextAction } from "../nextaction";
 import { pendingReminders } from "../notifications";
+import { progressDigest, readingPerformance, speakingBalance } from "../progress";
 import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
 import { dueCards } from "../srs";
+import { COMPLIANCE_WARN } from "../reading";
 import { loadStatsSummary } from "../statsStore";
 import {
   clearModuleChats,
@@ -121,6 +123,7 @@ export default function DashboardScreen({
 
       // "Bugün" kartı: uygulamanın tuttuğu veriden tek bir öneri (src/nextaction.ts).
       const modules = curriculum?.modules ?? [];
+      const balance = speakingBalance(stats);
       const nextMod = modules.find((m) => !completedModuleIds.includes(m.id));
       setToday(
         nextAction({
@@ -135,6 +138,11 @@ export default function DashboardScreen({
           spokenTotal: stats.total.spoken ?? 0,
           shadowedTotal: stats.total.shadowed ?? 0,
           readingsFinished: readings.filter((r) => r.finishedAt).length,
+          // Konuşma dengesi: sesli iş (mikrofon + gölgeleme) sessiz işe
+          // (tekrar + okuma) karşı. progress.ts ile AYNI tanım.
+          voiceWorkWeek: balance.voiceWork,
+          silentWorkWeek: balance.silentWork,
+          activeDays7: stats.activeDays7,
           daysSinceActivity: lastActivity
             ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86_400_000)
             : 0,
@@ -184,28 +192,49 @@ export default function DashboardScreen({
           setTeacherNote(previous.message);
           return;
         }
-        const [cards, mistakes, notes, lastActivity, reminders] = await Promise.all([
-          loadVocab(),
-          loadMistakes(),
-          loadNotes(),
-          loadLastActivity(),
-          pendingReminders(),
-        ]);
+        const [cards, mistakes, notes, lastActivity, reminders, wakeStats, wakeReadings] =
+          await Promise.all([
+            loadVocab(),
+            loadMistakes(),
+            loadNotes(),
+            loadLastActivity(),
+            pendingReminders(),
+            loadStatsSummary(),
+            loadReadings(),
+          ]);
         const due = dueCards(cards).length;
         const daysSince = lastActivity
           ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86_400_000)
           : 0;
-        if (due < 5 && daysSince < 2) return; // dürtecek bir şey yok — sessiz kal
+        const balance = speakingBalance(wakeStats);
+        // Sessiz kalma eşiğine KONUŞMA DENGESİ de eklendi: çalışkan ama hiç
+        // konuşmayan öğrenci eskiden hiç dürtülmüyordu — tekrarını aksatmadığı
+        // için "dürtecek bir şey yok" sayılıyordu. Asıl dürtülmesi gereken o.
+        const voiceProblem = balance.imbalanced || (balance.neverSpoken && cards.length >= 20);
+        if (due < 5 && daysSince < 2 && !voiceProblem) return;
 
+        // Konuşma durumu özete GİRMELİ: bu mesaj hocanın kendiliğinden
+        // konuştuğu tek yer ve eskiden burada sesli çalışmadan hiç söz
+        // edilmiyordu — öğrenci aylarca yazsa hoca fark etmezdi.
+        const voiceNote = balance.neverSpoken
+          ? "mikrofonla HİÇ konuşmamış"
+          : balance.imbalanced
+            ? `bu hafta ${balance.silentWork} sessiz işe karşılık yalnız ${balance.voiceWork} sesli iş yapmış`
+            : balance.voiceWork === 0
+              ? "bu hafta hiç sesli çalışmamış"
+              : `bu hafta ${balance.voiceWork} sesli iş yapmış`;
         const digest = `${due} kelimenin tekrarı gelmiş; öğrenci ${
           daysSince === 0 ? "bugün de çalışmış" : `${daysSince} gündür çalışmamış`
-        }; açık hata sayısı ${mistakes.filter((m) => !m.resolved).length}; kurulu hatırlatıcı ${reminders.length} adet.`;
+        }; ${voiceNote}; açık hata sayısı ${mistakes.filter((m) => !m.resolved).length}; kurulu hatırlatıcı ${reminders.length} adet.`;
 
         const ctx: AgentContext = { profile, profileChanged: false };
         const reply = await agenticChat(
           {
             stable: wakeCheckSystem(profile),
-            dynamic: memoryContext(mistakes, notes) + retentionDigest(cards),
+            dynamic:
+              memoryContext(mistakes, notes) +
+              retentionDigest(cards) +
+              progressDigest(wakeStats, readingPerformance(wakeReadings, COMPLIANCE_WARN)),
           },
           [{ role: "user", content: wakeCheckEvent(digest) }],
           ctx,

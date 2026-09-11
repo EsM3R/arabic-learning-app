@@ -51,10 +51,65 @@ export interface StudyState {
   readingsFinished: number;
   /** Son çalışmadan bu yana geçen tam gün. */
   daysSinceActivity: number;
+  /** Bu haftaki sesli iş: mikrofon denemesi + gölgeleme (bkz. progress.ts). */
+  voiceWorkWeek: number;
+  /** Bu haftaki sessiz iş: kelime tekrarı + okunan cümle. */
+  silentWorkWeek: number;
+  /** Son 7 günde çalışılan gün sayısı — tek günlük patlama denge sanılmasın. */
+  activeDays7: number;
 }
 
 /** Tekrar yükü bu sayıyı aşınca "önce tekrar" her şeyin önüne geçer. */
 export const DUE_URGENT = 10;
+
+/** Denge kontrolünün anlamlı olması için gereken en az sessiz iş hacmi. */
+export const SILENT_WORK_FLOOR = 20;
+/** Sesli işin toplam işe oranı bunun altındaysa uygulama araya girer. */
+export const VOICE_RATIO_MIN = 0.2;
+/** Denge kontrolü için gereken en az aktif gün — tek oturum yeterli değil. */
+export const BALANCE_MIN_DAYS = 2;
+
+/**
+ * Konuşma boşluğu — uygulamanın asıl hedefine göre en kritik kural.
+ *
+ * Eskiden burada tek seferlik bir kapı vardı (`spokenTotal === 0`): öğrenci
+ * hayatında BİR KEZ mikrofona bastıktan sonra uygulama onu bir daha konuşmaya
+ * itmiyordu. Yazmak her zaman daha kolay olduğu için bu, sessizce "dili bilen
+ * ama konuşamayan" öğrenci üretir. Kontrol artık SÜREKLİ: her hafta sesli ve
+ * sessiz iş oranına bakılır.
+ */
+export function speakingGap(s: StudyState): NextAction | null {
+  if (s.spokenTotal === 0) {
+    return {
+      screen: "pronunciation",
+      label: "Sesli çalışmayı dene",
+      reason: "Henüz hiç sesli çalışmadın — konuşma ancak konuşarak gelişir.",
+    };
+  }
+  if (s.shadowedTotal === 0) {
+    return {
+      screen: "shadowing",
+      label: "Gölgeleme yap",
+      reason: "Akıcılığın motoru gölgelemedir; hocanın üstüne konuş.",
+    };
+  }
+  const total = s.voiceWorkWeek + s.silentWorkWeek;
+  const imbalanced =
+    s.activeDays7 >= BALANCE_MIN_DAYS &&
+    s.silentWorkWeek >= SILENT_WORK_FLOOR &&
+    total > 0 &&
+    s.voiceWorkWeek / total < VOICE_RATIO_MIN;
+  if (!imbalanced) return null;
+
+  const silentPct = Math.round((1 - s.voiceWorkWeek / total) * 100);
+  // Hangi sesli iş daha zayıfsa oraya yönlendir: bu hafta hiç gölgelemediyse
+  // akıcılık, gölgeledi ama konuşmadıysa telaffuz/üretim.
+  return {
+    screen: s.voiceWorkWeek === 0 ? "pronunciation" : "shadowing",
+    label: "Sesli çalış",
+    reason: `Bu haftaki çalışmanın %${silentPct}'i sessiz geçti — ağzını açmadan konuşma gelmez.`,
+  };
+}
 
 /**
  * Tek öneri döndürür. Sıra bilinçlidir ve gerekçesi yorumlarda:
@@ -108,14 +163,9 @@ export function nextAction(s: StudyState): NextAction {
     };
   }
 
-  // Uygulamanın asıl hedefi konuşmak; hiç denenmemişse önce o açılır.
-  if (s.spokenTotal === 0) {
-    return {
-      screen: "pronunciation",
-      label: "Sesli çalışmayı dene",
-      reason: "Henüz hiç sesli çalışmadın — konuşma ancak konuşarak gelişir.",
-    };
-  }
+  // Uygulamanın asıl hedefi konuşmak: bu kapı bir kez değil HER HAFTA bakar.
+  const gap = speakingGap(s);
+  if (gap) return gap;
 
   // Seviye bitmişse ilerlemenin yolu yeni müfredattır.
   if (s.curriculumDone) {
@@ -168,14 +218,8 @@ export function nextAction(s: StudyState): NextAction {
     };
   }
 
-  // Gölgeleme akıcılığın motorudur ve en çok atlanan iştir.
-  if (s.shadowedTotal === 0) {
-    return {
-      screen: "shadowing",
-      label: "Gölgeleme yap",
-      reason: "Akıcılık için hocanın üstüne konuş.",
-    };
-  }
+  // (Gölgeleme ve sesli çalışma dürtmesi artık yukarıda, speakingGap içinde:
+  // en sona bırakılırsa haftalarca sıraya gelmiyordu.)
 
   // Her şey güncel: serbest sohbet her zaman değerlidir.
   return {
