@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  afterRound,
   baseSeconds,
   fluencyOutcome,
   fluencyTrend,
@@ -121,4 +122,41 @@ test("kütüphane budanır ve en yeniler kalır", () => {
   assert.equal(kept.length, KEEP_SESSIONS);
   const times = kept.map((s) => Date.parse(s.at));
   assert.deepEqual(times, [...times].sort((a, b) => b - a));
+});
+
+
+// ---------------------------------------------------------------------------
+// Tur sıralaması — GERÇEK bir hatanın nöbetçisi
+// ---------------------------------------------------------------------------
+
+test("ara turdan sonra 'arada', SON turdan sonra 'sonuc'", () => {
+  // Ekranda bu karar bayat bir index'le veriliyordu: son tur bittiğinde
+  // sonuç ekranı hiç açılmıyor, olmayan bir 4. tura geçiliyordu.
+  assert.deepEqual(afterRound(0, 3), { stage: "arada", next: 1 });
+  assert.deepEqual(afterRound(1, 3), { stage: "arada", next: 2 });
+  assert.deepEqual(afterRound(2, 3), { stage: "sonuc", next: null });
+});
+
+test("sınır dışı tur numarası oturumu BİTİRİR, ileri sarmaz", () => {
+  assert.deepEqual(afterRound(3, 3), { stage: "sonuc", next: null });
+  assert.deepEqual(afterRound(99, 3), { stage: "sonuc", next: null });
+  assert.deepEqual(afterRound(-1, 3), { stage: "sonuc", next: null });
+});
+
+test("tek turluk planda ilk tur zaten sonuncudur", () => {
+  assert.deepEqual(afterRound(0, 1), { stage: "sonuc", next: null });
+});
+
+test("sıralama plan uzunluğunu ASLA aşmaz", () => {
+  const plan = roundSeconds("A2");
+  let i = 0;
+  const gorulen = [i];
+  for (let guard = 0; guard < 10; guard++) {
+    const t = afterRound(i, plan.length);
+    if (t.next === null) break;
+    i = t.next;
+    gorulen.push(i);
+  }
+  assert.deepEqual(gorulen, [0, 1, 2]);
+  assert.ok(gorulen.every((x) => x < plan.length));
 });

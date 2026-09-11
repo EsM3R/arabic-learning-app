@@ -25,6 +25,7 @@ import Header from "../components/Header";
 import { Card, ProgressBar, SectionHeader } from "../components/ui";
 import { feedback } from "../feedback";
 import {
+  afterRound,
   fluencyOutcome,
   makeRound,
   PREP_SECONDS,
@@ -99,13 +100,25 @@ export default function FluencyScreen({
 
   // Tur boyunca duyulan metin burada birikir; tur bitince kelimeye çevrilir.
   const heard = useRef("");
+  /**
+   * Akan ara metnin son hâli. Gerekli çünkü teslim (`onResult`) bazı
+   * cihazlarda hiç gelmiyor; o zaman elde kalan tek şey ara metin oluyor ve
+   * `dictation.partial`'ı zamanlayıcının içinden okumak BAYAT değer verirdi.
+   */
+  const lastPartial = useRef("");
   const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Tur sonu sayımının gecikmesi — ekran kapanırsa iptal edilmeli. */
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dictation = useDictation({
     onResult: (text) => {
       heard.current = text;
     },
   });
+
+  useEffect(() => {
+    if (dictation.partial) lastPartial.current = dictation.partial;
+  }, [dictation.partial]);
 
   useEffect(() => {
     void (async () => {
@@ -130,61 +143,75 @@ export default function FluencyScreen({
       ticker.current = null;
     }
   };
-  useEffect(() => clearTicker, []);
+  useEffect(
+    () => () => {
+      clearTicker();
+      if (settle.current) clearTimeout(settle.current);
+    },
+    []
+  );
 
-  const finishRound = () => {
+  /**
+   * Geri sayım kurar. Kalan süre YEREL bir sayaçta tutulur, state güncelleme
+   * fonksiyonunun içinde değil.
+   *
+   * Buradaki tuzak gerçek bir hataya mal oldu: sayaç `setLeft(s => ...)`
+   * içinden finishRound çağırıyordu ve o finishRound, turun BAŞLATILDIĞI
+   * render'ın `index`'ini görüyordu — yani bir önceki turunkini. Sonuç: 2. tur
+   * 60 sn, 3. tur 45 sn sanılarak kaydediliyor (hız olduğundan düşük çıkıyor),
+   * sonuç ekranı hiç açılmıyor ve 4. tur diye olmayan bir tura geçilip
+   * NaN'a kilitleniyordu. Tur numarası artık AÇIKÇA taşınıyor.
+   */
+  const countdown = (seconds: number, onDone: () => void) => {
+    clearTicker();
+    let remaining = seconds;
+    setLeft(remaining);
+    ticker.current = setInterval(() => {
+      remaining -= 1;
+      setLeft(Math.max(0, remaining));
+      if (remaining <= 0) {
+        clearTicker();
+        onDone();
+      }
+    }, 1000);
+  };
+
+  const finishRound = (i: number) => {
     clearTicker();
     dictation.stop();
     // Tanıma "end" olayını biraz gecikmeli verir; son parçayı kaçırmamak için
     // sayımı kısa bir gecikmeyle yapıyoruz.
-    setTimeout(() => {
-      const words = wordCount(heard.current || dictation.partial, pack.script);
-      const round = makeRound(words, plan[index]);
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => {
+      settle.current = null;
+      const said = heard.current || lastPartial.current;
+      const round = makeRound(wordCount(said, pack.script), plan[i]);
       setRounds((prev) => [...prev, round]);
       void recordStat("fluencyRound");
       void recordStat("spoken"); // bu gerçekten bir konuşma denemesidir
       void touchLastActivity();
       void feedback(true);
-      setStage(index === plan.length - 1 ? "sonuc" : "arada");
+      // Sıralama saf modülde ve test altında (bkz. src/fluency.ts afterRound).
+      setStage(afterRound(i, plan.length).stage);
     }, 900);
   };
 
   const startRound = (i: number) => {
+    if (i < 0 || i >= plan.length) return; // olmayan tura geçilmesin
     heard.current = "";
+    lastPartial.current = "";
     setIndex(i);
-    setLeft(plan[i]);
     setStage("tur");
     dictation.start();
-    clearTicker();
-    ticker.current = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1) {
-          clearTicker();
-          finishRound();
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
+    countdown(plan[i], () => finishRound(i));
   };
 
   const startPrep = (chosen: string) => {
     setTopic(chosen);
     setRounds([]);
     setSaved(false);
-    setLeft(PREP_SECONDS);
     setStage("hazirlik");
-    clearTicker();
-    ticker.current = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1) {
-          clearTicker();
-          startRound(0);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
+    countdown(PREP_SECONDS, () => startRound(0));
   };
 
   const outcome = useMemo(() => fluencyOutcome(rounds), [rounds]);
@@ -290,13 +317,13 @@ export default function FluencyScreen({
             <Text style={styles.hint}>
               {dictation.listening ? "● Dinliyorum — konuşmaya devam et" : "Mikrofon kapalı"}
             </Text>
-            <TouchableOpacity style={styles.secondary} onPress={finishRound}>
+            <TouchableOpacity style={styles.secondary} onPress={() => finishRound(index)}>
               <Text style={styles.secondaryText}>Turu erken bitir</Text>
             </TouchableOpacity>
           </Card>
         )}
 
-        {stage === "arada" && (
+        {stage === "arada" && index + 1 < plan.length && (
           <Card>
             <Text style={styles.stageLabel}>TUR BİTTİ</Text>
             <Text style={styles.bigNumber}>{rounds[rounds.length - 1]?.wpm ?? 0}</Text>
@@ -306,7 +333,10 @@ export default function FluencyScreen({
               bu sefer {mmss(plan[index + 1])} içinde. Yeni şey ekleme, aynı
               hikâyeyi daha hızlı akıt.
             </Text>
-            <TouchableOpacity style={styles.primary} onPress={() => startRound(index + 1)}>
+            <TouchableOpacity
+              style={styles.primary}
+              onPress={() => startRound(afterRound(index, plan.length).next ?? index)}
+            >
               <Text style={styles.primaryText}>
                 {index + 2}. tura başla ({mmss(plan[index + 1])})
               </Text>

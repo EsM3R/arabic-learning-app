@@ -91,6 +91,29 @@ export function makeRound(words: number, seconds: number): FluencyRound {
   return { seconds, words, wpm: speechRate(words, seconds) };
 }
 
+/**
+ * Tur bittiğinde sırada ne var.
+ *
+ * Bu küçük fonksiyonun ayrı durmasının sebebi bir HATA: sıralama ekranın
+ * içinde, zamanlayıcı kapanışının içinde yaşıyordu ve bayat bir `index`
+ * okuyordu. Sonuç ekranı hiç açılmıyor, olmayan bir 4. tura geçiliyordu.
+ * Ekranda yaşayan mantık test edilemez; burada edilebilir.
+ */
+export interface RoundTransition {
+  /** Tur bittikten sonraki aşama. */
+  stage: "arada" | "sonuc";
+  /** Sıradaki turun numarası; son turdaysa null. */
+  next: number | null;
+}
+
+export function afterRound(roundIndex: number, totalRounds: number): RoundTransition {
+  const last = totalRounds - 1;
+  // Sınır dışı bir numara gelirse oturumu BİTİR: olmayan tura geçmek
+  // ekranı NaN'a kilitliyordu.
+  if (roundIndex >= last || roundIndex < 0) return { stage: "sonuc", next: null };
+  return { stage: "arada", next: roundIndex + 1 };
+}
+
 export interface FluencyOutcome {
   firstWpm: number;
   lastWpm: number;
