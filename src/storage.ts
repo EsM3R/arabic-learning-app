@@ -2,6 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BackupFile, mergeDeviceSecrets } from "./backup";
 import type { FluencySession } from "./fluency";
 import { FUSHA_MIGRATION_KEY } from "./fusha";
+import { runMigrations, SCHEMA_KEY, SCHEMA_VERSION, schemaStatus } from "./schema";
+import type { SchemaStatus } from "./schema";
 import { getActiveLanguageId, setActiveLanguage } from "./languages";
 import {
   Assessment,
@@ -216,9 +218,75 @@ export async function dumpAllEntries(): Promise<[string, string | null][]> {
  * API anahtarı / model seçimi korunur (yedekte anahtar yoktur).
  */
 export async function restoreFromBackup(b: BackupFile, current: Profile | null): Promise<void> {
-  const entries = { ...b.entries };
-  const merged = mergeDeviceSecrets(entries[PROFILE_KEY], current);
-  if (merged) entries[PROFILE_KEY] = merged;
+  const merged0 = { ...b.entries };
+  const merged = mergeDeviceSecrets(merged0[PROFILE_KEY], current);
+  if (merged) merged0[PROFILE_KEY] = merged;
+  // Eski bir yedek eski biçimde olabilir: göç zinciri yazmadan ÖNCE çalışır,
+  // yoksa bugünkü kod eski biçimi okumaya çalışır ve sessizce yanlış okur.
+  const migrated = runMigrations(merged0, b.schema ?? 1);
   await AsyncStorage.clear();
-  await AsyncStorage.multiSet(Object.entries(entries));
+  await AsyncStorage.multiSet(Object.entries(migrated.entries));
+  await AsyncStorage.setItem(SCHEMA_KEY, String(migrated.version));
+}
+
+// ---------------------------------------------------------------------------
+// Şema sürümü ve göç (bkz. src/schema.ts)
+// ---------------------------------------------------------------------------
+
+export async function loadSchemaVersion(): Promise<number | null> {
+  const raw = await AsyncStorage.getItem(SCHEMA_KEY);
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export interface SchemaCheck {
+  status: SchemaStatus;
+  /** Uygulanan göçlerin notları. */
+  applied: string[];
+}
+
+/**
+ * Açılışta çağrılır. Üç durum:
+ * - "gelecekten": VERİYE DOKUNULMAZ, çağıran öğrenciyi uyarır.
+ * - "bos": ilk kurulum ya da damgadan önceki sürüm → bugünün sürümü damgalanır.
+ *   Damgasız veri, damgalama öncesi biçimden gelir ve o biçim bugünküyle
+ *   aynıdır; göç gerekmez.
+ * - "goc-gerekli": zincir çalışır, ulaşılan sürüm damgalanır (yarım kalırsa
+ *   eksik sürüm damgalanır ve bir sonraki açılışta kaldığı yerden devam eder).
+ */
+export async function ensureSchema(): Promise<SchemaCheck> {
+  const stored = await loadSchemaVersion();
+  const status = schemaStatus(stored);
+  if (status === "gelecekten") return { status, applied: [] };
+  if (status === "guncel") return { status, applied: [] };
+  if (status === "bos") {
+    await AsyncStorage.setItem(SCHEMA_KEY, String(SCHEMA_VERSION));
+    return { status, applied: [] };
+  }
+
+  const keys = await AsyncStorage.getAllKeys();
+  const pairs = await AsyncStorage.multiGet([...keys]);
+  const entries: Record<string, string> = {};
+  for (const [k, v] of pairs) if (v != null) entries[k] = v;
+
+  const result = runMigrations(entries, stored ?? 1);
+  const changed = Object.entries(result.entries).filter(([k, v]) => entries[k] !== v);
+  if (changed.length > 0) await AsyncStorage.multiSet(changed);
+  await AsyncStorage.setItem(SCHEMA_KEY, String(result.version));
+  return { status, applied: result.applied };
+}
+
+// ---------------------------------------------------------------------------
+// Yedek hatırlatması — veri yalnız bu telefonda duruyor (bkz. src/backup.ts)
+// ---------------------------------------------------------------------------
+
+const LAST_EXPORT_KEY = "lastExport.v1";
+
+export async function loadLastExportAt(): Promise<string | null> {
+  return AsyncStorage.getItem(LAST_EXPORT_KEY);
+}
+
+export async function saveLastExportAt(): Promise<void> {
+  await AsyncStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
 }

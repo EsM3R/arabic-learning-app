@@ -23,7 +23,7 @@ import {
 import Header from "../components/Header";
 import { isLanguageId, LANGUAGE_PACKS } from "../languages";
 import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
-import { dumpAllEntries, restoreFromBackup } from "../storage";
+import { dumpAllEntries, restoreFromBackup, saveLastExportAt } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import { Profile } from "../types";
 import { formatTry, usageSummary, UsageSummary } from "../usage";
@@ -120,6 +120,7 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
       file.create();
       file.write(serializeBackup(backup));
       if (!(await Sharing.isAvailableAsync())) {
+        await saveLastExportAt();
         Alert.alert("Paylaşım kullanılamıyor", `Yedek şuraya yazıldı:\n${file.uri}`);
         return;
       }
@@ -127,6 +128,8 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
         mimeType: "application/json",
         dialogTitle: "Yedeği nereye kaydedelim?",
       });
+      // Hatırlatma sayacı burada sıfırlanır: dosya gerçekten dışarı çıktı.
+      await saveLastExportAt();
     } catch (e) {
       Alert.alert("Yedek alınamadı", errText(e));
     } finally {

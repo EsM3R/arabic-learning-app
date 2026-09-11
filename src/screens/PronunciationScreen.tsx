@@ -21,7 +21,7 @@ import { effectivePlayIndex, pickVoiceVariant } from "../hvpt";
 import { getActivePack } from "../languages";
 import { strugglingCards } from "../srs";
 import { getTargetVoiceIds, speakTarget, speakTargetWith, stopSpeaking } from "../speech";
-import { judgeSpeech, SpeechAttempt } from "../speechinput";
+import { judgeSpeech, RECOGNITION_NOTE, SpeechAttempt } from "../speechinput";
 import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadPronunciationSet, loadVocab, savePronunciationSet, touchLastActivity } from "../storage";
@@ -392,12 +392,9 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
               ]}
             >
               <Text style={styles.verdictText}>{attempt.message}</Text>
-              {attempt.verdict !== "dogru" && (
-                <Text style={styles.verdictHint}>
-                  Not: tanıma fusha ağırlıklıdır — ama ammice alışkanlığı (ق'ın hemzeye,
-                  ث'nin t/s'ye kayması) tanınmamana yol açabilir. Kendi kaydını dinlemek
-                  de bir ölçüdür.
-                </Text>
+              <Text style={styles.verdictHint}>{RECOGNITION_NOTE}</Text>
+              {!!getActivePack().asrNote && (
+                <Text style={styles.verdictHint}>{getActivePack().asrNote}</Text>
               )}
             </View>
           )}

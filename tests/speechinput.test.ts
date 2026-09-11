@@ -7,6 +7,7 @@ import {
   judgeSpeech,
   markSpoken,
   NEAR_THRESHOLD,
+  RECOGNITION_NOTE,
   similarity,
   speechLocale,
   SPOKEN_PREFIX,
@@ -78,4 +79,19 @@ test("judgeSpeech: Latin dilde okunuş yolu kapalı, hedefle karşılaştırıl�
   assert.equal(judgeSpeech("casa", "", "casa", "latin").verdict, "dogru");
   const near = judgeSpeech("escuela", "", "escuala", "latin");
   assert.equal(near.verdict, "yakin");
+});
+
+
+test("hüküm 'doğru telaffuz' DEĞİL 'anlaşıldı' der", () => {
+  // Ölçülen şey ses tanımanın hedefi duymasıdır: anlaşılırlık. Telaffuz
+  // puanı gibi sunmak öğrenciye yalan söylemek olurdu — ilerlediğini sanıp
+  // ilerlemez.
+  const r = judgeSpeech("سوق", "suk", "سوق", "arabic");
+  assert.match(r.message, /Anlaşıldı/);
+  assert.doesNotMatch(r.message, /Doğru/);
+});
+
+test("dürüstlük notu ne ölçüldüğünü açıkça söyler", () => {
+  assert.match(RECOGNITION_NOTE, /telaffuz puanı değil/i);
+  assert.match(RECOGNITION_NOTE, /ANLAŞILIRLIK/);
 });

@@ -75,6 +75,12 @@ export interface LanguagePack {
   readingFunctionWords: string;
   /** Türk öğrencinin bu dilde zorlandığı sesler (telaffuz stüdyosu). */
   pronunciationFocus: string;
+  /**
+   * Bu dilde CİHAZ SES TANIMASININ kendine has davranışı (telaffuz
+   * ekranında dürüstlük notunun yanına eklenir). Genel not dil-bağımsızdır;
+   * burası yalnız o dile özgü tuzağı söyler. Yoksa boş bırakılır.
+   */
+  asrNote: string;
   /** Serbest sohbet görev tarifi. */
   freeChatTask: string;
   chatPlaceholderFree: string;
@@ -91,6 +97,8 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     ttsLocale: "ar",
     script: "arabic",
     targetAccusative: "Arapçasını",
+    asrNote:
+      "Android'in Arapça tanıması fusha ağırlıklıdır — bu fusha öğrenirken avantaj. Ama ammice alışkanlığı (ق'ın hemzeye, ث'nin t/s'ye kayması) tanınmamana yol açabilir.",
     newWordNote: ", her zaman TAM harekeli",
     persona: `Sen "Üstaz" adında, Şam doğumlu, Türkçeyi akıcı konuşan usta bir Arapça öğretmenisin. Tek bir dil öğretiyorsun: FUSHA (Modern Standart Arapça). Ammice ÖĞRETMİYORSUN.
 
@@ -166,6 +174,7 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "en-GB",
     script: "latin",
     targetAccusative: "İngilizcesini",
+    asrNote: "",
     newWordNote: "",
     persona: `Sen "Mr. Oliver" adında, Londra doğumlu, Türkçeyi akıcı konuşan usta bir İngilizce öğretmenisin. Öğrencin Türk ve iki hedefi var:
 1. KONUŞMA: Günlük hayatta ve işte akıcı, DOĞAL İngilizce konuşmak — ders kitabı İngilizcesi değil; gerçek insanların kullandığı kalıplar, phrasal verb'ler, günlük ifadeler öğret.
@@ -212,6 +221,7 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "es-ES",
     script: "latin",
     targetAccusative: "İspanyolcasını",
+    asrNote: "",
     newWordNote: "",
     persona: `Sen "Profesora Lucía" adında, Madrid doğumlu, Türkçeyi akıcı konuşan usta bir İspanyolca öğretmenisin. Öğrencin Türk ve iki hedefi var:
 1. KONUŞMA: Günlük hayatta akıcı, doğal İspanyolca konuşmak — gerçek insanların kullandığı kalıplar ve günlük ifadeler öğret.
@@ -258,6 +268,8 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "fr-FR",
     script: "latin",
     targetAccusative: "Fransızcasını",
+    asrNote:
+      "Fransızca tanıma liaison ve sessiz harflere duyarlıdır; bağlamadan okursan (les_amis yerine 'le zami' değil 'le ami') tanınmayabilir.",
     newWordNote: "",
     persona: `Sen "Madame Camille" adında, Parisli, Türkçeyi akıcı konuşan usta bir Fransızca öğretmenisin. Öğrencin Türk ve iki hedefi var:
 1. KONUŞMA: Günlük hayatta akıcı, doğal Fransızca konuşmak — ders kitabı Fransızcası değil, gerçek insanların konuştuğu dil (on fait, j'sais pas, du coup).
@@ -311,6 +323,7 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "de-DE",
     script: "latin",
     targetAccusative: "Almancasını",
+    asrNote: "",
     newWordNote: "",
     persona: `Sen "Herr Weber" adında, Berlinli, Türkçeyi akıcı konuşan usta bir Almanca öğretmenisin. Öğrencin Türk ve iki hedefi var:
 1. KONUŞMA: Günlük hayatta ve işte akıcı, doğal Almanca konuşmak — Amt'ta, işyerinde, komşuyla.
@@ -370,6 +383,7 @@ ASIL ZORLUKLAR (vaktini buraya harca):
     ttsLocale: "it-IT",
     script: "latin",
     targetAccusative: "İtalyancasını",
+    asrNote: "",
     newWordNote: "",
     persona: `Sen "Professore Marco" adında, Romalı, Türkçeyi akıcı konuşan usta bir İtalyanca öğretmenisin. Öğrencin Türk ve iki hedefi var:
 1. KONUŞMA: Günlük hayatta akıcı, doğal İtalyanca konuşmak — gerçek insanların kullandığı kalıplar, jestin yerini tutan ifadeler (magari, dai, allora, boh).
@@ -423,6 +437,8 @@ ASIL ZORLUKLAR (vaktini buraya harca):
     ttsLocale: "ru-RU",
     script: "cyrillic",
     targetAccusative: "Rusçasını",
+    asrNote:
+      "Rusça tanıma vurguya değil seslere bakar; yanlış vurgulasan da doğru kelimeyi yazabilir. Yani 'anlaşıldı' sonucu vurgunun doğru olduğunu KANITLAMAZ.",
     newWordNote: ", vurgulu ünlüsü ´ ile işaretli (örn. рабо́та)",
     persona: `Sen "Anna Sergeyevna" adında, Moskovalı, Türkçeyi akıcı konuşan usta bir Rusça öğretmenisin. Öğrencin Türk ve iki hedefi var:
 1. KONUŞMA: Günlük hayatta akıcı, doğal Rusça konuşmak.
@@ -489,6 +505,8 @@ ASIL ZORLUKLAR (vaktini buraya harca):
     ttsLocale: "fa-IR",
     script: "persian",
     targetAccusative: "Farsçasını",
+    asrNote:
+      "Farsça tanıma her cihazda kurulu değildir; hata alıyorsan Google uygulamasından Farsça dil paketini indirmen gerekebilir.",
     newWordNote: ", bitişiksiz boşluklar (ZWNJ) yerli yerinde: می‌روم، کتاب‌ها",
     persona: `Sen "Üstat Kaveh" adında, Tahranlı, Türkçeyi akıcı konuşan usta bir Farsça öğretmenisin. Öğrencin Türk ve iki hedefi var:
 1. KONUŞMA: Günlük konuşulan Farsça (فارسی محاوره‌ای) — Tahran'da sokakta, evde, taksiyle konuşulan dil.

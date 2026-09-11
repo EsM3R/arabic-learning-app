@@ -92,6 +92,17 @@ test("her dilin ses tanıma yerel kodu var ve TTS diliyle aynı dili gösteriyor
   }
 });
 
+test("her pakette ses tanıma notu ALANI var (boş olabilir, eksik olamaz)", () => {
+  // Bu not telaffuz ekranında gösteriliyordu ve Arapçaya özgü metin bütün
+  // dillere sızmıştı: Rusça çalışan öğrenciye "ammice alışkanlığı" deniyordu.
+  for (const pack of LANGUAGE_LIST) {
+    assert.equal(typeof pack.asrNote, "string", `${pack.id}: asrNote yok`);
+  }
+  assert.match(LANGUAGE_PACKS.ar.asrNote, /fusha/);
+  assert.match(LANGUAGE_PACKS.ru.asrNote, /vurgu/);
+  assert.equal(LANGUAGE_PACKS.en.asrNote, "");
+});
+
 test("Arapça hâlâ diglossik değil, Farsça diglossik", () => {
   // Arapça paketi fusha-only'ye çevrildi (tek register); Farsçada yazılı
   // (می‌روم) ve konuşulan (می‌رم) gerçekten ayrı registerlar.

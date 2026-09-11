@@ -9,6 +9,7 @@
  * API anahtarları yedeğe GİRMEZ: dosya Drive/WhatsApp gibi yerlerde
  * dolaşacak. Geri yüklerken cihazdaki mevcut anahtarlar korunur.
  */
+import { SCHEMA_VERSION } from "./schema.ts";
 import type { Profile } from "./types";
 
 export const BACKUP_FORMAT = "lisan-hocasi-yedek";
@@ -18,6 +19,12 @@ export const PROFILE_KEY = "profile.v1";
 export interface BackupFile {
   format: typeof BACKUP_FORMAT;
   version: number;
+  /**
+   * Yedeğin alındığı depo şema sürümü. Eski bir yedeği yeni uygulamaya
+   * geri yüklerken göç zincirinin nereden başlayacağını bu söyler; damgası
+   * olmayan (eski) yedekler 1 sayılır.
+   */
+  schema?: number;
   exportedAt: string;
   /** Yedeği alan derleme (bilgi amaçlı). */
   app: string;
@@ -51,6 +58,7 @@ export function buildBackup(
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
+    schema: SCHEMA_VERSION,
     exportedAt: now.toISOString(),
     app,
     entries: out,
@@ -99,6 +107,8 @@ export function parseBackup(text: string): BackupFile {
   return {
     format: BACKUP_FORMAT,
     version: b.version,
+    // Damgasız yedek, şema damgasından ÖNCEKİ bir sürümden gelmiştir: 1.
+    schema: typeof b.schema === "number" && b.schema > 0 ? b.schema : 1,
     exportedAt: typeof b.exportedAt === "string" ? b.exportedAt : "",
     app: typeof b.app === "string" ? b.app : "",
     entries,
@@ -186,4 +196,52 @@ export function mergeDeviceSecrets(
   } catch {
     return backupProfileJson;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Yedek hatırlatması
+// ---------------------------------------------------------------------------
+
+/**
+ * Bu uygulamanın verisi YALNIZCA telefonda durur; sunucu yok. Yani telefon
+ * kaybolursa aylarca birikmiş kelime defteri, hata defteri ve hocanın hafızası
+ * gider. Tek gerçek koruma öğrencinin dosyayı dışarı almasıdır — ama kimse
+ * kendiliğinden hatırlamaz. Uygulama hatırlatır.
+ */
+export const EXPORT_REMINDER_DAYS = 21;
+/** Bu kadar kelime birikmeden hatırlatma yapılmaz — yeni kullanıcıyı boğmayalım. */
+export const EXPORT_REMINDER_MIN_VOCAB = 30;
+
+export interface ExportReminder {
+  needed: boolean;
+  /** Son yedekten bu yana geçen tam gün; hiç alınmadıysa null. */
+  daysSince: number | null;
+  message: string;
+}
+
+export function exportReminder(
+  lastExportAt: string | null,
+  vocabCount: number,
+  now = new Date()
+): ExportReminder {
+  if (vocabCount < EXPORT_REMINDER_MIN_VOCAB) {
+    return { needed: false, daysSince: null, message: "" };
+  }
+  if (!lastExportAt) {
+    return {
+      needed: true,
+      daysSince: null,
+      message: `${vocabCount} kelime biriktirdin ve henüz hiç yedek almadın. Telefon kaybolursa hepsi gider — Ayarlar'dan dosyayı dışarı al, Drive'a at.`,
+    };
+  }
+  const ms = now.getTime() - new Date(lastExportAt).getTime();
+  const days = Math.floor(ms / 86_400_000);
+  if (!Number.isFinite(days) || days < EXPORT_REMINDER_DAYS) {
+    return { needed: false, daysSince: Number.isFinite(days) ? days : null, message: "" };
+  }
+  return {
+    needed: true,
+    daysSince: days,
+    message: `Son yedeğin ${days} gün önce alındı; o günden beri ${vocabCount} kelimelik defterin büyüdü. Yeni bir yedek al.`,
+  };
 }

@@ -12,7 +12,7 @@ import { ProgressBar } from "../components/ui";
 import { feedback } from "../feedback";
 import { getActivePack } from "../languages";
 import { speakTarget } from "../speech";
-import { judgeSpeech, SpeechAttempt } from "../speechinput";
+import { RECOGNITION_NOTE, SpeechAttempt, judgeSpeech } from "../speechinput";
 import { gradeCard, sessionQueue } from "../srs";
 import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
@@ -272,7 +272,10 @@ export default function ReviewScreen({ onBack }: Props) {
                 )}
                 {dictation.error && <Text style={styles.micErrorText}>{dictation.error}</Text>}
                 {speech && !dictation.listening && (
-                  <Text style={styles.speechVerdict}>{speech.message}</Text>
+                  <>
+                    <Text style={styles.speechVerdict}>{speech.message}</Text>
+                    <Text style={styles.speechNote}>{RECOGNITION_NOTE}</Text>
+                  </>
                 )}
                 {revealed ? (
                   <>
@@ -568,6 +571,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
   },
+  speechNote: { fontSize: 11, lineHeight: 16, color: colors.inkFaint, marginTop: 6 },
   translitNote: { fontSize: 11, color: colors.inkFaint, marginTop: 8, textAlign: "center" },
   correctBanner: { fontSize: 16, fontWeight: "800", color: colors.accentDark, marginBottom: 10 },
   wrongBanner: { fontSize: 14, fontWeight: "800", color: colors.danger, marginBottom: 10 },

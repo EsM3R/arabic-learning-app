@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Alert, View } from "react-native";
 import ErrorBoundary from "./src/components/ErrorBoundary";
 import { installGlobalErrorHandler, reportError } from "./src/errorLog";
 import DashboardScreen from "./src/screens/DashboardScreen";
@@ -16,8 +16,10 @@ import ShadowingScreen from "./src/screens/ShadowingScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import SetupScreen from "./src/screens/SetupScreen";
 import { getActiveLanguageId, LanguageId, setActiveLanguage } from "./src/languages";
+import { FUTURE_SCHEMA_WARNING } from "./src/schema";
 import {
   clearModuleChats,
+  ensureSchema,
   loadProfile,
   resetAll,
   saveProfile,
@@ -75,6 +77,12 @@ export default function App() {
   /** Depodan profili yükleyip panele geç — açılışta ve yedekten dönüşte. */
   const bootFromStorage = async () => {
     try {
+      // Şema kontrolü HER ŞEYDEN ÖNCE: veri bu derlemeden yeniyse hiçbir
+      // şeye dokunmadan uyarırız, yoksa eski kod yeni biçimin üstüne yazar.
+      const schema = await ensureSchema();
+      if (schema.status === "gelecekten") {
+        Alert.alert("Uygulamayı güncelle", FUTURE_SCHEMA_WARNING);
+      }
       const saved = await loadProfile();
       if (!saved) {
         profileRef.current = null;

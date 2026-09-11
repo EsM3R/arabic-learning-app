@@ -1,11 +1,15 @@
 /** Yedek dosyası saf mantık testleri. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { SCHEMA_VERSION } from "../src/schema.ts";
 import {
   backupFileName,
   BACKUP_FORMAT,
   BACKUP_VERSION,
   buildBackup,
+  EXPORT_REMINDER_DAYS,
+  EXPORT_REMINDER_MIN_VOCAB,
+  exportReminder,
   mergeDeviceSecrets,
   parseBackup,
   serializeBackup,
@@ -142,4 +146,61 @@ test("mergeDeviceSecrets: cihazdaki anahtar/model/sağlayıcı yedekteki profile
 
 test("backupFileName tarih damgalı", () => {
   assert.equal(backupFileName(NOW), "lisan-hocasi-yedek-2026-09-02.json");
+});
+
+
+// ---------------------------------------------------------------------------
+// Şema damgası ve yedek hatırlatması
+// ---------------------------------------------------------------------------
+
+test("yedek şema sürümünü damgalar; damgasız eski yedek 1 sayılır", () => {
+  // Damga olmadan, eski biçimli bir yedeği geri yüklerken göç zincirinin
+  // nereden başlayacağı bilinemez ve veri sessizce yanlış okunur.
+  const b = buildBackup([["profile.v1", "{}"]], "test");
+  assert.equal(b.schema, SCHEMA_VERSION);
+
+  const legacy = JSON.stringify({
+    format: "lisan-hocasi-yedek",
+    version: 1,
+    exportedAt: "2026-01-01T00:00:00.000Z",
+    app: "eski",
+    entries: { "profile.v1": "{}" },
+  });
+  assert.equal(parseBackup(legacy).schema, 1);
+});
+
+test("yedek hatırlatması: az kelimeyle rahatsız etmez", () => {
+  const r = exportReminder(null, EXPORT_REMINDER_MIN_VOCAB - 1);
+  assert.equal(r.needed, false);
+  assert.equal(r.message, "");
+});
+
+test("yedek hatırlatması: hiç yedek alınmadıysa uyarır", () => {
+  const r = exportReminder(null, 120);
+  assert.equal(r.needed, true);
+  assert.equal(r.daysSince, null);
+  assert.match(r.message, /hiç yedek almadın/);
+  assert.match(r.message, /120 kelime/);
+});
+
+test("yedek hatırlatması: taze yedekten sonra susar", () => {
+  const now = new Date("2026-09-11T10:00:00.000Z");
+  const r = exportReminder("2026-09-08T10:00:00.000Z", 200, now);
+  assert.equal(r.needed, false);
+  assert.equal(r.daysSince, 3);
+});
+
+test("yedek hatırlatması: eşik geçilince gün sayısıyla uyarır", () => {
+  const now = new Date("2026-09-11T10:00:00.000Z");
+  const old = new Date(now.getTime() - (EXPORT_REMINDER_DAYS + 4) * 86_400_000);
+  const r = exportReminder(old.toISOString(), 200, now);
+  assert.equal(r.needed, true);
+  assert.equal(r.daysSince, EXPORT_REMINDER_DAYS + 4);
+  assert.match(r.message, new RegExp(`${EXPORT_REMINDER_DAYS + 4} gün önce`));
+});
+
+test("yedek hatırlatması: bozuk tarih çökertmez", () => {
+  const r = exportReminder("bu bir tarih değil", 200);
+  assert.equal(r.needed, false);
+  assert.equal(r.daysSince, null);
 });

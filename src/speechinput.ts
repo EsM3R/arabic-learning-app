@@ -54,6 +54,17 @@ export function stripSpokenMark(text: string): string {
 
 export type SpeechVerdict = "dogru" | "yakin" | "uzak" | "bos";
 
+/**
+ * Öğrenciye bir kez gösterilecek dürüstlük notu.
+ *
+ * Bu ölçüm bir TELAFFUZ PUANI değildir ve öyleymiş gibi sunulması bu
+ * uygulamanın en kaçındığı hata olurdu: öğrenci ilerlediğini sanıp
+ * ilerlemez. Ölçülen şey "telefon seni doğru kelimeyi söylerken duydu mu",
+ * yani ANLAŞILIRLIK — ki iletişim için asıl önemli olan da odur.
+ */
+export const RECOGNITION_NOTE =
+  "Bu ölçüm telaffuz puanı değil, ANLAŞILIRLIKTIR: telefonun ses tanıması seni doğru kelimeyi söylerken duydu mu, onu gösterir. Tanıma aksanı bazen düzeltir, bazen doğru söyleneni ıskalar — tek bir sonuca değil, eğilime bak.";
+
 export interface SpeechAttempt {
   verdict: SpeechVerdict;
   /** 0-1: hedefle örtüşme oranı (karakter düzeyinde). */
@@ -125,7 +136,11 @@ export function judgeSpeech(
       verdict: "dogru",
       similarity: 1,
       match,
-      message: match === "translit" ? "Doğru (okunuşundan tanındı) ✓" : "Doğru ✓",
+      // "Doğru" DEĞİL, "anlaşıldı": ölçtüğümüz şey ses tanımanın hedefi
+      // duymasıdır — yani ANLAŞILIRLIK. Telaffuz kalitesi değil. İyi bir
+      // tanıyıcı öğrencinin aksanını düzeltip doğru kelimeyi yazabilir;
+      // "doğru telaffuz ettin" demek öğrenciye yalan söylemek olurdu.
+      message: match === "translit" ? "Anlaşıldı (okunuşundan tanındı) ✓" : "Anlaşıldı ✓",
     };
   }
   // Hem hedef yazımla hem okunuşla karşılaştır; iyi olanı al.

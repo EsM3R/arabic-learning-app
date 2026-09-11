@@ -11,6 +11,8 @@ import {
 import { AgentContext, TEACHER_TOOLS } from "../agent";
 import { agenticChat, generateCurriculum } from "../claude";
 import { Card, Pill, ProgressRing, SectionHeader, Skeleton } from "../components/ui";
+import { exportReminder } from "../backup";
+import type { ExportReminder } from "../backup";
 import { migrationScope, migrationSummary, MigrationScope, withoutColloquial } from "../fusha";
 import { getActiveLanguageId, getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { nextAction, NextAction } from "../nextaction";
@@ -26,6 +28,7 @@ import {
   loadFluency,
   loadFushaMigrated,
   loadLastActivity,
+  loadLastExportAt,
   loadMistakes,
   loadNotes,
   loadReadings,
@@ -102,6 +105,8 @@ export default function DashboardScreen({
   const [today, setToday] = useState<NextAction | null>(null);
   /** Ammice → fusha geçişi (tek seferlik); null = gerekmiyor. */
   const [fusha, setFusha] = useState<MigrationScope | null>(null);
+  /** Yedek hatırlatması — veri yalnız bu telefonda duruyor. */
+  const [backupWarn, setBackupWarn] = useState<ExportReminder | null>(null);
   const wakeStarted = React.useRef(false);
   const c = useTheme();
 
@@ -128,6 +133,8 @@ export default function DashboardScreen({
       // "Bugün" kartı: uygulamanın tuttuğu veriden tek bir öneri (src/nextaction.ts).
       const modules = curriculum?.modules ?? [];
       const balance = speakingBalance(stats);
+      const reminder = exportReminder(await loadLastExportAt(), cards.length);
+      setBackupWarn(reminder.needed ? reminder : null);
       const nextMod = modules.find((m) => !completedModuleIds.includes(m.id));
       setToday(
         nextAction({
@@ -469,6 +476,18 @@ export default function DashboardScreen({
       </LinearGradient>
 
       <View style={styles.body}>
+        {backupWarn && (
+          <TouchableOpacity
+            style={styles.backupCard}
+            onPress={onOpenSettings}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backupTitle}>💾 Yedek al</Text>
+            <Text style={styles.backupText}>{backupWarn.message}</Text>
+            <Text style={styles.backupCta}>Ayarlar → Yedek al ›</Text>
+          </TouchableOpacity>
+        )}
+
         {fusha && (
           <View style={styles.fushaCard}>
             <Text style={styles.fushaTitle}>🕌 Fushaya geçiş</Text>
@@ -850,6 +869,18 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   body: { paddingHorizontal: 18, marginTop: -24 },
+  backupCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 14,
+    borderRadius: radius.lg,
+    backgroundColor: colors.goldSoft,
+    borderWidth: 1,
+    borderColor: colors.goldDeep,
+  },
+  backupTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
+  backupText: { fontSize: 13, lineHeight: 19, color: colors.inkSoft, marginTop: 6 },
+  backupCta: { fontSize: 13, fontWeight: "800", color: colors.goldDeep, marginTop: 8 },
   fushaCard: {
     backgroundColor: colors.goldSoft,
     borderRadius: radius.lg,
