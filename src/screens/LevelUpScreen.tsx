@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -24,6 +24,8 @@ import { COMPLIANCE_WARN } from "../reading";
 import { loadStatsSummary } from "../statsStore";
 import { loadFluency, loadMistakes, loadNotes, loadReadings, loadVocab } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { Assessment, Curriculum, Profile } from "../types";
 import { isRtl } from "../scripts";
 
@@ -44,6 +46,9 @@ type Stage = "judging" | "verdict" | "building" | "error";
  * öğrenci görüyor, sonra yeni seviyenin müfredatı kuruluyor.
  */
 export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const pack = getActivePack();
   const [stage, setStage] = useState<Stage>("judging");
   const [verdict, setVerdict] = useState("");
@@ -214,7 +219,13 @@ export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
   busyTitle: { fontSize: 17, fontWeight: "800", color: colors.ink, marginTop: 4 },
@@ -255,3 +266,4 @@ const styles = StyleSheet.create({
   secondary: { paddingVertical: 12, alignItems: "center" },
   secondaryText: { color: colors.accent, fontSize: 14, fontWeight: "700" },
 });
+}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { buildLabel } from "../buildInfo";
 import {
@@ -8,7 +8,9 @@ import {
   reportError,
   subscribeErrors,
 } from "../errorLog";
-import { colors, radius, shadowLift } from "../theme";
+import { radius, shadowLift } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 
 interface Props {
   children: React.ReactNode;
@@ -75,36 +77,49 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       .filter(Boolean)
       .join("\n");
 
-    return (
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.emoji}>🛠️</Text>
-          <Text style={styles.title}>Uygulama bir hataya takıldı</Text>
-          <Text style={styles.lead}>
-            Aşağıdaki metni kopyalayıp (uzun basıp seç) bana gönderirsen sebebini
-            bulup düzeltirim. Verilerin duruyor — silinmedi.
-          </Text>
-
-          <View style={styles.card}>
-            <Text style={styles.detail} selectable>
-              {detail}
-            </Text>
-          </View>
-
-          <TouchableOpacity style={styles.button} onPress={this.reset} activeOpacity={0.85}>
-            <Text style={styles.buttonText}>Tekrar dene</Text>
-          </TouchableOpacity>
-          <Text style={styles.hint}>
-            Tekrar denemek çözmezse uygulamayı kapatıp açman yeterli; verilerin
-            telefonda kayıtlı kalır.
-          </Text>
-        </ScrollView>
-      </View>
-    );
+    return <CrashScreen detail={detail} onRetry={this.reset} />;
   }
 }
 
-const styles = StyleSheet.create({
+
+/**
+ * Hata ekranı ayrı bir FONKSİYON bileşen: sınıf bileşeni kanca çağıramaz,
+ * dolayısıyla temayı okuyamaz. Çökme ekranı gece yarısı karşımıza çıkan
+ * ekrandır — beyaz patlaması en son burada istenir.
+ */
+function CrashScreen({ detail, onRetry }: { detail: string; onRetry: () => void }) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.emoji}>🛠️</Text>
+        <Text style={styles.title}>Uygulama bir hataya takıldı</Text>
+        <Text style={styles.lead}>
+          Aşağıdaki metni kopyalayıp (uzun basıp seç) bana gönderirsen sebebini bulup
+          düzeltirim. Verilerin duruyor — silinmedi.
+        </Text>
+
+        <View style={styles.card}>
+          <Text style={styles.detail} selectable>
+            {detail}
+          </Text>
+        </View>
+
+        <TouchableOpacity style={styles.button} onPress={onRetry} activeOpacity={0.85}>
+          <Text style={styles.buttonText}>Tekrar dene</Text>
+        </TouchableOpacity>
+        <Text style={styles.hint}>
+          Tekrar denemek çözmezse uygulamayı kapatıp açman yeterli; verilerin telefonda
+          kayıtlı kalır.
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 24, paddingTop: 80, paddingBottom: 40 },
   emoji: { fontSize: 44, marginBottom: 10 },
@@ -133,4 +148,5 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
   hint: { fontSize: 12, color: colors.inkSoft, lineHeight: 18, marginTop: 14 },
-});
+  });
+}

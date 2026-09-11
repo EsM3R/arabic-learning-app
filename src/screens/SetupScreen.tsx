@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,6 +13,8 @@ import {
 import { LANGUAGE_LIST, LANGUAGE_PACKS, LanguageId } from "../languages";
 import { PROVIDER_LIST, ProviderId } from "../providers";
 import { colors, radius, shadow, shadowLift } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 
 interface Props {
   onDone: (
@@ -26,6 +28,9 @@ interface Props {
 const STEPS = 4;
 
 export default function SetupScreen({ onDone }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -120,6 +125,9 @@ export default function SetupScreen({ onDone }: Props) {
 /* ---------------------------------------------------------------- adımlar */
 
 function Welcome() {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View>
       <LinearGradient
@@ -169,6 +177,9 @@ function Welcome() {
 }
 
 function HowItWorks() {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.pad}>
       <Text style={styles.stepTitle}>Nasıl çalışır?</Text>
@@ -219,6 +230,9 @@ function PickLanguage({
   selected: LanguageId;
   onSelect: (id: LanguageId) => void;
 }) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.pad}>
       <Text style={styles.stepTitle}>Hangi dili öğreneceksin?</Text>
@@ -270,6 +284,9 @@ function Connect({
   setProviderId: (v: ProviderId) => void;
   pack: (typeof LANGUAGE_PACKS)[LanguageId];
 }) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const provider =
     PROVIDER_LIST.find((p) => p.meta.id === providerId) ?? PROVIDER_LIST[0];
   return (
@@ -334,6 +351,9 @@ function Connect({
 }
 
 function Point({ icon, title, text }: { icon: string; title: string; text: string }) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.point}>
       <Text style={styles.pointIcon}>{icon}</Text>
@@ -346,6 +366,9 @@ function Point({ icon, title, text }: { icon: string; title: string; text: strin
 }
 
 function Step({ n, title, text }: { n: string; title: string; text: string }) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.point}>
       <View style={styles.stepNum}>
@@ -361,7 +384,13 @@ function Step({ n, title, text }: { n: string; title: string; text: string }) {
 
 /* ---------------------------------------------------------------- stiller */
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı aynı
+ * kalır. Parametre adı bilinçli olarak `colors` — gövdedeki jetonlar
+ * olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingBottom: 24 },
@@ -503,3 +532,4 @@ const styles = StyleSheet.create({
   },
   nextText: { color: "#FFFFFF", fontSize: 16.5, fontWeight: "800" },
 });
+}

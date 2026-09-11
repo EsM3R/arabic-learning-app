@@ -25,7 +25,7 @@ import {
   saveProfile,
   switchLanguageProgress,
 } from "./src/storage";
-import { colors } from "./src/theme";
+import { useTheme } from "./src/useTheme";
 import {
   Assessment,
   Curriculum,
@@ -65,6 +65,7 @@ function mergeProfile(prev: Profile, next: Profile): Profile {
 }
 
 export default function App() {
+  const colors = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
   /** Aktif dil — ekran anahtarı olarak da kullanılır ki dil değişince ekranlar tazelensin. */
@@ -258,7 +259,7 @@ export default function App() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <StatusBar style="dark" />
+      <StatusBar style="auto" />
       {screen.name === "loading" && (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator size="large" color={colors.accent} />

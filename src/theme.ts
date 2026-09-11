@@ -1,6 +1,8 @@
-import { TextStyle, ViewStyle } from "react-native";
-import { isArabicFamily } from "./scripts";
-import type { ScriptId } from "./scripts";
+// Tip-yalnız import: node --experimental-strip-types bunları siler, böylece
+// tema testi react-native yüklemeden koşabilir (tests/theme.test.ts).
+import type { TextStyle, ViewStyle } from "react-native";
+import { isArabicFamily } from "./scripts.ts";
+import type { ScriptId } from "./scripts.ts";
 
 /**
  * Tasarım sistemi — "Şam Akşamı":

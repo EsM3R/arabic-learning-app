@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,8 @@ import { SequenceHandle, speakSequence, speakTarget, stopSpeaking } from "../spe
 import { recordStat } from "../statsStore";
 import { loadReadings, loadVocab, saveReadings, saveVocab, touchLastActivity } from "../storage";
 import { ARABIC_FONT, arabicText, colors, radius, shadow, shadowLift } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { Profile, ReadingLength, ReadingText } from "../types";
 import { normalizeTarget } from "../textnorm";
 import { isRtl, needsTranslit } from "../scripts";
@@ -35,6 +37,9 @@ type View_ = "list" | "create" | "reader";
  * cihazda ve bedava. Ekranı açmak tek başına hiçbir istek harcamaz.
  */
 export default function ReadingScreen({ profile, onBack }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const pack = getActivePack();
   const [view, setView] = useState<View_>("list");
   const [library, setLibrary] = useState<ReadingText[]>([]);
@@ -597,7 +602,13 @@ export default function ReadingScreen({ profile, onBack }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 28 },
   body: { padding: 16, paddingBottom: 40 },
@@ -807,3 +818,4 @@ const styles = StyleSheet.create({
   libBadge: { fontSize: 11.5, color: colors.inkSoft, marginTop: 3 },
   libRight: { fontSize: 15, color: colors.inkFaint, fontWeight: "700" },
 });
+}

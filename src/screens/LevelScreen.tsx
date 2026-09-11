@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import Header from "../components/Header";
 import { getActivePack } from "../languages";
 import { colors, radius, shadow, shadowLift } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { Profile } from "../types";
 
 interface Props {
@@ -19,6 +21,9 @@ interface Props {
  * yer burası.
  */
 export default function LevelScreen({ profile, onBack }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const pack = getActivePack();
   const a = profile.assessment;
   const curriculum = profile.curriculum;
@@ -133,7 +138,13 @@ export default function LevelScreen({ profile, onBack }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 18, paddingBottom: 40 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
@@ -198,3 +209,4 @@ const styles = StyleSheet.create({
   track: { height: 8, borderRadius: 4, backgroundColor: colors.bg, overflow: "hidden" },
   fill: { height: "100%", borderRadius: 4, backgroundColor: colors.accent },
 });
+}

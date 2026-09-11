@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
@@ -33,6 +33,8 @@ import {
   touchLastActivity,
 } from "../storage";
 import { colors } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { ChatMessage, CurriculumModule, NavigationSuggestion, Profile } from "../types";
 import { containsTargetScript } from "../scripts";
 
@@ -59,6 +61,9 @@ export default function LessonScreen({
   onProfileChange,
   onNavigate,
 }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   /** Akış halindeki hoca cevabı (henüz kaydedilmedi) — ChatView canlı balon çizer. */
@@ -333,7 +338,13 @@ export default function LessonScreen({
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   completeButton: {
     backgroundColor: colors.goldSoft,
@@ -350,3 +361,4 @@ const styles = StyleSheet.create({
   },
   doneBadge: { color: colors.accentDark, fontWeight: "800", fontSize: 12 },
 });
+}

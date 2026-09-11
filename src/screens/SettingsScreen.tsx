@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -25,6 +25,8 @@ import { isLanguageId, LANGUAGE_PACKS } from "../languages";
 import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
 import { dumpAllEntries, restoreFromBackup, saveLastExportAt } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { Profile } from "../types";
 import { formatTry, usageSummary, UsageSummary } from "../usage";
 import { buildLabel } from "../buildInfo";
@@ -43,6 +45,9 @@ function languageLabel(id: string): string {
 }
 
 export default function SettingsScreen({ profile, onSave, onRestored, onBack }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   // Depodan gelen değer bilinmeyen bir metin olabilir (eski/bozuk kayıt).
   // Doğrulamadan kullanırsak aşağıdaki find() undefined döner ve ekran çöker.
   const initial: ProviderId = isProviderId(profile.provider)
@@ -337,7 +342,13 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
   body: { padding: 18, paddingBottom: 40 },
@@ -472,3 +483,4 @@ const styles = StyleSheet.create({
   backupButtonText: { color: colors.gold, fontSize: 13, fontWeight: "800" },
   backupButtonAltText: { color: colors.accentDark },
 });
+}

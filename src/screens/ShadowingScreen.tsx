@@ -5,7 +5,7 @@ import {
   useAudioPlayer,
   useAudioRecorder,
 } from "expo-audio";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Header from "../components/Header";
 import { getActivePack } from "../languages";
@@ -28,6 +28,8 @@ import {
 } from "../storage";
 import { normalizeTarget } from "../textnorm";
 import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { isRtl, needsTranslit } from "../scripts";
 
 interface Props {
@@ -46,6 +48,9 @@ type ShadowStep = "hazir" | "kaydediliyor" | "dinle" | "not";
  * bu ekran hiç API çağırmaz.
  */
 export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenReading }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const pack = getActivePack();
   const [queue, setQueue] = useState<ShadowItem[]>([]);
   const [notes, setNotes] = useState<ShadowNotesMap>({});
@@ -347,7 +352,13 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 28 },
   body: { padding: 20, paddingBottom: 40 },
@@ -461,3 +472,4 @@ const styles = StyleSheet.create({
   loopChipText: { fontSize: 12, fontWeight: "800", color: colors.inkSoft },
   loopChipTextActive: { color: colors.onDeep },
 });
+}

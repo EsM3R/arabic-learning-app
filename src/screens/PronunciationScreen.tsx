@@ -5,7 +5,7 @@ import {
   useAudioPlayer,
   useAudioRecorder,
 } from "expo-audio";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,6 +26,8 @@ import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadPronunciationSet, loadVocab, savePronunciationSet, touchLastActivity } from "../storage";
 import { colors, radius, shadow, shadowLift, targetText } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { Profile, PronunciationSet } from "../types";
 
 interface Props {
@@ -42,6 +44,9 @@ interface Props {
 type PronPhase = "ayirt" | "ozet" | "kayit";
 
 export default function PronunciationScreen({ profile, onBack }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [set, setSet] = useState<PronunciationSet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -437,7 +442,13 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   newSetButton: {
     backgroundColor: colors.goldSoft,
@@ -585,3 +596,4 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 });
+}

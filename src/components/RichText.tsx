@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, TextStyle, View } from "react-native";
 import { Block, classifyLine, InlineToken, splitInline, splitScript } from "../richtext";
-import { arabicText, colors } from "../theme";
+import { arabicText } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 
 /**
  * Hocanın mesajlarını okunabilir biçimde basar.
@@ -31,7 +33,10 @@ interface Props {
  * 2) Kalın gövdede fontWeight mirası Arapça fontu düşürüyordu; kalın için
  *    fontWeight değil ayrı aile adı (SemiBold) verilir.
  */
+type Styles = ReturnType<typeof makeStyles>;
+
 function renderRuns(
+  styles: Styles,
   text: string,
   baseSize: number,
   scaleScript: boolean,
@@ -61,6 +66,7 @@ function renderRuns(
 }
 
 function renderInline(
+  styles: Styles,
   text: string,
   baseSize: number,
   scaleScript: boolean,
@@ -68,7 +74,7 @@ function renderInline(
 ): React.ReactNode[] {
   return splitInline(text).map((token: InlineToken, i) => {
     const k = `${key}i${i}`;
-    const inner = renderRuns(token.text, baseSize, scaleScript, k, token.kind === "bold");
+    const inner = renderRuns(styles, token.text, baseSize, scaleScript, k, token.kind === "bold");
     if (token.kind === "bold") {
       return (
         <Text key={k} style={styles.bold}>
@@ -95,6 +101,8 @@ function renderInline(
 }
 
 export default function RichText({ content, style, scaleScript = false }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const baseSize = typeof style.fontSize === "number" ? style.fontSize : 15;
   const lines = content.replace(/\r\n/g, "\n").split("\n");
 
@@ -112,7 +120,7 @@ export default function RichText({ content, style, scaleScript = false }: Props)
     }
     lastWasBlank = false;
 
-    const content = renderInline(block.text, baseSize, scaleScript, key);
+    const content = renderInline(styles, block.text, baseSize, scaleScript, key);
 
     if (block.type === "heading") {
       nodes.push(
@@ -149,7 +157,8 @@ export default function RichText({ content, style, scaleScript = false }: Props)
   return <View>{nodes}</View>;
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   gap: { height: 9 },
   bold: { fontWeight: "800" },
   /** Arapça run'ı, kalın sarmalayıcının fontWeight mirasından korur. */
@@ -167,4 +176,5 @@ const styles = StyleSheet.create({
     marginVertical: 3,
   },
   quoteText: { fontStyle: "italic" },
-});
+  });
+}

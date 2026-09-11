@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { colors } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 
 interface Props {
   title: string;
@@ -12,6 +14,9 @@ interface Props {
 
 /** Tüm iç ekranlarda ortak, sakin başlık çubuğu. */
 export default function Header({ title, subtitle, onBack, right }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       {onBack ? (
@@ -36,7 +41,13 @@ export default function Header({ title, subtitle, onBack, right }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -63,3 +74,4 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 12, color: colors.inkSoft, marginTop: 2 },
   right: { flexDirection: "row", alignItems: "center" },
 });
+}

@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -39,6 +39,7 @@ import {
   saveWakeCheck,
 } from "../storage";
 import { colors, radius, shadow, shadowLift, spacing } from "../theme";
+import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import {
   Curriculum,
@@ -108,7 +109,8 @@ export default function DashboardScreen({
   /** Yedek hatırlatması — veri yalnız bu telefonda duruyor. */
   const [backupWarn, setBackupWarn] = useState<ExportReminder | null>(null);
   const wakeStarted = React.useRef(false);
-  const c = useTheme();
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const totalModules = curriculum?.modules.length ?? 0;
   const doneModules =
@@ -550,10 +552,10 @@ export default function DashboardScreen({
               sublabel="MÜFREDAT"
             />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.curriculumTitle, { color: c.ink }]}>
+              <Text style={[styles.curriculumTitle, { color: colors.ink }]}>
                 {doneModules}/{totalModules} modül tamam
               </Text>
-              <Text style={[styles.curriculumSub, { color: c.inkSoft }]}>
+              <Text style={[styles.curriculumSub, { color: colors.inkSoft }]}>
                 {assessment?.speakingLevel ?? "A0"} konuşma · {assessment?.readingLevel ?? "A0"} okuma
               </Text>
             </View>
@@ -815,7 +817,13 @@ export default function DashboardScreen({
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU. Panel useTheme'i çağırıyordu ama stil bloğu
+ * modül düzeyinde donmuştu: karanlık modda yalnız iki satır renk
+ * değişiyor, panelin geri kalanı açık palete çakılı kalıyordu.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: 44 },
   hero: {
@@ -1180,3 +1188,4 @@ const styles = StyleSheet.create({
   },
   levelPillText: { fontSize: 11, fontWeight: "800", color: colors.accentDark },
 });
+}

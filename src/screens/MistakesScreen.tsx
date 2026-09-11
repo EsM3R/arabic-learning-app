@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Header from "../components/Header";
 import { loadMistakes } from "../storage";
 import { colors, radius, shadow } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { MistakeEntry } from "../types";
 
 interface Props {
@@ -10,6 +12,9 @@ interface Props {
 }
 
 export default function MistakesScreen({ onBack }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -56,7 +61,13 @@ export default function MistakesScreen({ onBack }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
   emptyEmoji: { fontSize: 48 },
@@ -94,3 +105,4 @@ const styles = StyleSheet.create({
   correction: { fontSize: 15, color: colors.accent, fontWeight: "600", marginBottom: 6 },
   explanation: { fontSize: 13, color: colors.inkSoft, lineHeight: 19 },
 });
+}

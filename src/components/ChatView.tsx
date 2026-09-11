@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -17,6 +17,8 @@ import { extractArabic, speakTarget } from "../speech";
 import { isSpoken, stripSpokenMark } from "../speechinput";
 import { useDictation } from "../useDictation";
 import { colors, shadow } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { ChatMessage, NavigationSuggestion } from "../types";
 import { containsTargetScript, isRtl } from "../scripts";
 
@@ -45,6 +47,9 @@ export default function ChatView({
   suggestion,
   onSuggestionPress,
 }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const pack = getActivePack();
@@ -206,7 +211,13 @@ export default function ChatView({
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   micButton: {
     width: 44,
     height: 44,
@@ -369,3 +380,4 @@ const styles = StyleSheet.create({
   sendDisabled: { opacity: 0.35 },
   sendText: { color: "#FFFFFF", fontWeight: "800", fontSize: 20, marginTop: -1 },
 });
+}

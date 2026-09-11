@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   StyleSheet,
@@ -19,6 +19,8 @@ import { recordStat } from "../statsStore";
 import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity } from "../storage";
 import { matchProduction, ProductionMatch } from "../textnorm";
 import { colors, radius, shadow, shadowLift, targetText } from "../theme";
+import type { Palette } from "../theme";
+import { useTheme } from "../useTheme";
 import { ReviewGrade, VocabCard } from "../types";
 import { needsTranslit } from "../scripts";
 
@@ -37,6 +39,9 @@ type Phase = "sor" | "sonuc";
  * Tamamen API'siz.
  */
 export default function ReviewScreen({ onBack }: Props) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [allCards, setAllCards] = useState<VocabCard[]>([]);
   const [queue, setQueue] = useState<VocabCard[]>([]);
   const [revealed, setRevealed] = useState(false);
@@ -473,6 +478,9 @@ export default function ReviewScreen({ onBack }: Props) {
 }
 
 function GradeRow({ onGrade }: { onGrade: (g: ReviewGrade) => void }) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.gradeRow}>
       <TouchableOpacity
@@ -503,7 +511,13 @@ function GradeRow({ onGrade }: { onGrade: (g: ReviewGrade) => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
+ * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
+ * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ */
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
   emptyEmoji: { fontSize: 48 },
@@ -652,3 +666,4 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 });
+}
