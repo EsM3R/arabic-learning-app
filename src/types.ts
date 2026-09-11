@@ -192,7 +192,7 @@ export interface Reminder {
 export type ReadingLength = "kisa" | "orta" | "uzun";
 
 export interface ReadingSentence {
-  /** Hedef dilin kendi yazımıyla TEK cümle (Arapça'da hareke politikasına göre). */
+  /** Hedef dilin kendi yazımıyla TEK cümle (paketin yazı politikasına göre: hareke/vurgu/ZWNJ). */
   target: string;
   /** Türkçe okunuşa yakın Latin transkripsiyon; Latin dillerde "". */
   translit: string;
@@ -201,7 +201,7 @@ export interface ReadingSentence {
 }
 
 export interface ReadingNewWord {
-  /** Hedef yazım (Arapça'da HER ZAMAN tam harekeli). */
+  /** Hedef yazım (paketin newWordNote kuralına göre: Arapça tam harekeli, Rusça vurgulu…). */
   word: string;
   translit: string;
   tr: string;

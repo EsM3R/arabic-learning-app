@@ -1,4 +1,6 @@
 import { TextStyle, ViewStyle } from "react-native";
+import { isArabicFamily } from "./scripts";
+import type { ScriptId } from "./scripts";
 
 /**
  * Tasarım sistemi — "Şam Akşamı":
@@ -151,6 +153,24 @@ export function arabicText(fontSize: number, semibold = false): TextStyle {
     fontSize,
     lineHeight: Math.round(fontSize * ARABIC_LINE),
     letterSpacing: 0,
+  };
+}
+
+/**
+ * Hedef dil kelimesinin BÜYÜK gösterimi (kelime kartı, telaffuz stüdyosu).
+ *
+ * Naskh + 2.25 satır yüksekliği yalnızca Arap alfabesinde DOĞRUDUR; Kiril ve
+ * Latin'de yanlıştır: Noto Naskh'ta Kiril glifi yoktur (Rusça kelime kutu
+ * olarak çıkar) ve 2.25 çarpanı Latin kelimeyi ekrana yayar. Alfabe kimliği
+ * geldiğinden beri bu karar artık tahmin değil.
+ */
+export function targetText(fontSize: number, script: ScriptId, semibold = false): TextStyle {
+  if (isArabicFamily(script)) return arabicText(fontSize, semibold);
+  return {
+    fontSize,
+    lineHeight: Math.round(fontSize * 1.3),
+    fontWeight: semibold ? "800" : "700",
+    letterSpacing: -0.3,
   };
 }
 

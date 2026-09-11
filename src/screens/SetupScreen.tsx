@@ -158,8 +158,10 @@ function Welcome() {
         />
         <Point
           icon="🌍"
-          title="Üç dil, tek uygulama"
-          text="Arapça, İngilizce ve İspanyolca. Her dilin kendi hocası, müfredatı ve defteri var; aynı anda birden fazlasını çalışabilirsin."
+          title={`${LANGUAGE_LIST.length} dil, tek uygulama`}
+          // Liste elle yazılmıyor: yeni bir dil paketi eklendiğinde bu cümle
+          // kendiliğinden doğru kalsın.
+          text={`${languageNames()}. Her dilin kendi hocası, müfredatı ve defteri var; aynı anda birden fazlasını çalışabilirsin.`}
         />
       </View>
     </View>
@@ -201,6 +203,13 @@ function HowItWorks() {
       </View>
     </View>
   );
+}
+
+/** "Arapça, İngilizce, … ve Farsça" — paketlerden türetilir. */
+function languageNames(): string {
+  const names = LANGUAGE_LIST.map((l) => l.label);
+  if (names.length < 2) return names.join("");
+  return `${names.slice(0, -1).join(", ")} ve ${names[names.length - 1]}`;
 }
 
 function PickLanguage({

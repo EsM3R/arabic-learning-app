@@ -21,6 +21,7 @@ import {
   summarizeBackup,
 } from "../backup";
 import Header from "../components/Header";
+import { isLanguageId, LANGUAGE_PACKS } from "../languages";
 import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
 import { dumpAllEntries, restoreFromBackup } from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
@@ -34,6 +35,11 @@ interface Props {
   /** Yedekten dönüldü — depo baştan yazıldı, uygulama kendini yeniden yüklemeli. */
   onRestored: () => void;
   onBack: () => void;
+}
+
+/** Yedekteki dil kodunu okunur ada çevirir ("ru" → "Rusça"). */
+function languageLabel(id: string): string {
+  return isLanguageId(id) ? LANGUAGE_PACKS[id].label : id;
 }
 
 export default function SettingsScreen({ profile, onSave, onRestored, onBack }: Props) {
@@ -148,7 +154,7 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
         "Yedekten dön",
         `Yedek: ${s.name || "isimsiz"} · ${when}\n` +
           `${s.vocab} kelime · ${s.mistakes} hata · ${s.readings} okuma metni · ${s.chats} sohbet\n` +
-          `Diller: ${s.languages.join(", ") || "—"}\n\n` +
+          `Diller: ${s.languages.map(languageLabel).join(", ") || "—"}\n\n` +
           "Bu cihazdaki HER ŞEY silinip yedektekiyle değiştirilecek. API anahtarın ve model seçimin bu cihazda kalır.",
         [
           { text: "Vazgeç", style: "cancel" },

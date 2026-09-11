@@ -18,7 +18,7 @@ import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity } from "../storage";
 import { matchProduction, ProductionMatch } from "../textnorm";
-import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
+import { colors, radius, shadow, shadowLift, targetText } from "../theme";
 import { ReviewGrade, VocabCard } from "../types";
 import { needsTranslit } from "../scripts";
 
@@ -235,7 +235,7 @@ export default function ReviewScreen({ onBack }: Props) {
               // ------------------------- TANIMA (yeni kart ilk görüş)
               <>
                 <Text style={styles.newBadge}>🌱 Yeni kelime — önce tanı</Text>
-                <Text style={styles.arabic}>{current.arabic}</Text>
+                <Text style={[styles.targetWord, targetText(40, pack.script)]}>{current.arabic}</Text>
                 <View style={styles.listenRow}>
                   <TouchableOpacity
                     style={styles.listenChip}
@@ -344,7 +344,7 @@ export default function ReviewScreen({ onBack }: Props) {
                 ) : mode === "yaz" && answer.trim() ? (
                   <Text style={styles.wrongBanner}>Doğrusu:</Text>
                 ) : null}
-                <Text style={styles.arabic}>{current.arabic}</Text>
+                <Text style={[styles.targetWord, targetText(40, pack.script)]}>{current.arabic}</Text>
                 <Text style={styles.translit}>{current.transliteration}</Text>
                 <View style={styles.listenRow}>
                   <TouchableOpacity
@@ -532,7 +532,9 @@ const styles = StyleSheet.create({
   modeChipText: { fontSize: 11, fontWeight: "800", color: colors.inkSoft },
   modeChipTextActive: { color: colors.onDeep },
   newBadge: { fontSize: 12, color: colors.gold, fontWeight: "700", marginBottom: 10 },
-  arabic: { ...arabicText(40), color: colors.ink, textAlign: "center", marginBottom: 12 },
+  // Yazı tipi/satır yüksekliği artık alfabeye göre (targetText); burada
+  // yalnız alfabeden bağımsız olanlar kalır.
+  targetWord: { color: colors.ink, textAlign: "center", marginBottom: 12 },
   listenRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
   listenChip: {
     backgroundColor: colors.accentSoft,

@@ -25,7 +25,7 @@ import { judgeSpeech, SpeechAttempt } from "../speechinput";
 import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadPronunciationSet, loadVocab, savePronunciationSet, touchLastActivity } from "../storage";
-import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
+import { colors, radius, shadow, shadowLift, targetText } from "../theme";
 import { Profile, PronunciationSet } from "../types";
 
 interface Props {
@@ -339,7 +339,7 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
           <View style={styles.card}>
-            <Text style={styles.arabic}>{item.arabic}</Text>
+            <Text style={[styles.targetWord, targetText(42, getActivePack().script)]}>{item.arabic}</Text>
             <Text style={styles.translit}>{item.transliteration}</Text>
             <Text style={styles.turkish}>{item.turkish}</Text>
           </View>
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     ...shadowLift,
   },
-  arabic: { ...arabicText(42), color: colors.ink, textAlign: "center", marginBottom: 12 },
+  targetWord: { color: colors.ink, textAlign: "center", marginBottom: 12 },
   translit: { fontSize: 18, color: colors.accent, fontWeight: "600", marginBottom: 6 },
   turkish: { fontSize: 16, color: colors.inkSoft },
   tipBox: {

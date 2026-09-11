@@ -45,7 +45,7 @@ export const LENGTH_SPECS: Record<ReadingLength, LengthSpec> = {
 
 /**
  * Metne gömülecek tekrar kartları: tekrarı gelenler (due sırasıyla), sonra
- * zorlanılanlar; cap'e kadar, mükerrersiz. Diglossik dillerde (Arapça) havuz
+ * zorlanılanlar; cap'e kadar, mükerrersiz. Diglossik dillerde (Farsça) havuz
  * yalnız "okuma" parkurudur — fusha metne ammice gömdürmeyiz; ammice kartlar
  * yine BİLİNEN listesinde kalır (çoğu kelime iki registerde ortaktır).
  */
