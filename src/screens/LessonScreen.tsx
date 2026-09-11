@@ -7,6 +7,7 @@ import { agenticChat } from "../claude";
 import { getActivePack } from "../languages";
 import { extractArabic } from "../speech";
 import { markSpoken } from "../speechinput";
+import { fluencyTrend } from "../fluency";
 import { progressDigest, readingPerformance } from "../progress";
 import { COMPLIANCE_WARN } from "../reading";
 import { loadStatsSummary, recordStat } from "../statsStore";
@@ -23,6 +24,7 @@ import {
 } from "../prompts";
 import {
   loadChat,
+  loadFluency,
   loadMistakes,
   loadNotes,
   loadReadings,
@@ -121,12 +123,13 @@ export default function LessonScreen({
     // ÖLÇÜLEN veri de buraya girer. Eskiden yalnız bir ARAÇ olarak vardı
     // (ilerleme_durumu) ve model onu çağırmadıkça hoca öğrencinin konuşup
     // konuşmadığını GÖREMİYORDU — uygulamanın asıl hedefine kör kalıyordu.
-    const [mistakes, notes, vocab, stats, readings] = await Promise.all([
+    const [mistakes, notes, vocab, stats, readings, fluency] = await Promise.all([
       loadMistakes(),
       loadNotes(),
       loadVocab(),
       loadStatsSummary(),
       loadReadings(),
+      loadFluency(),
     ]);
     const stable = quiz
       ? quizSystem(current)
@@ -138,7 +141,7 @@ export default function LessonScreen({
       dynamic:
         memoryContext(mistakes, notes, module?.track) +
         retentionDigest(vocab) +
-        progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN)),
+        progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN), fluencyTrend(fluency)),
     };
   };
 

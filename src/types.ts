@@ -170,7 +170,8 @@ export interface NavigationSuggestion {
     | "mistakes"
     | "module"
     | "reading"
-    | "shadowing";
+    | "shadowing"
+    | "fluency";
   moduleId?: string;
   label: string;
 }

@@ -21,7 +21,8 @@ export type ActionScreen =
   | "pronunciation"
   | "shadowing"
   | "mistakes"
-  | "curriculum";
+  | "curriculum"
+  | "fluency";
 
 export interface NextAction {
   screen: ActionScreen;
@@ -48,6 +49,8 @@ export interface StudyState {
   /** Bu hafta ve toplam sayaçlar. */
   spokenTotal: number;
   shadowedTotal: number;
+  /** Tamamlanan akıcılık (4/3/2) turu sayısı. */
+  fluencyTotal: number;
   readingsFinished: number;
   /** Son çalışmadan bu yana geçen tam gün. */
   daysSinceActivity: number;
@@ -93,6 +96,16 @@ export function speakingGap(s: StudyState): NextAction | null {
       reason: "Akıcılığın motoru gölgelemedir; hocanın üstüne konuş.",
     };
   }
+  // Akıcılık alıştırması hiç denenmemişse: konuşabilmenin önündeki engel
+  // çoğu zaman kelime değil DURAKSAMADIR; antrenmanı yalnız burada var.
+  if (s.fluencyTotal === 0) {
+    return {
+      screen: "fluency",
+      label: "Akıcılık Odası'nı dene",
+      reason: "Aynı şeyi azalan sürede üç kez anlat — duraksamayı eriten alıştırma.",
+    };
+  }
+
   const total = s.voiceWorkWeek + s.silentWorkWeek;
   const imbalanced =
     s.activeDays7 >= BALANCE_MIN_DAYS &&

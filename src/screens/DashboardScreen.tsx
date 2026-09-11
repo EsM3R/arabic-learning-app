@@ -15,6 +15,7 @@ import { migrationScope, migrationSummary, MigrationScope, withoutColloquial } f
 import { getActiveLanguageId, getActivePack, LANGUAGE_LIST, LanguageId } from "../languages";
 import { nextAction, NextAction } from "../nextaction";
 import { pendingReminders } from "../notifications";
+import { fluencyTrend } from "../fluency";
 import { progressDigest, readingPerformance, speakingBalance } from "../progress";
 import { memoryContext, retentionDigest, wakeCheckEvent, wakeCheckSystem } from "../prompts";
 import { dueCards } from "../srs";
@@ -22,6 +23,7 @@ import { COMPLIANCE_WARN } from "../reading";
 import { loadStatsSummary } from "../statsStore";
 import {
   clearModuleChats,
+  loadFluency,
   loadFushaMigrated,
   loadLastActivity,
   loadMistakes,
@@ -54,6 +56,7 @@ interface Props {
   onOpenPronunciation: () => void;
   onOpenReading: () => void;
   onOpenShadowing: () => void;
+  onOpenFluency: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
   onOpenLevel: () => void;
   /** Panelden kurulan müfredatı profile yazar. */
@@ -73,6 +76,7 @@ export default function DashboardScreen({
   onOpenPronunciation,
   onOpenReading,
   onOpenShadowing,
+  onOpenFluency,
   onSwitchLanguage,
   onOpenLevel,
   onCurriculumBuilt,
@@ -137,6 +141,7 @@ export default function DashboardScreen({
           curriculumDone: modules.length > 0 && !nextMod,
           spokenTotal: stats.total.spoken ?? 0,
           shadowedTotal: stats.total.shadowed ?? 0,
+          fluencyTotal: stats.total.fluencyRound ?? 0,
           readingsFinished: readings.filter((r) => r.finishedAt).length,
           // Konuşma dengesi: sesli iş (mikrofon + gölgeleme) sessiz işe
           // (tekrar + okuma) karşı. progress.ts ile AYNI tanım.
@@ -192,7 +197,16 @@ export default function DashboardScreen({
           setTeacherNote(previous.message);
           return;
         }
-        const [cards, mistakes, notes, lastActivity, reminders, wakeStats, wakeReadings] =
+        const [
+          cards,
+          mistakes,
+          notes,
+          lastActivity,
+          reminders,
+          wakeStats,
+          wakeReadings,
+          wakeFluency,
+        ] =
           await Promise.all([
             loadVocab(),
             loadMistakes(),
@@ -201,6 +215,7 @@ export default function DashboardScreen({
             pendingReminders(),
             loadStatsSummary(),
             loadReadings(),
+            loadFluency(),
           ]);
         const due = dueCards(cards).length;
         const daysSince = lastActivity
@@ -234,7 +249,11 @@ export default function DashboardScreen({
             dynamic:
               memoryContext(mistakes, notes) +
               retentionDigest(cards) +
-              progressDigest(wakeStats, readingPerformance(wakeReadings, COMPLIANCE_WARN)),
+              progressDigest(
+                wakeStats,
+                readingPerformance(wakeReadings, COMPLIANCE_WARN),
+                fluencyTrend(wakeFluency)
+              ),
           },
           [{ role: "user", content: wakeCheckEvent(digest) }],
           ctx,
@@ -262,6 +281,8 @@ export default function DashboardScreen({
         return onOpenPronunciation();
       case "shadowing":
         return onOpenShadowing();
+      case "fluency":
+        return onOpenFluency();
       case "mistakes":
         return onOpenMistakes();
       case "lesson":
@@ -284,6 +305,7 @@ export default function DashboardScreen({
     else if (s.screen === "pronunciation") onOpenPronunciation();
     else if (s.screen === "reading") onOpenReading();
     else if (s.screen === "shadowing") onOpenShadowing();
+    else if (s.screen === "fluency") onOpenFluency();
     else if (s.screen === "mistakes") onOpenMistakes();
     else if (s.screen === "module") {
       const target = curriculum?.modules.find((m) => m.id === s.moduleId);
@@ -649,9 +671,26 @@ export default function DashboardScreen({
               <Text style={styles.iconSquareText}>🗣️</Text>
             </View>
             <Text style={styles.cardTitle}>Gölgeleme</Text>
-            <Text style={styles.cardMeta}>Dinle, üstüne konuş — akıcılık antrenmanı</Text>
+            <Text style={styles.cardMeta}>Dinle, üstüne konuş — taklitle prosodi</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={[styles.readingCard, { marginBottom: 26 }]}
+          onPress={onOpenFluency}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.iconSquare, { backgroundColor: colors.goldSoft }]}>
+            <Text style={styles.iconSquareText}>⏱️</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Akıcılık Odası · 4·3·2</Text>
+            <Text style={styles.cardMeta}>
+              Aynı şeyi azalan sürede üç kez anlat — hızlanman ölçülür
+            </Text>
+          </View>
+          <Text style={styles.cardArrow}>›</Text>
+        </TouchableOpacity>
 
         <SectionHeader title="Defterlerin" hint="Kelimeler ve hatalar burada birikiyor" />
 

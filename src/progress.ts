@@ -8,6 +8,7 @@
  * yalnız kelime tekrarına ve hata defterine bakılarak veriliyordu.
  * Bu modül o veriyi hocanın okuyabileceği tek bir Türkçe özete çevirir.
  */
+import type { FluencyTrend } from "./fluency.ts";
 import type { StatsSummary } from "./stats.ts";
 import type { ReadingText } from "./types";
 
@@ -98,7 +99,11 @@ export function speakingBalance(stats: StatsSummary): SpeakingBalance {
  * Hocaya sunulan ilerleme raporu. Veri yoksa o satır hiç yazılmaz — modele
  * "0 metin okudu" demek yerine susmak daha dürüst: henüz ölçüm yok demektir.
  */
-export function progressDigest(stats: StatsSummary, reading: ReadingPerformance): string {
+export function progressDigest(
+  stats: StatsSummary,
+  reading: ReadingPerformance,
+  fluency?: FluencyTrend | null
+): string {
   const lines: string[] = [];
 
   if (reading.finished > 0) {
@@ -170,6 +175,22 @@ export function progressDigest(stats: StatsSummary, reading: ReadingPerformance)
       `Bu hafta üretim: ${parts.join(", ")} — ${stats.activeDays7} gün aktif (son 30 günde ${stats.activeDays30} gün).`
     );
   }
+  // Akıcılık: 4/3/2 alıştırmasının ölçtüğü konuşma HIZI. Uygulamanın
+  // öğrencinin akıcılığı hakkında sahip olduğu tek sayısal kanıt budur.
+  if (fluency) {
+    const trendNote =
+      fluency.previousAvgWpm === null
+        ? "ilk oturum, kıyas yok"
+        : fluency.latestWpm > fluency.previousAvgWpm
+          ? `önceki oturumların ortalaması ${fluency.previousAvgWpm} idi — hızlanıyor`
+          : fluency.latestWpm < fluency.previousAvgWpm
+            ? `önceki oturumların ortalaması ${fluency.previousAvgWpm} idi — yavaşlamış`
+            : "önceki oturumlarla aynı";
+    lines.push(
+      `Akıcılık (4/3/2): ${fluency.sessions} oturum; son bitiş hızı ${fluency.latestWpm} kelime/dk (${trendNote}).`
+    );
+  }
+
   // KONUŞMA DENGESİ — bu bölüm hocanın en sık kör kaldığı yer.
   // Eksik dürtmeleri yalnız ÇALIŞAN öğrenciye anlamlı: hiç verisi olmayana
   // "şunu yapmamışsın" demek, henüz hiçbir şey yapmamış birine tek eksiğini

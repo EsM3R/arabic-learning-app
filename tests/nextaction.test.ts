@@ -21,6 +21,7 @@ function state(over: Partial<StudyState> = {}): StudyState {
     curriculumDone: false,
     spokenTotal: 20,
     shadowedTotal: 5,
+    fluencyTotal: 3,
     readingsFinished: 2,
     daysSinceActivity: 0,
     // Varsayılan: dengeli çalışan öğrenci — konuşma kapısı kapalı kalsın ki

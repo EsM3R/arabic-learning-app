@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from "react-native";
 import ErrorBoundary from "./src/components/ErrorBoundary";
 import { installGlobalErrorHandler, reportError } from "./src/errorLog";
 import DashboardScreen from "./src/screens/DashboardScreen";
+import FluencyScreen from "./src/screens/FluencyScreen";
 import LessonScreen from "./src/screens/LessonScreen";
 import LevelScreen from "./src/screens/LevelScreen";
 import LevelUpScreen from "./src/screens/LevelUpScreen";
@@ -42,6 +43,7 @@ type Screen =
   | { name: "pronunciation" }
   | { name: "reading" }
   | { name: "shadowing" }
+  | { name: "fluency" }
   | { name: "settings" }
   | { name: "level" }
   | { name: "levelup" };
@@ -221,6 +223,9 @@ export default function App() {
       case "shadowing":
         setScreen({ name: "shadowing" });
         break;
+      case "fluency":
+        setScreen({ name: "fluency" });
+        break;
       case "mistakes":
         setScreen({ name: "mistakes" });
         break;
@@ -264,6 +269,7 @@ export default function App() {
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
           onOpenReading={() => setScreen({ name: "reading" })}
           onOpenShadowing={() => setScreen({ name: "shadowing" })}
+          onOpenFluency={() => setScreen({ name: "fluency" })}
           onSwitchLanguage={(id) => void onSwitchLanguage(id)}
           onOpenLevel={() => setScreen({ name: "level" })}
           onCurriculumBuilt={(c) => void onCurriculumBuilt(c)}
@@ -321,6 +327,13 @@ export default function App() {
           onBack={() => setScreen({ name: "dashboard" })}
           onOpenPronunciation={() => setScreen({ name: "pronunciation" })}
           onOpenReading={() => setScreen({ name: "reading" })}
+        />
+      )}
+      {screen.name === "fluency" && profile && (
+        <FluencyScreen
+          key={lang}
+          profile={profile}
+          onBack={() => setScreen({ name: "dashboard" })}
         />
       )}
     </View>

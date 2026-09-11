@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BackupFile, mergeDeviceSecrets } from "./backup";
+import type { FluencySession } from "./fluency";
 import { FUSHA_MIGRATION_KEY } from "./fusha";
 import { getActiveLanguageId, setActiveLanguage } from "./languages";
 import {
@@ -53,6 +54,9 @@ export const saveReminders = (reminders: Reminder[]) => saveList(langKey("remind
 /** Okuma Salonu kütüphanesi. Kayıt her zaman pruneReadings ile budanarak yapılmalı. */
 export const loadReadings = () => loadList<ReadingText>(langKey("readings"));
 export const saveReadings = (list: ReadingText[]) => saveList(langKey("readings"), list);
+/** Akıcılık (4/3/2) oturumları. Kayıt pruneSessions ile budanarak yapılmalı. */
+export const loadFluency = () => loadList<FluencySession>(langKey("fluency"));
+export const saveFluency = (list: FluencySession[]) => saveList(langKey("fluency"), list);
 
 /** Kelime sınavı modu tercihi ("yaz" | "soyle") — dil-bağımsız UI ayarı. */
 export async function loadReviewMode(): Promise<string | null> {

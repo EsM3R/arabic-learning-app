@@ -18,6 +18,7 @@ export type StatEvent =
   | "discriminationCorrect" // doğru cevaplanan ayırt etme (oran = correct/discrimination)
   | "spoken" // mikrofonla yapılan konuşma denemesi (hedef dilde)
   | "spokenCorrect" // ses tanımanın hedefi doğru duyduğu deneme (oran = correct/spoken)
+  | "fluencyRound" // tamamlanan 4/3/2 akıcılık turu
   | "mistakeClosed"; // hocanın kapattığı hata
 
 export type DayCounts = Partial<Record<StatEvent, number>>;

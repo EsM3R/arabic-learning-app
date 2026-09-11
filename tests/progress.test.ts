@@ -197,3 +197,34 @@ test("speakingBalance: 'produced' sayacı dengeye KARIŞMAZ", () => {
   assert.equal(b.silentWork, 10);
   assert.equal(b.ratio, 0.5);
 });
+
+
+test("progressDigest: akıcılık eğilimi hocaya sayıyla ulaşır", () => {
+  const d = progressDigest(
+    stats({ week: { reviewed: 10, spoken: 5 }, activeDays7: 3 }),
+    readingPerformance([], 0.85),
+    { sessions: 4, latestWpm: 82, previousAvgWpm: 64 }
+  );
+  assert.match(d, /Akıcılık \(4\/3\/2\): 4 oturum/);
+  assert.match(d, /82 kelime\/dk/);
+  assert.match(d, /hızlanıyor/);
+});
+
+test("progressDigest: ilk akıcılık oturumunda kıyas UYDURULMAZ", () => {
+  const d = progressDigest(
+    stats({ week: { reviewed: 10, spoken: 5 }, activeDays7: 3 }),
+    readingPerformance([], 0.85),
+    { sessions: 1, latestWpm: 50, previousAvgWpm: null }
+  );
+  assert.match(d, /kıyas yok/);
+  assert.doesNotMatch(d, /hızlanıyor|yavaşlamış/);
+});
+
+test("progressDigest: akıcılık verisi yoksa o satır hiç yazılmaz", () => {
+  const d = progressDigest(
+    stats({ week: { reviewed: 10, spoken: 5 }, activeDays7: 3 }),
+    readingPerformance([], 0.85),
+    null
+  );
+  assert.doesNotMatch(d, /Akıcılık/);
+});

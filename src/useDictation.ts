@@ -15,7 +15,7 @@ import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from "expo-speech-recognition";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getActiveLanguageId } from "./languages";
 import { speechLocale } from "./speechinput";
 
@@ -73,6 +73,21 @@ export function useDictation(opts: DictationOptions): DictationState {
   const delivered = useRef(false);
   const startedAt = useRef(0);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Bekleyen gecikmeli durdurma ekran kapanınca da temizlenmeli: yoksa
+  // zamanlayıcı sökülmüş bileşenin üstünde ateşler (setState uyarısı) ve
+  // mikrofon açık kalabilir.
+  useEffect(
+    () => () => {
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch {
+        // ekran zaten kapanıyor
+      }
+    },
+    []
+  );
 
   const reset = () => {
     finals.current = [];

@@ -4,10 +4,12 @@ import { validateLevelChange } from "./levels";
 import { findOpenSameTopic } from "./mistakes";
 import { scheduleReminder } from "./notifications";
 import { progressDigest, readingPerformance } from "./progress";
+import { fluencyTrend } from "./fluency";
 import { COMPLIANCE_WARN } from "./reading";
 import { loadStatsSummary, recordStat } from "./statsStore";
 import { cardMemory, deckStats, Difficulty, dueCards, gradeCard, newCard, strugglingCards } from "./srs";
 import {
+  loadFluency,
   loadMistakes,
   loadNotes,
   loadReadings,
@@ -315,13 +317,13 @@ const INITIATIVE_TOOLS: Anthropic.Tool[] = [
   {
     name: "ekrana_git",
     description:
-      "Öğrenciye bir sonraki adım için ekran önerir; sohbetin altında tıklanabilir bir öneri olarak görünür (zorlama yok). Modülü tamamladıktan sonra sıradaki modülü, tekrarı gelen kelime varsa kelime defterini, telaffuz sorunu görürsen telaffuz stüdyosunu öner. Okuma çalışması önereceksen 'reading' ile Okuma Salonu'nu öner — öğrenci orada kelime defterinden örülmüş metin okur; tekrarı gelen kelimeler birikince de uygundur. Akıcılık/telaffuz pratiği için 'shadowing' (gölgeleme: dinle, üstüne konuş) önerebilirsin.",
+      "Öğrenciye bir sonraki adım için ekran önerir; sohbetin altında tıklanabilir bir öneri olarak görünür (zorlama yok). Modülü tamamladıktan sonra sıradaki modülü, tekrarı gelen kelime varsa kelime defterini, telaffuz sorunu görürsen telaffuz stüdyosunu öner. Okuma çalışması önereceksen 'reading' ile Okuma Salonu'nu öner — öğrenci orada kelime defterinden örülmüş metin okur; tekrarı gelen kelimeler birikince de uygundur. Akıcılık/telaffuz pratiği için 'shadowing' (gölgeleme: dinle, üstüne konuş) önerebilirsin. Öğrenci cümle kurabiliyor ama DURAKSAYARAK konuşuyorsa 'fluency' ile Akıcılık Odası'nı öner: aynı konuyu azalan sürede üç kez anlatır (4/3/2) ve hızlanması ölçülür — akıcılığın asıl antrenmanı budur.",
     input_schema: {
       type: "object",
       properties: {
         screen: {
           type: "string",
-          enum: ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module", "reading", "shadowing"],
+          enum: ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module", "reading", "shadowing", "fluency"],
           description: "Hedef ekran. 'module' seçersen moduleId de ver.",
         },
         moduleId: { type: "string", description: "screen='module' ise açılacak modülün id'si" },
@@ -507,7 +509,11 @@ export async function executeTool(
 
     case "ilerleme_durumu": {
       const [stats, readings] = await Promise.all([loadStatsSummary(), loadReadings()]);
-      const digest = progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN));
+      const digest = progressDigest(
+        stats,
+        readingPerformance(readings, COMPLIANCE_WARN),
+        fluencyTrend(await loadFluency())
+      );
       return { result: digest.trim(), summary: "📊 ilerleme verine baktı" };
     }
 
