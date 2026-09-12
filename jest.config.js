@@ -9,7 +9,9 @@
 module.exports = {
   preset: "jest-expo",
   setupFiles: ["<rootDir>/jest.setup.js"],
-  testMatch: ["<rootDir>/uitests/**/*.test.tsx"],
+  // .tsx ekran testleri, .ts ise cihaz modülü gerektiren mantık testleri
+  // (agent araç döngüsü gibi) — ikisi de jest ortamına muhtaç.
+  testMatch: ["<rootDir>/uitests/**/*.test.tsx", "<rootDir>/uitests/**/*.test.ts"],
   transformIgnorePatterns: [
     "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg))",
   ],

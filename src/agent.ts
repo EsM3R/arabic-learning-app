@@ -48,6 +48,27 @@ export interface ToolOutcome {
 
 const LEVELS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 
+/**
+ * ekrana_git'in kabul ettiği ekranlar — TEK KAYNAK.
+ *
+ * Eskiden liste iki yerde ayrı yazılıydı (araç şeması ve çalışma-zamanı
+ * doğrulaması) ve ayrıştılar: "fluency" şemaya eklendi ama doğrulamaya
+ * eklenmedi. Sonuç, modelin geçerli sandığı bir çağrının sessizce
+ * reddedilmesiydi — hoca Akıcılık Odası'nı ASLA öneremezdi ve kimse
+ * hatayı görmezdi.
+ */
+export const NAV_SCREENS = [
+  "dashboard",
+  "review",
+  "quiz",
+  "pronunciation",
+  "mistakes",
+  "module",
+  "reading",
+  "shadowing",
+  "fluency",
+] as const;
+
 // ---------------------------------------------------------------------------
 // OKUMA ARAÇLARI — Üstaz'ın kendi yazdığı veriyi görebilmesi için
 // ---------------------------------------------------------------------------
@@ -323,7 +344,7 @@ const INITIATIVE_TOOLS: Anthropic.Tool[] = [
       properties: {
         screen: {
           type: "string",
-          enum: ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module", "reading", "shadowing", "fluency"],
+          enum: [...NAV_SCREENS],
           description: "Hedef ekran. 'module' seçersen moduleId de ver.",
         },
         moduleId: { type: "string", description: "screen='module' ise açılacak modülün id'si" },
@@ -846,8 +867,9 @@ export async function executeTool(
 
     case "ekrana_git": {
       const screen = String(input.screen ?? "");
-      const allowed = ["dashboard", "review", "quiz", "pronunciation", "mistakes", "module", "reading", "shadowing"];
-      if (!allowed.includes(screen)) return { result: `Hata: geçersiz ekran '${screen}'.` };
+      if (!(NAV_SCREENS as readonly string[]).includes(screen)) {
+        return { result: `Hata: geçersiz ekran '${screen}'.` };
+      }
       const moduleId = input.moduleId ? String(input.moduleId) : undefined;
       if (screen === "module") {
         const found = ctx.profile.curriculum?.modules.some((m) => m.id === moduleId);

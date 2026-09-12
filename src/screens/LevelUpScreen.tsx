@@ -16,13 +16,21 @@ import {
   KICKOFF_LEVELUP,
   levelUpSystem,
   memoryContext,
+  negotiationContext,
   retentionDigest,
 } from "../prompts";
 import { fluencyTrend } from "../fluency";
 import { progressDigest, readingPerformance } from "../progress";
 import { COMPLIANCE_WARN } from "../reading";
 import { loadStatsSummary } from "../statsStore";
-import { loadFluency, loadMistakes, loadNotes, loadReadings, loadVocab } from "../storage";
+import {
+  loadFluency,
+  loadMistakes,
+  loadNotes,
+  loadReadings,
+  loadRepairSeen,
+  loadVocab,
+} from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
@@ -64,14 +72,16 @@ export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
       try {
         // Seviye kararının girdisi yalnız kelime tekrarı olmasın: cihazda
         // ölçülen anlama ve kulak verisi de hocanın önüne konur.
-        const [mistakes, notes, vocab, stats, readings, fluency] = await Promise.all([
-          loadMistakes(),
-          loadNotes(),
-          loadVocab(),
-          loadStatsSummary(),
-          loadReadings(),
-          loadFluency(),
-        ]);
+        const [mistakes, notes, vocab, stats, readings, fluency, repairSeen] =
+          await Promise.all([
+            loadMistakes(),
+            loadNotes(),
+            loadVocab(),
+            loadStatsSummary(),
+            loadReadings(),
+            loadFluency(),
+            loadRepairSeen(),
+          ]);
         const ctx: AgentContext = { profile, profileChanged: false };
         const reply = await agenticChat(
           {
@@ -83,7 +93,11 @@ export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
                 stats,
                 readingPerformance(readings, COMPLIANCE_WARN),
                 fluencyTrend(fluency)
-              ),
+              ) +
+              // Etkileşimsel yeterlilik CEFR konuşma tanımlayıcılarının
+              // içindedir: onarım yapamayan öğrenci "akıcı" sayılmaz.
+              // Seviye kararı bunu görmeden verilirse eksik verilir.
+              negotiationContext(profile.assessment?.speakingLevel ?? "A0", repairSeen),
           },
           [{ role: "user", content: KICKOFF_LEVELUP }],
           ctx,

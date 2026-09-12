@@ -217,6 +217,7 @@ export default function DashboardScreen({
           wakeStats,
           wakeReadings,
           wakeFluency,
+          wakeRepair,
         ] =
           await Promise.all([
             loadVocab(),
@@ -227,6 +228,7 @@ export default function DashboardScreen({
             loadStatsSummary(),
             loadReadings(),
             loadFluency(),
+            loadRepairSeen(),
           ]);
         const due = dueCards(cards).length;
         const daysSince = lastActivity
@@ -236,7 +238,10 @@ export default function DashboardScreen({
         // Sessiz kalma eşiğine KONUŞMA DENGESİ de eklendi: çalışkan ama hiç
         // konuşmayan öğrenci eskiden hiç dürtülmüyordu — tekrarını aksatmadığı
         // için "dürtecek bir şey yok" sayılıyordu. Asıl dürtülmesi gereken o.
-        const voiceProblem = balance.imbalanced || (balance.neverSpoken && cards.length >= 20);
+        const voiceProblem =
+          balance.imbalanced ||
+          (balance.neverSpoken && cards.length >= 20) ||
+          (wakeRepair.length === 0 && cards.length >= 30);
         if (due < 5 && daysSince < 2 && !voiceProblem) return;
 
         // Konuşma durumu özete GİRMELİ: bu mesaj hocanın kendiliğinden
@@ -249,9 +254,16 @@ export default function DashboardScreen({
             : balance.voiceWork === 0
               ? "bu hafta hiç sesli çalışmamış"
               : `bu hafta ${balance.voiceWork} sesli iş yapmış`;
+        // Onarım refleksi de özete girer: hoca panelde kendiliğinden
+        // konuşurken öğrencinin hiç "anlamadım" dememiş olduğunu bilmeliydi,
+        // bilmiyordu — derste görüyordu, panelde görmüyordu.
+        const repairNote =
+          wakeRepair.length === 0
+            ? "bir kez bile onarım hamlesi (anlamadım/tekrar eder misin) yapmamış"
+            : `${wakeRepair.length} çeşit onarım hamlesi kullanmış`;
         const digest = `${due} kelimenin tekrarı gelmiş; öğrenci ${
           daysSince === 0 ? "bugün de çalışmış" : `${daysSince} gündür çalışmamış`
-        }; ${voiceNote}; açık hata sayısı ${mistakes.filter((m) => !m.resolved).length}; kurulu hatırlatıcı ${reminders.length} adet.`;
+        }; ${voiceNote}; ${repairNote}; açık hata sayısı ${mistakes.filter((m) => !m.resolved).length}; kurulu hatırlatıcı ${reminders.length} adet.`;
 
         const ctx: AgentContext = { profile, profileChanged: false };
         const reply = await agenticChat(
