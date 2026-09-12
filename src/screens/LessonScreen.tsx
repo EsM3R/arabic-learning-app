@@ -19,13 +19,17 @@ import {
   KICKOFF_QUIZ,
   lessonSystem,
   memoryContext,
+  negotiationContext,
   quizSystem,
   retentionDigest,
 } from "../prompts";
+import { detectRepair } from "../negotiation";
 import {
+  addRepairSeen,
   loadChat,
   loadFluency,
   loadMistakes,
+  loadRepairSeen,
   loadNotes,
   loadReadings,
   loadVocab,
@@ -128,13 +132,14 @@ export default function LessonScreen({
     // ÖLÇÜLEN veri de buraya girer. Eskiden yalnız bir ARAÇ olarak vardı
     // (ilerleme_durumu) ve model onu çağırmadıkça hoca öğrencinin konuşup
     // konuşmadığını GÖREMİYORDU — uygulamanın asıl hedefine kör kalıyordu.
-    const [mistakes, notes, vocab, stats, readings, fluency] = await Promise.all([
+    const [mistakes, notes, vocab, stats, readings, fluency, seen] = await Promise.all([
       loadMistakes(),
       loadNotes(),
       loadVocab(),
       loadStatsSummary(),
       loadReadings(),
       loadFluency(),
+      loadRepairSeen(),
     ]);
     const stable = quiz
       ? quizSystem(current)
@@ -146,7 +151,8 @@ export default function LessonScreen({
       dynamic:
         memoryContext(mistakes, notes, module?.track) +
         retentionDigest(vocab) +
-        progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN), fluencyTrend(fluency)),
+        progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN), fluencyTrend(fluency)) +
+        negotiationContext(current.assessment?.speakingLevel ?? "A0", seen),
     };
   };
 
@@ -271,8 +277,18 @@ export default function LessonScreen({
     // Hedef dilde yazılmış mesaj üretimdir. Yalnız ayrı alfabeli dillerde
     // güvenle tespit edilebiliyor (Latin dillerde Türkçe/hedef ayrımı yok —
     // dürüst metrik için sayılmaz; oradaki üretim sınav/okuma/gölgelemeden gelir).
-    const inTarget = containsTargetScript(text, getActivePack().script);
+    const pack = getActivePack();
+    const inTarget = containsTargetScript(text, pack.script);
     if (inTarget) void recordStat("produced");
+
+    // ONARIM HAMLESİ: "anlamadım", "tekrar eder misin" gibi kalıplar sayılır.
+    // Ölçülmeyen davranış öğretilemez — hoca öğrencinin bu refleksi hiç
+    // kullanmadığını ancak böyle görebiliyor (bkz. src/negotiation.ts).
+    const moves = detectRepair(text, pack.negotiation, pack.script);
+    if (moves.length > 0) {
+      void recordStat("repairUsed");
+      void addRepairSeen(moves); // bir sonraki turun promptu güncel listeyi okur
+    }
     if (spoken) {
       // Mikrofonla söylendi: ses tanıma öğrenciyi hedef dilde duyduysa bu
       // gerçek bir konuşma denemesidir — konuşma ölçümü buradan doğar.

@@ -51,6 +51,8 @@ export interface StudyState {
   shadowedTotal: number;
   /** Tamamlanan akıcılık (4/3/2) turu sayısı. */
   fluencyTotal: number;
+  /** Şimdiye kadar KULLANILAN onarım hamlesi türü sayısı (bkz. negotiation.ts). */
+  repairMoves: number;
   readingsFinished: number;
   /** Son çalışmadan bu yana geçen tam gün. */
   daysSinceActivity: number;
@@ -103,6 +105,18 @@ export function speakingGap(s: StudyState): NextAction | null {
       screen: "fluency",
       label: "Akıcılık Odası'nı dene",
       reason: "Aynı şeyi azalan sürede üç kez anlat — duraksamayı eriten alıştırma.",
+    };
+  }
+
+  // Onarım refleksi: konuşabilmenin en görünmez şartı. Öğrenci cümle
+  // kurabiliyor olabilir ama "anlamadım" diyemiyorsa gerçek konuşmada
+  // kilitlenir. Defteri dolmuş ama hiç onarım yapmamışsa araya gir.
+  if (s.repairMoves === 0 && s.vocabTotal >= 30) {
+    return {
+      screen: "lesson",
+      label: "Hocanla konuş — ama bu sefer sen sor",
+      reason:
+        "Bir kez bile 'anlamadım' ya da 'tekrar eder misin' dememişsin; gerçek konuşmanın yarısı budur.",
     };
   }
 

@@ -1,7 +1,24 @@
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
 import { normalizePronunciationItems, sanitizeMinimalPairs } from "./hvpt";
 import { getActivePack } from "./languages";
-import { activeSetup, Effort, StreamHooks, ToolSpec } from "./providers";
+import {
+  activeSetup,
+  Effort,
+  keyFor,
+  modelFor,
+  PROVIDERS,
+  ProviderId,
+  StreamHooks,
+  ToolSpec,
+} from "./providers";
+import {
+  classifyError,
+  successResult,
+  TEST_PROMPT,
+  TEST_TIMEOUT_MS,
+  validateBeforeCall,
+} from "./connectiontest";
+import type { TestResult } from "./connectiontest";
 import {
   curriculumSystem,
   pronunciationSystem,
@@ -96,6 +113,52 @@ export async function agenticChat(
     runTool: (name, input) => executeTool(name, input, ctx),
     ...opts.hooks,
   });
+}
+
+/**
+ * Sağlayıcıyı sınar: tek turluk, araçsız, en kısa istek.
+ *
+ * Bu uygulamada dört sağlayıcı var ama hepsi canlı denenmedi; denenmemiş kod
+ * yolu, ders açıldığında uzun bir bekleyişin sonunda patlayan bir sürprizdir.
+ * Sınama bunu Ayarlar'a, beş saniyeye çeker.
+ *
+ * ARAÇSIZ ve TEK TUR: sınanan şey öğretim değil BAĞLANTI. Araç listesi
+ * gönderilseydi bir sağlayıcının araç biçimindeki sorunu "bağlantı yok" gibi
+ * görünürdü.
+ */
+export async function testConnection(
+  profile: Profile,
+  providerId: ProviderId
+): Promise<TestResult> {
+  const provider = PROVIDERS[providerId];
+  const apiKey = keyFor(profile, providerId);
+  const model = modelFor(profile, providerId);
+
+  const early = validateBeforeCall(apiKey, provider.meta.keyPrefix);
+  if (early) return early;
+
+  // Süre sınırı: sağlayıcı cevap vermezse kullanıcı sonsuza kadar beklemesin.
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("timed out")), TEST_TIMEOUT_MS)
+  );
+  try {
+    const reply = await Promise.race([
+      provider.chat({
+        stable: "Kısa cevap ver.",
+        messages: [{ role: "user", content: TEST_PROMPT }],
+        tools: [],
+        maxRounds: 1,
+        effort: "low",
+        model,
+        apiKey,
+        runTool: async () => ({ result: "" }),
+      }),
+      timeout,
+    ]);
+    return successResult(reply.text, model);
+  } catch (e) {
+    return classifyError(e instanceof Error ? e.message : String(e));
+  }
 }
 
 const CURRICULUM_SCHEMA = {

@@ -16,11 +16,16 @@ import ShadowingScreen from "./src/screens/ShadowingScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import SetupScreen from "./src/screens/SetupScreen";
 import { getActiveLanguageId, LanguageId, setActiveLanguage } from "./src/languages";
+import { snapshotDue } from "./src/autobackup";
 import { FUTURE_SCHEMA_WARNING } from "./src/schema";
+import { writeSnapshot } from "./src/snapshots";
 import {
   clearModuleChats,
   ensureSchema,
+  loadLastSnapshotAt,
   loadProfile,
+  loadVocab,
+  saveLastSnapshotAt,
   resetAll,
   saveProfile,
   switchLanguageProgress,
@@ -101,6 +106,7 @@ export default function App() {
       if (patched !== saved) await saveProfile(patched);
       profileRef.current = patched;
       setProfile(patched);
+      void takeSnapshotIfDue();
       setBootId((n) => n + 1);
       setScreen({ name: "dashboard" });
     } catch (e) {
@@ -108,6 +114,22 @@ export default function App() {
       // yerine kurulum ekranına düş; hata da görünür olsun.
       reportError(e, "profil yüklenirken", false);
       setScreen({ name: "setup" });
+    }
+  };
+
+  /**
+   * Otomatik anlık görüntü — açılışta ve arka planda. Hata YUTULUR ve
+   * kullanıcıya gösterilmez: yedek alamamak dersi engellememeli, ama
+   * sessizce başarısız olduğunu Ayarlar'daki durum satırı ele verir.
+   */
+  const takeSnapshotIfDue = async () => {
+    try {
+      const [lastAt, vocab] = await Promise.all([loadLastSnapshotAt(), loadVocab()]);
+      if (!snapshotDue(lastAt, vocab.length).due) return;
+      const res = await writeSnapshot();
+      if (res.ok) await saveLastSnapshotAt(new Date().toISOString());
+    } catch {
+      // sessiz: bir sonraki açılışta yeniden denenir
     }
   };
 

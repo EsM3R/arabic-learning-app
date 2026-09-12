@@ -22,6 +22,7 @@ function state(over: Partial<StudyState> = {}): StudyState {
     spokenTotal: 20,
     shadowedTotal: 5,
     fluencyTotal: 3,
+    repairMoves: 4,
     readingsFinished: 2,
     daysSinceActivity: 0,
     // Varsayılan: dengeli çalışan öğrenci — konuşma kapısı kapalı kalsın ki
@@ -214,4 +215,19 @@ test("her durumda etiket ve gerekçe dolu döner", () => {
     assert.ok(a.label.length > 0, "etiket boş");
     assert.ok(a.reason.length > 0, "gerekçe boş");
   }
+});
+
+
+test("hiç onarım hamlesi yapmamış öğrenci derse çağrılır", () => {
+  // Cümle kurabilmek yetmez: "anlamadım" diyemeyen öğrenci gerçek
+  // konuşmada kilitlenir.
+  const a = nextAction(state({ repairMoves: 0, vocabTotal: 60 }));
+  assert.equal(a.screen, "lesson");
+  assert.match(a.reason, /anlamadım/);
+});
+
+test("defteri henüz doldurmamış öğrenci onarım için zorlanmaz", () => {
+  const a = nextAction(state({ repairMoves: 0, vocabTotal: 5, dueCount: 0 }));
+  assert.notEqual(a.reason, undefined);
+  assert.doesNotMatch(a.reason, /anlamadım/);
 });

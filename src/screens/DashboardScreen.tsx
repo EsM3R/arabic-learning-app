@@ -32,6 +32,7 @@ import {
   loadMistakes,
   loadNotes,
   loadReadings,
+  loadRepairSeen,
   loadVocab,
   loadWakeCheck,
   saveFushaMigrated,
@@ -151,6 +152,7 @@ export default function DashboardScreen({
           spokenTotal: stats.total.spoken ?? 0,
           shadowedTotal: stats.total.shadowed ?? 0,
           fluencyTotal: stats.total.fluencyRound ?? 0,
+          repairMoves: (await loadRepairSeen()).length,
           readingsFinished: readings.filter((r) => r.finishedAt).length,
           // Konuşma dengesi: sesli iş (mikrofon + gölgeleme) sessiz işe
           // (tekrar + okuma) karşı. progress.ts ile AYNI tanım.

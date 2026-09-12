@@ -1,6 +1,7 @@
 // Uzantılı importlar: bu dosyanın hafıza/tekrar özeti mantığı node altında
 // test edilebilsin diye (tests/prompts.test.ts). Bkz. tsconfig yorumu.
 import { getActivePack } from "./languages.ts";
+import { feignPolicy, kitBrief, repairCoverage } from "./negotiation.ts";
 import { LENGTH_SPECS } from "./reading.ts";
 import type { ReadingRequest } from "./reading.ts";
 import { listSeparator, needsTranslit } from "./scripts.ts";
@@ -42,7 +43,15 @@ ${p.contentFormat}
 - DÜZELTME DENGESİ: Bir cevapta EN FAZLA BİR hatayı düzelt — anlamı bozan öncelikli. Diğer hataları sessizce hata defterine kaydet ve sonraki fırsatlarda döndür; uzun düzeltme blokları öğrenciyi boğar ve hiçbirini öğretmez. Öğrenciyi konuşmaktan korkutma.
 - SESLİ MESAJLAR: "[sesli]" ile başlayan mesajı öğrenci KONUŞARAK söyledi; metin, telefonun ses tanımasının duyduğudur. Bu yüzden: (a) küçük yazım/harf sapmalarını düzeltme, onlar tanıma gürültüsü olabilir; (b) ama tanınamayacak kadar bozuk geldiyse bunu telaffuz sinyali say ve o sesi çalıştır; (c) öğrenciyi sesli devam etmeye teşvik et — konuşma ancak konuşarak gelişir. Cevabında "[sesli]" ifadesini asla tekrarlama.
 - SESLİ ÜRETİM İSTE: Öğrencinin ekranında her zaman bir mikrofon düğmesi var ve basılı tutarak konuşabiliyor — ama yazmak her zaman daha kolay geldiği için kendiliğinden konuşmaz. Bu yüzden sesli üretimi SEN isteyeceksin: derste en az bir kez "bunu bir de sesli söyle, mikrofona basılı tut" de. ÖLÇÜLEN İLERLEME bölümünde konuşma uyarısı görüyorsan bu isteği ertelemeden, o mesajda yap.
-- DERS KAPANIŞI: Her dersi küçük bir üretim göreviyle bitir ("bunu kendi cümlenle yaz") — ezber değil, transfer. Öğrenci o derste hiç sesli cevap vermediyse kapanış görevini SESLİ iste.`;
+- DERS KAPANIŞI: Her dersi küçük bir üretim göreviyle bitir ("bunu kendi cümlenle yaz") — ezber değil, transfer. Öğrenci o derste hiç sesli cevap vermediyse kapanış görevini SESLİ iste.
+
+ANLAM MÜZAKERESİ — bu bölüm uygulamanın en geç kapattığı eksik, hafife alma:
+Gerçek konuşmanın büyük kısmı ONARIMDIR: anlamadığını söylemek, tekrar istemek, "yani şöyle mi?" diye teyit etmek, bilmediğin kelimeyi tarif etmek. Bunu hiç yapmamış öğrenci, dili bildiği hâlde ilk gerçek konuşmada kilitlenir — eksik olan dil değil, ONARIM REFLEKSİDİR. Kuralların:
+- HER ZAMAN ANLAMA. Belirtilen sıklıkta, öğrencinin cümlesini gerçekten anlamamış gibi yap ve onarım iste. Bunu yaparken sıcak ol; amaç sınamak değil, refleks kurmak.
+- KURTARMA. Öğrenci bir kelimeyi bilmiyorsa hemen verme: önce TARİF ETTİR ("adını bilmiyorsan anlat: ne işe yarar, neye benzer?"). Dolaylı anlatım gerçek konuşmanın can simididir; kelimeyi peşin vermek o refleksi öldürür.
+- Öğrenci bir onarım kalıbı kullandığında bunu AÇIKÇA ödüllendir ve konuşmayı sürdür — doğru davranışı pekiştiren tek şey budur.
+- Öğrenci anlamadığı hâlde anlamış gibi geçiştiriyorsa (konuyu değiştiriyor, alakasız cevap veriyor) bunu nazikçe yakala: "anlamadıysan söyleyebilirsin, o da dilin parçası."
+- Kendi konuşmanda doldurucuları (şey…, yani…) doğal biçimde kullan; öğrenci gerçek konuşma ritmini senden duyacak.`;
 }
 
 export function curriculumSystem(
@@ -180,6 +189,29 @@ export function memoryContext(
   }
 
   return parts.length > 0 ? `\n\nHAFIZA:\n${parts.join("\n\n")}` : "";
+}
+
+/**
+ * Müzakere bloğu — derse GİREN dinamik kısım.
+ *
+ * Araç çantası (kalıplar) ve öğrencinin şimdiye kadar hangi hamleleri
+ * kullandığı burada birleşir. Kapsam verisi olmadan hoca "anlamadım demeyi
+ * öğret" der ama öğrencinin onu zaten bildiğini bilmez; kapsamla birlikte
+ * eksik olanı hedefler.
+ */
+export function negotiationContext(level: string, repairSeen: string[]): string {
+  const p = getActivePack();
+  const kit = p.negotiation;
+  const policy = feignPolicy(level);
+  const coverage = repairCoverage(repairSeen);
+  return `\n\nMÜZAKERE ARAÇ ÇANTASI (öğrencinin kullanmasını istediğin kalıplar):
+${kitBrief(kit, p.script)}
+
+KASITLI ANLAMAMA: ${policy.instruction}
+Anlamadığını şöyle belli edebilirsin: ${kit.teacherCue}
+TÜRK ÖĞRENCİNİN TUZAĞI: ${kit.turkishTrap}
+
+ÖĞRENCİNİN ONARIM DURUMU: ${coverage.summary}`;
 }
 
 export function lessonSystem(profile: Profile, module: CurriculumModule): string {

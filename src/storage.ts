@@ -60,6 +60,23 @@ export const saveReadings = (list: ReadingText[]) => saveList(langKey("readings"
 export const loadFluency = () => loadList<FluencySession>(langKey("fluency"));
 export const saveFluency = (list: FluencySession[]) => saveList(langKey("fluency"), list);
 
+/**
+ * Öğrencinin ŞİMDİYE KADAR kullandığı onarım hamlesi türleri (bkz.
+ * src/negotiation.ts). Dil başına tutulur: Fransızcada "anlamadım" demeyi
+ * öğrenmiş olmak Rusçada da öğrenmiş olmak demek değildir.
+ */
+export const loadRepairSeen = () => loadList<string>(langKey("repairSeen"));
+
+/** Yeni bir kategori ekler; zaten varsa yazma yapmaz. */
+export async function addRepairSeen(categories: string[]): Promise<string[]> {
+  if (categories.length === 0) return loadRepairSeen();
+  const current = await loadRepairSeen();
+  const merged = Array.from(new Set([...current, ...categories]));
+  if (merged.length === current.length) return current;
+  await saveList(langKey("repairSeen"), merged);
+  return merged;
+}
+
 /** Kelime sınavı modu tercihi ("yaz" | "soyle") — dil-bağımsız UI ayarı. */
 export async function loadReviewMode(): Promise<string | null> {
   return AsyncStorage.getItem("reviewMode.v1");
@@ -289,4 +306,14 @@ export async function loadLastExportAt(): Promise<string | null> {
 
 export async function saveLastExportAt(): Promise<void> {
   await AsyncStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
+}
+
+const LAST_SNAPSHOT_KEY = "lastSnapshot.v1";
+
+export async function loadLastSnapshotAt(): Promise<string | null> {
+  return AsyncStorage.getItem(LAST_SNAPSHOT_KEY);
+}
+
+export async function saveLastSnapshotAt(at: string): Promise<void> {
+  await AsyncStorage.setItem(LAST_SNAPSHOT_KEY, at);
 }

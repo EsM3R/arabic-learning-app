@@ -23,7 +23,17 @@ import {
 import Header from "../components/Header";
 import { isLanguageId, LANGUAGE_PACKS } from "../languages";
 import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
-import { dumpAllEntries, restoreFromBackup, saveLastExportAt } from "../storage";
+import { latestSnapshotUri, listSnapshots } from "../snapshots";
+import { snapshotStatus } from "../autobackup";
+import { testConnection } from "../claude";
+import { classifyError } from "../connectiontest";
+import type { TestResult } from "../connectiontest";
+import {
+  dumpAllEntries,
+  loadLastSnapshotAt,
+  restoreFromBackup,
+  saveLastExportAt,
+} from "../storage";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
@@ -109,13 +119,70 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
     onBack();
   };
 
-  const [busy, setBusy] = useState<"export" | "import" | null>(null);
+  const [busy, setBusy] = useState<"export" | "import" | "test" | null>(null);
   const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
   /**
    * Yedek al: depodaki her şey (API anahtarları HARİÇ) tek JSON dosyasına
    * yazılır ve Android paylaşım sayfası açılır — Drive, WhatsApp, e-posta...
    */
+  /** Son bağlantı sınaması sonucu (null = henüz sınanmadı). */
+  const [test, setTest] = useState<TestResult | null>(null);
+  /** Otomatik anlık görüntü durumu — Ayarlar açılınca okunur. */
+  const [snapInfo, setSnapInfo] = useState<string>("");
+
+  useEffect(() => {
+    void (async () => {
+      const [lastAt, names] = await Promise.all([
+        loadLastSnapshotAt(),
+        Promise.resolve(listSnapshots()),
+      ]);
+      setSnapInfo(snapshotStatus(lastAt, names.length));
+    })();
+  }, []);
+
+  /** Son otomatik anlık görüntüyü dışarı paylaş — bir dokunuşla kurtarma. */
+  const shareSnapshot = async () => {
+    const uri = latestSnapshotUri();
+    if (!uri) {
+      Alert.alert("Anlık görüntü yok", "Henüz otomatik anlık görüntü alınmamış.");
+      return;
+    }
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Paylaşım kullanılamıyor", `Dosya şurada:\n${uri}`);
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/json",
+        dialogTitle: "Anlık görüntüyü nereye kaydedelim?",
+      });
+      await saveLastExportAt();
+    } catch (e) {
+      Alert.alert("Paylaşılamadı", errText(e));
+    }
+  };
+
+  const runConnectionTest = async () => {
+    setBusy("test");
+    setTest(null);
+    try {
+      // Sınama EKRANDAKİ değerlerle yapılmalı: kullanıcı anahtarı yeni
+      // yapıştırmış ama kaydetmemiş olabilir.
+      const draft: Profile = {
+        ...profile,
+        provider: selected,
+        apiKeys: { ...(profile.apiKeys ?? {}), ...keys },
+        models: { ...(profile.models ?? {}), ...models },
+      };
+      setTest(await testConnection(draft, selected));
+    } catch (e) {
+      setTest(classifyError(e instanceof Error ? e.message : String(e)));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportBackup = async () => {
     setBusy("export");
     try {
@@ -252,9 +319,33 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
           {meta.experimental && (
             <View style={styles.warnBox}>
               <Text style={styles.warnText}>
-                Bu sağlayıcı canlı API'ye karşı denenmedi. Çalışmazsa Anthropic'e geri
-                dön — dersin, kelime defterin ve ilerlemen etkilenmez.
+                Bu sağlayıcı canlı API'ye karşı denenmedi. Aşağıdaki düğmeyle kendin
+                sınayabilirsin; çalışmazsa Anthropic'e geri dön — dersin, kelime
+                defterin ve ilerlemen etkilenmez.
               </Text>
+            </View>
+          )}
+
+          {/* Bağlantı sınaması: denenmemiş kod yolunun hatası ders ortasında
+              değil BURADA çıksın. Ders açıp uzun bir bekleyişin sonunda
+              patlamak en pahalı hata bildirim biçimidir. */}
+          <TouchableOpacity
+            style={[styles.testButton, busy === "test" && styles.testButtonOff]}
+            disabled={busy === "test"}
+            onPress={() => void runConnectionTest()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.testButtonText}>
+              {busy === "test" ? "Sınanıyor…" : "🔌 Bağlantıyı sına"}
+            </Text>
+          </TouchableOpacity>
+          {test && (
+            <View style={[styles.testResult, test.ok ? styles.testOk : styles.testBad]}>
+              <Text style={styles.testTitle}>
+                {test.ok ? "✓ " : "✕ "}
+                {test.title}
+              </Text>
+              <Text style={styles.testDetail}>{test.detail}</Text>
             </View>
           )}
 
@@ -335,6 +426,18 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Otomatik anlık görüntü: uygulama kendi verisini bozarsa geri
+                dönülecek nokta. Telefon kaybolursa BUNLAR DA GİDER — durum
+                metni bunu açıkça söylüyor, yanlış güven vermesin. */}
+            {!!snapInfo && (
+              <View style={styles.snapBox}>
+                <Text style={styles.snapText}>{snapInfo}</Text>
+                <TouchableOpacity onPress={() => void shareSnapshot()} activeOpacity={0.85}>
+                  <Text style={styles.snapLink}>Son anlık görüntüyü dışarı al ›</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -418,6 +521,29 @@ function makeStyles(colors: Palette) {
   },
   rowMeta: { fontSize: 11.5, color: colors.inkSoft, marginTop: 2 },
   keyOk: { fontSize: 11, fontWeight: "800", color: colors.accent },
+  snapBox: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  snapText: { fontSize: 12, lineHeight: 18, color: colors.inkFaint },
+  snapLink: { fontSize: 13, fontWeight: "800", color: colors.accent, marginTop: 8 },
+  testButton: {
+    marginTop: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  testButtonOff: { opacity: 0.5 },
+  testButtonText: { color: colors.accent, fontWeight: "800", fontSize: 14 },
+  testResult: { marginTop: 10, padding: 12, borderRadius: radius.md, borderWidth: 1 },
+  testOk: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  testBad: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
+  testTitle: { fontWeight: "800", fontSize: 14, color: colors.ink },
+  testDetail: { fontSize: 13, lineHeight: 19, color: colors.inkSoft, marginTop: 4 },
   warnBox: {
     backgroundColor: colors.goldSoft,
     borderRadius: 12,

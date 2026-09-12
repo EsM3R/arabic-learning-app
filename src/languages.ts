@@ -4,7 +4,9 @@
  * telaffuz odakları, ses kodu — bu paketlerden gelir.
  */
 
+import type { NegotiationKit } from "./negotiation.ts";
 import type { ScriptId } from "./scripts.ts";
+import { NEGOTIATION_KITS } from "./negotiationkits.ts";
 
 export type LanguageId = "ar" | "en" | "es" | "fr" | "de" | "it" | "ru" | "fa";
 
@@ -76,6 +78,13 @@ export interface LanguagePack {
   /** Türk öğrencinin bu dilde zorlandığı sesler (telaffuz stüdyosu). */
   pronunciationFocus: string;
   /**
+   * Anlam müzakeresi araç çantası: "anlamadım", "tekrar eder misin",
+   * "yani şöyle mi" gibi ONARIM kalıpları (bkz. src/negotiation.ts).
+   * İçerik src/negotiationkits.ts'te tutulur — bu dosya zaten uzun ve
+   * araç çantaları dil başına ~15 kalıp.
+   */
+  negotiation: NegotiationKit;
+  /**
    * Bu dilde CİHAZ SES TANIMASININ kendine has davranışı (telaffuz
    * ekranında dürüstlük notunun yanına eklenir). Genel not dil-bağımsızdır;
    * burası yalnız o dile özgü tuzağı söyler. Yoksa boş bırakılır.
@@ -97,6 +106,7 @@ export const LANGUAGE_PACKS: Record<LanguageId, LanguagePack> = {
     ttsLocale: "ar",
     script: "arabic",
     targetAccusative: "Arapçasını",
+    negotiation: NEGOTIATION_KITS.ar,
     asrNote:
       "Android'in Arapça tanıması fusha ağırlıklıdır — bu fusha öğrenirken avantaj. Ama ammice alışkanlığı (ق'ın hemzeye, ث'nin t/s'ye kayması) tanınmamana yol açabilir.",
     newWordNote: ", her zaman TAM harekeli",
@@ -174,6 +184,7 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "en-GB",
     script: "latin",
     targetAccusative: "İngilizcesini",
+    negotiation: NEGOTIATION_KITS.en,
     asrNote: "",
     newWordNote: "",
     persona: `Sen "Mr. Oliver" adında, Londra doğumlu, Türkçeyi akıcı konuşan usta bir İngilizce öğretmenisin. Öğrencin Türk ve iki hedefi var:
@@ -221,6 +232,7 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "es-ES",
     script: "latin",
     targetAccusative: "İspanyolcasını",
+    negotiation: NEGOTIATION_KITS.es,
     asrNote: "",
     newWordNote: "",
     persona: `Sen "Profesora Lucía" adında, Madrid doğumlu, Türkçeyi akıcı konuşan usta bir İspanyolca öğretmenisin. Öğrencin Türk ve iki hedefi var:
@@ -268,6 +280,7 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "fr-FR",
     script: "latin",
     targetAccusative: "Fransızcasını",
+    negotiation: NEGOTIATION_KITS.fr,
     asrNote:
       "Fransızca tanıma liaison ve sessiz harflere duyarlıdır; bağlamadan okursan (les_amis yerine 'le zami' değil 'le ami') tanınmayabilir.",
     newWordNote: "",
@@ -323,6 +336,7 @@ YALANCI EŞDEĞER TUZAĞI — bunları uyararak öğret: مسافر "yolcu"dur, 
     ttsLocale: "de-DE",
     script: "latin",
     targetAccusative: "Almancasını",
+    negotiation: NEGOTIATION_KITS.de,
     asrNote: "",
     newWordNote: "",
     persona: `Sen "Herr Weber" adında, Berlinli, Türkçeyi akıcı konuşan usta bir Almanca öğretmenisin. Öğrencin Türk ve iki hedefi var:
@@ -383,6 +397,7 @@ ASIL ZORLUKLAR (vaktini buraya harca):
     ttsLocale: "it-IT",
     script: "latin",
     targetAccusative: "İtalyancasını",
+    negotiation: NEGOTIATION_KITS.it,
     asrNote: "",
     newWordNote: "",
     persona: `Sen "Professore Marco" adında, Romalı, Türkçeyi akıcı konuşan usta bir İtalyanca öğretmenisin. Öğrencin Türk ve iki hedefi var:
@@ -437,6 +452,7 @@ ASIL ZORLUKLAR (vaktini buraya harca):
     ttsLocale: "ru-RU",
     script: "cyrillic",
     targetAccusative: "Rusçasını",
+    negotiation: NEGOTIATION_KITS.ru,
     asrNote:
       "Rusça tanıma vurguya değil seslere bakar; yanlış vurgulasan da doğru kelimeyi yazabilir. Yani 'anlaşıldı' sonucu vurgunun doğru olduğunu KANITLAMAZ.",
     newWordNote: ", vurgulu ünlüsü ´ ile işaretli (örn. рабо́та)",
@@ -505,6 +521,7 @@ ASIL ZORLUKLAR (vaktini buraya harca):
     ttsLocale: "fa-IR",
     script: "persian",
     targetAccusative: "Farsçasını",
+    negotiation: NEGOTIATION_KITS.fa,
     asrNote:
       "Farsça tanıma her cihazda kurulu değildir; hata alıyorsan Google uygulamasından Farsça dil paketini indirmen gerekebilir.",
     newWordNote: ", bitişiksiz boşluklar (ZWNJ) yerli yerinde: می‌روم، کتاب‌ها",
