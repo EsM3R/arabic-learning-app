@@ -50,6 +50,9 @@ function client(apiKey: string): GoogleGenAI {
 }
 
 function toTools(req: AgenticRequest) {
+  // Araç yoksa alanın kendisi gönderilmez: Gemini boş functionDeclarations'ı
+  // geçersiz sayar (bkz. toolsOrUndefined).
+  if (req.tools.length === 0) return undefined;
   return [
     {
       functionDeclarations: req.tools.map((t) => ({

@@ -13,6 +13,7 @@ import {
   ProviderMeta,
   StructuredRequest,
   TRUNCATED_TEXT,
+  toolsOrUndefined,
   withDynamic,
   wrapUpNotice,
 } from "./types";
@@ -84,7 +85,7 @@ const TOOL_TEXT_CORRECTION =
 
 async function chat(req: AgenticRequest): Promise<AgenticReply> {
   const openai = client(req.apiKey);
-  const tools = toTools(req);
+  const tools = toolsOrUndefined(toTools(req));
   const actions: string[] = [];
   // Ekrana akanla kaydedilen aynı olsun diye cevap TÜM turların metnidir.
   const textParts: string[] = [];

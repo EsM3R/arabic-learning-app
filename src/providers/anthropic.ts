@@ -15,6 +15,7 @@ import {
   REFUSAL_TEXT,
   StructuredRequest,
   TRUNCATED_TEXT,
+  toolsOrUndefined,
   wrapUpNotice,
 } from "./types";
 
@@ -76,7 +77,7 @@ async function streamRound(
 
 async function chat(req: AgenticRequest): Promise<AgenticReply> {
   const anthropic = client(req.apiKey);
-  const tools = toTools(req);
+  const tools = toolsOrUndefined(toTools(req));
   const history = buildMessages(req.messages, req.dynamic);
   const actions: string[] = [];
   // Ekrana akanla kaydedilen aynı olsun diye cevap TÜM turların metnidir

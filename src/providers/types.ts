@@ -1,4 +1,6 @@
-import { ChatMessage } from "../types";
+// Tip-yalnız + uzantılı: boş araç kararı node altında test edilebilsin
+// (tests/providertools.test.ts).
+import type { ChatMessage } from "../types.ts";
 
 export type ProviderId = "anthropic" | "openai" | "gemini" | "deepseek";
 
@@ -50,6 +52,19 @@ export interface AgenticRequest extends StreamHooks {
   apiKey: string;
   /** Araç çağrısını çalıştırır (agent.ts'teki executeTool'a bağlanır). */
   runTool: (name: string, input: Record<string, unknown>) => Promise<ToolOutcome>;
+}
+
+/**
+ * Boş araç listesi GÖNDERİLMEZ.
+ *
+ * Sağlayıcıların bir kısmı boş listeyi geçersiz sayar (Gemini boş
+ * functionDeclarations'ı reddeder, OpenAI uyumlu uçlar da "en az bir öğe"
+ * ister). Bu, araçsız çağıran tek yolu — Ayarlar'daki bağlantı sınamasını —
+ * yanlış hatayla düşürüyordu: tam da yardım etmesi gereken sağlayıcıda
+ * "çalışmıyor" diyordu.
+ */
+export function toolsOrUndefined<T>(list: T[]): T[] | undefined {
+  return list.length > 0 ? list : undefined;
 }
 
 export interface AgenticReply {
