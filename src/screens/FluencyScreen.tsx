@@ -36,7 +36,7 @@ import {
 import type { FluencyRound } from "../fluency";
 import { getActivePack } from "../languages";
 import { isRtl } from "../scripts";
-import { recordStat } from "../statsStore";
+import { recordStats } from "../statsStore";
 import {
   loadFluency,
   loadReadings,
@@ -187,8 +187,8 @@ export default function FluencyScreen({
       const said = heard.current || lastPartial.current;
       const round = makeRound(wordCount(said, pack.script), plan[i]);
       setRounds((prev) => [...prev, round]);
-      void recordStat("fluencyRound");
-      void recordStat("spoken"); // bu gerçekten bir konuşma denemesidir
+      // Tur hem akıcılık turu hem konuşma denemesidir; ikisi TOPLU yazılır.
+      void recordStats(["fluencyRound", "spoken"]);
       void touchLastActivity();
       void feedback(true);
       // Sıralama saf modülde ve test altında (bkz. src/fluency.ts afterRound).

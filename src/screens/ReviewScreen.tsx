@@ -15,7 +15,8 @@ import { speakTarget } from "../speech";
 import { RECOGNITION_NOTE, SpeechAttempt, judgeSpeech } from "../speechinput";
 import { gradeCard, sessionQueue } from "../srs";
 import { useDictation } from "../useDictation";
-import { recordStat } from "../statsStore";
+import { recordStat, recordStats } from "../statsStore";
+import type { StatEvent } from "../stats";
 import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity } from "../storage";
 import { matchProduction, ProductionMatch } from "../textnorm";
 import { colors, radius, shadow, shadowLift, targetText } from "../theme";
@@ -112,18 +113,22 @@ export default function ReviewScreen({ onBack }: Props) {
     );
     setSpeech(attempt);
     void feedback(attempt.verdict === "dogru");
-    void recordStat("spoken");
-    if (attempt.verdict === "dogru") void recordStat("spokenCorrect");
+    const heard: StatEvent[] = ["spoken"];
+    if (attempt.verdict === "dogru") heard.push("spokenCorrect");
 
-    if (direction === "tanima") return; // telaffuz provası: notlama yok
+    if (direction === "tanima") {
+      void recordStats(heard); // telaffuz provası: notlama yok
+      return;
+    }
     setAnswer(said);
     if (attempt.verdict === "dogru") {
-      void recordStat("reviewed");
-      void recordStat("produced"); // sesli doğru üretim
+      // Tek doğru cevap dört sayaç birden artırır; TOPLU yazılır.
+      void recordStats([...heard, "reviewed", "produced"]);
       setMatchKind(attempt.match);
       setPreGrade(current);
       await applyGrade(current, 2);
     } else {
+      void recordStats(heard);
       setMatchKind("none");
     }
     setPhase("sonuc");
@@ -159,8 +164,7 @@ export default function ReviewScreen({ onBack }: Props) {
       void feedback(true); // doğru cevap elde hissedilsin
       setPreGrade(current);
       await applyGrade(current, 2);
-      void recordStat("reviewed");
-      void recordStat("produced"); // yazılı doğru üretim — panelin "ürettiğin" sayacı
+      void recordStats(["reviewed", "produced"]); // yazılı doğru üretim
     } else {
       void feedback(false);
     }

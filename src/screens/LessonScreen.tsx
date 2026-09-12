@@ -10,7 +10,7 @@ import { markSpoken } from "../speechinput";
 import { fluencyTrend } from "../fluency";
 import { progressDigest, readingPerformance } from "../progress";
 import { COMPLIANCE_WARN } from "../reading";
-import { loadStatsSummary, recordStat } from "../statsStore";
+import { loadStatsSummary, recordStat, recordStats } from "../statsStore";
 import {
   freeChatSystem,
   idleNudgeEvent,
@@ -292,8 +292,7 @@ export default function LessonScreen({
     if (spoken) {
       // Mikrofonla söylendi: ses tanıma öğrenciyi hedef dilde duyduysa bu
       // gerçek bir konuşma denemesidir — konuşma ölçümü buradan doğar.
-      void recordStat("spoken");
-      if (inTarget) void recordStat("spokenCorrect");
+      void recordStats(inTarget ? ["spoken", "spokenCorrect"] : ["spoken"]);
     }
     // Hoca yazıyla söyleneni ayırt edebilmeli: ses tanıma gürültülüdür,
     // kelime kelime yazım düzeltmesi yapılmamalı.
