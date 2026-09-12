@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { LessonQuality } from "./lessonquality";
 import { BackupFile, mergeDeviceSecrets } from "./backup";
 import type { FluencySession } from "./fluency";
 import { FUSHA_MIGRATION_KEY } from "./fusha";
@@ -59,6 +60,15 @@ export const saveReadings = (list: ReadingText[]) => saveList(langKey("readings"
 /** Akıcılık (4/3/2) oturumları. Kayıt pruneSessions ile budanarak yapılmalı. */
 export const loadFluency = () => loadList<FluencySession>(langKey("fluency"));
 export const saveFluency = (list: FluencySession[]) => saveList(langKey("fluency"), list);
+
+/**
+ * DERS KALİTESİ ölçümleri (bkz. src/lessonquality.ts). Dil başına tutulur:
+ * hocanın Arapça derste çok Türkçe konuşması, Fransızca dersi hakkında bir
+ * şey söylemez. Kayıt pruneQuality ile budanarak yapılmalı.
+ */
+export const loadLessonQuality = () => loadList<LessonQuality>(langKey("lessonQuality"));
+export const saveLessonQuality = (list: LessonQuality[]) =>
+  saveList(langKey("lessonQuality"), list);
 
 /**
  * Öğrencinin ŞİMDİYE KADAR kullandığı onarım hamlesi türleri (bkz.

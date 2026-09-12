@@ -5,6 +5,12 @@ import ChatView from "../components/ChatView";
 import Header from "../components/Header";
 import { agenticChat } from "../claude";
 import { isBudgetError } from "../budget";
+import {
+  analyzeLesson,
+  averageQuality,
+  lessonQualityDigest,
+  pruneQuality,
+} from "../lessonquality";
 import { getActivePack } from "../languages";
 import { extractArabic } from "../speech";
 import { markSpoken } from "../speechinput";
@@ -31,10 +37,12 @@ import {
   loadFluency,
   loadMistakes,
   loadRepairSeen,
+  loadLessonQuality,
   loadNotes,
   loadReadings,
   loadVocab,
   saveChat,
+  saveLessonQuality,
   touchLastActivity,
 } from "../storage";
 import { colors } from "../theme";
@@ -133,15 +141,17 @@ export default function LessonScreen({
     // ÖLÇÜLEN veri de buraya girer. Eskiden yalnız bir ARAÇ olarak vardı
     // (ilerleme_durumu) ve model onu çağırmadıkça hoca öğrencinin konuşup
     // konuşmadığını GÖREMİYORDU — uygulamanın asıl hedefine kör kalıyordu.
-    const [mistakes, notes, vocab, stats, readings, fluency, seen] = await Promise.all([
-      loadMistakes(),
-      loadNotes(),
-      loadVocab(),
-      loadStatsSummary(),
-      loadReadings(),
-      loadFluency(),
-      loadRepairSeen(),
-    ]);
+    const [mistakes, notes, vocab, stats, readings, fluency, seen, quality] =
+      await Promise.all([
+        loadMistakes(),
+        loadNotes(),
+        loadVocab(),
+        loadStatsSummary(),
+        loadReadings(),
+        loadFluency(),
+        loadRepairSeen(),
+        loadLessonQuality(),
+      ]);
     const stable = quiz
       ? quizSystem(current)
       : module
@@ -153,8 +163,41 @@ export default function LessonScreen({
         memoryContext(mistakes, notes, module?.track) +
         retentionDigest(vocab) +
         progressDigest(stats, readingPerformance(readings, COMPLIANCE_WARN), fluencyTrend(fluency)) +
-        negotiationContext(current.assessment?.speakingLevel ?? "A0", seen),
+        negotiationContext(current.assessment?.speakingLevel ?? "A0", seen) +
+        // Hocanın KENDİ dersinin ölçümü. Öğrencinin durumu zaten besleniyordu;
+        // hoca kendi öğretme biçimini göremiyordu — ölçülen ama söylenmeyen
+        // her şey gibi, hiç ölçülmemiş sayılırdı.
+        lessonQualityDigest(averageQuality(quality), current.assessment?.speakingLevel ?? "A0"),
     };
+  };
+
+  /**
+   * Bu sohbetin kalite ölçümünü kaydeder.
+   *
+   * Ders başına TEK kayıt tutulur: her turda bir satır eklense on beş turluk
+   * bir ders, on beş kısa dersmiş gibi ortalamaya girer ve eğilim anlamını
+   * yitirirdi. Bu yüzden aynı sohbetin kaydı yerinde güncellenir.
+   *
+   * Sınav ve serbest sohbet DIŞARIDA: ölçülmek istenen şey ders anlatımı.
+   * Sınavda hocanın tek kelimelik sorular sorması ve öğrencinin kısa cevaplar
+   * vermesi doğru davranıştır; onu "hoca soru sormuyor / öğrenci üretmiyor"
+   * diye kusur saymak ölçümü çöpe çevirirdi.
+   */
+  const recordLessonQuality = async (history: ChatMessage[]) => {
+    if (quiz || !module) return;
+    try {
+      const vocab = await loadVocab();
+      const q = analyzeLesson(
+        history,
+        pack.script,
+        vocab.map((c) => c.arabic)
+      );
+      const list = await loadLessonQuality();
+      const mine = list.filter((x) => x.chatId !== chatId);
+      await saveLessonQuality(pruneQuality([...mine, { ...q, chatId }]));
+    } catch {
+      // Ölçüm dersin kritik yolunda değil: hata yutulur, ders akmaya devam eder.
+    }
   };
 
   /** Tampondaki akışı ekrana bas (en geç 80 ms'de bir). */
@@ -231,6 +274,7 @@ export default function LessonScreen({
       ];
       setMessages(updated);
       await saveChat(chatId, updated);
+      void recordLessonQuality(updated);
       if (ctx.pendingNavigation) setSuggestion(ctx.pendingNavigation);
       armIdleTimer();
     } catch (e) {

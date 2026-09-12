@@ -1,6 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import Header from "../components/Header";
+import { averageQuality, lessonFindings } from "../lessonquality";
+import type { LessonQuality, QualityFinding } from "../lessonquality";
+import { loadLessonQuality } from "../storage";
 import { getActivePack } from "../languages";
 import { colors, radius, shadow, shadowLift } from "../theme";
 import type { Palette } from "../theme";
@@ -39,6 +42,22 @@ export default function LevelScreen({ profile, onBack }: Props) {
   };
   const konusma = trackStat("konusma");
   const okuma = trackStat("okuma");
+
+  /**
+   * HOCANIN KARNESİ.
+   *
+   * Uygulamadaki her ölçüm öğrenciye bakıyordu; hocaya hiç bakılmıyordu.
+   * Oysa uygulamanın tamamı "model iyi ders anlatıyor" varsayımına dayanıyor.
+   * Burası o varsayımı öğrencinin de görebildiği tek yer — hoca kendi
+   * karnesini düzeltemesin diye ölçüm cihazda yapılıyor, modele sorulmuyor.
+   */
+  const [quality, setQuality] = useState<LessonQuality | null>(null);
+  useEffect(() => {
+    void loadLessonQuality().then((list) => setQuality(averageQuality(list)));
+  }, []);
+  const findings: QualityFinding[] = quality
+    ? lessonFindings(quality, a?.speakingLevel ?? "A0")
+    : [];
 
   return (
     <View style={styles.container}>
@@ -112,6 +131,40 @@ export default function LevelScreen({ profile, onBack }: Props) {
               <Text style={styles.listNote}>
                 {pack.teacherName} bunları derslere doğal biçimde serpiştiriyor; düzeldikçe
                 listeden düşüyorlar.
+              </Text>
+            </View>
+          )}
+
+          {findings.length > 0 && (
+            <View style={styles.listCard}>
+              <Text style={[styles.listTitle, { color: colors.ink }]}>
+                {pack.teacherName} nasıl ders veriyor
+              </Text>
+              {findings.map((f) => (
+                <View key={f.key} style={styles.listRow}>
+                  <Text
+                    style={[
+                      styles.listMark,
+                      {
+                        color:
+                          f.level === "sorun"
+                            ? colors.danger
+                            : f.level === "dikkat"
+                              ? colors.gold
+                              : colors.accent,
+                      },
+                    ]}
+                  >
+                    {f.level === "iyi" ? "✓" : f.level === "dikkat" ? "!" : "✗"}
+                  </Text>
+                  <Text style={styles.listText}>{f.text}</Text>
+                </View>
+              ))}
+              <Text style={styles.listNote}>
+                Son {"\u00A0"}derslerin ortalaması; cihazda hesaplanır, hiçbir yere
+                gönderilmez. Latin alfabeli dillerde Türkçe/hedef dil ayrımı tahminîdir,
+                sayılar YAKLAŞIKTIR. {pack.teacherName} bu ölçümü her derste görüp
+                kendini düzeltir.
               </Text>
             </View>
           )}
