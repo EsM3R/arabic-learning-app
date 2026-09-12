@@ -46,6 +46,42 @@ jest.mock("expo-file-system", () => ({
   },
 }));
 
+/**
+ * Ses kaydı: gerçek mikrofon yok. Kaydedici durumu __recorder üzerinden
+ * sürülebilir ki "izin verilmedi" gibi yollar da test edilebilsin.
+ */
+const recorderState = { isRecording: false, uri: null, permission: true, prepared: 0, played: [] };
+global.__recorder = recorderState;
+jest.mock("expo-audio", () => ({
+  RecordingPresets: { HIGH_QUALITY: {} },
+  requestRecordingPermissionsAsync: jest.fn(async () => ({
+    granted: global.__recorder.permission,
+  })),
+  setAudioModeAsync: jest.fn(async () => {}),
+  useAudioRecorder: () => ({
+    get isRecording() {
+      return global.__recorder.isRecording;
+    },
+    get uri() {
+      return global.__recorder.uri;
+    },
+    prepareToRecordAsync: async () => {
+      global.__recorder.prepared += 1;
+    },
+    record: () => {
+      global.__recorder.isRecording = true;
+    },
+    stop: async () => {
+      global.__recorder.isRecording = false;
+      global.__recorder.uri = "file:///rec.m4a";
+    },
+  }),
+  useAudioPlayer: () => ({
+    replace: (src) => global.__recorder.played.push(src),
+    play: jest.fn(),
+  }),
+}));
+
 jest.mock("expo-linear-gradient", () => {
   const { View } = require("react-native");
   return { LinearGradient: View };
