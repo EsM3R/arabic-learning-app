@@ -2,17 +2,17 @@
  * Dil başına anlam müzakeresi araç çantaları.
  *
  * languages.ts'ten AYRI duruyor çünkü o dosya zaten uzun ve bu içerik dil
- * başına ~15 kalıp. Mantık src/negotiation.ts'te; burası saf veri.
+ * başına ~14 kalıp. Mantık src/negotiation.ts'te; burası saf veri.
  *
  * İçerik üretilirken iki şey gözetildi:
  * 1. GERÇEKTEN kullanılan biçimler — ders kitabında geçip sokakta duyulmayan
- *    kalıp işe yaramaz, öğrenci onu kullanınca yapay görünür.
- * 2. Nezaket düzeyi (register) açıkça işaretli — Türk öğrenci Türkçenin
+ *    kalıp işe yaramaz; öğrenci onu kullanınca yapay görünür.
+ * 2. Nezaket düzeyi (register) her kalıpta işaretli — Türk öğrenci Türkçenin
  *    nezaket sezgisini taşır ve yanlış registerda kaba ya da aşırı resmî
- *    görünür. Almancada du/Sie, Rusçada ты/вы ayrımı notlarda.
+ *    görünür. Almancada du/Sie, Rusçada ты/вы yanlışı en pahalı hatadır.
  *
  * Okunuşlar TÜRKÇE ses değerleriyle yazılır ("ş", "ç", "h"); İngiliz tarzı
- * digraf (sh/ch/kh) kullanılmaz — öğrenci onu yanlış okur.
+ * digraf (sh/ch/kh) kullanılmaz — Türk öğrenci "sh"i "sıh" diye okur.
  */
 import type { NegotiationKit } from "./negotiation.ts";
 import type { LanguageId } from "./languages.ts";
@@ -159,24 +159,24 @@ export const NEGOTIATION_KITS: Record<LanguageId, NegotiationKit> = {
   // --- Almanca ---
   de: {
     phrases: [
-      { category: "anlamadim", target: "Wie bitte?", translit: "", tr: "Efendim? / Anlamadım?", register: "notr", note: "En güvenli ve en sık duyulan onarım ifadesi. Hem du hem Sie ortamında kullanılır, kişi eki yok. 'Was?' deme, kaba duyulur." },
-      { category: "anlamadim", target: "Das hab ich nicht verstanden.", translit: "", tr: "Onu anlamadım.", register: "notr", note: "Kişi eki yok, her ortamda geçer. 'hab' konuşmada 'habe'nin normal hali, kitap dili gibi 'habe' demene gerek yok." },
-      { category: "tekrar", target: "Können Sie das wiederholen?", translit: "", tr: "Tekrar eder misiniz?", register: "resmi", note: "Sie biçimi. Samimi karşılığı: 'Kannst du das wiederholen?' Tanımadığın yetişkine, memura, satıcıya Sie." },
-      { category: "tekrar", target: "Noch mal, bitte.", translit: "", tr: "Bir daha, lütfen.", register: "notr", note: "Kişi eki olmadığı için du/Sie derdi yok; panikte en kullanışlısı. 'bitte' olmadan emir gibi duyulur." },
+      { category: "anlamadim", target: "Wie bitte?", translit: "", tr: "Efendim? / Anlamadım?", register: "notr", note: "En güvenli ve en sık duyulan onarım ifadesi. Hem du hem Sie ortamında aynen kullanılır, içinde çekimli fiil yok. 'Was?' deme, kaba duyulur." },
+      { category: "anlamadim", target: "Das hab ich nicht verstanden.", translit: "", tr: "Onu anlamadım.", register: "notr", note: "Kendinden bahsettiğin için du/Sie ayrımı gerekmez, her ortamda geçer. 'hab' konuşmada 'habe'nin normal hali, kitap dili gibi 'habe' demene gerek yok." },
+      { category: "tekrar", target: "Können Sie das bitte wiederholen?", translit: "", tr: "Tekrar eder misiniz lütfen?", register: "resmi", note: "Sie biçimi. 'bitte' olmadan da doğru ama biraz buyurgan duyulur. Samimi karşılığı: 'Kannst du das bitte wiederholen?' Tanımadığın yetişkine, memura, satıcıya Sie." },
+      { category: "tekrar", target: "Noch mal, bitte.", translit: "", tr: "Bir daha, lütfen.", register: "notr", note: "Çekimli fiil olmadığı için du/Sie derdi yok; panikte en kullanışlısı. 'bitte' olmadan emir gibi duyulur." },
       { category: "yavas", target: "Etwas langsamer, bitte.", translit: "", tr: "Biraz daha yavaş, lütfen.", register: "notr", note: "Fiilsiz olduğu için du/Sie sorunu yok. Her ortamda güvenli." },
-      { category: "yavas", target: "Können Sie langsamer sprechen?", translit: "", tr: "Daha yavaş konuşabilir misiniz?", register: "resmi", note: "Sie biçimi. Samimi: 'Kannst du langsamer sprechen?'" },
-      { category: "teyit", target: "Also meinst du ...?", translit: "", tr: "Yani ... demek istiyorsun?", register: "samimi", note: "du biçimi; resmî hali 'Also meinen Sie ...?'. Sonuna duyduğun şeyi kendi kelimelerinle ekle." },
-      { category: "teyit", target: "Ach so, okay.", translit: "", tr: "Haa, tamam / anladım.", register: "samimi", note: "'Ach so' anladığını gösteren en Alman refleksi. Resmî ortamda da geçer ama 'Alles klar' daha nötr durur." },
-      { category: "kelime_sor", target: "Wie heißt das auf Deutsch?", translit: "", tr: "Bunun Almancası ne?", register: "notr", note: "Kişi eki yok, her ortamda aynı. Bir nesneyi gösterirken söyle." },
+      { category: "yavas", target: "Können Sie bitte etwas langsamer sprechen?", translit: "", tr: "Biraz daha yavaş konuşabilir misiniz lütfen?", register: "resmi", note: "Sie biçimi; 'etwas' (biraz) eklemek Almancada ricayı yumuşatır. Samimi: 'Kannst du bitte etwas langsamer sprechen?'" },
+      { category: "teyit", target: "Also meinst du ...?", translit: "", tr: "Yani ... demek istiyorsun?", register: "samimi", note: "du biçimi; resmî hali 'Also meinen Sie ...?'. Sonuna duyduğun şeyi kendi kelimelerinle ekle. 'Du meinst also ...?' de aynı derecede yaygın." },
+      { category: "teyit", target: "Ach so, okay.", translit: "", tr: "Haa, tamam / anladım.", register: "samimi", note: "'Ach so' anladığını gösteren en Alman refleksi; iki ayrı kelime yazılır. Resmî ortamda 'Ach so, alles klar.' daha nötr durur." },
+      { category: "kelime_sor", target: "Wie heißt das auf Deutsch?", translit: "", tr: "Bunun Almancası ne?", register: "notr", note: "Çekimli kişi yok, her ortamda aynı. 'heißt' ß ile yazılır. Bir nesneyi gösterirken söyle." },
       { category: "kelime_sor", target: "Was bedeutet das?", translit: "", tr: "Bu ne demek?", register: "notr", note: "Bilmediğin kelimeyi duyunca. 'Was heißt das?' de aynı şekilde çok yaygın." },
-      { category: "yazilis_sor", target: "Wie schreibt man das?", translit: "", tr: "Bu nasıl yazılıyor?", register: "notr", note: "'man' sayesinde du/Sie sorunu yok, her yerde kullan." },
+      { category: "yazilis_sor", target: "Wie schreibt man das?", translit: "", tr: "Bu nasıl yazılıyor?", register: "notr", note: "'man' sayesinde du/Sie sorunu yok, her yerde kullan. Harf harf istiyorsan: 'Können Sie das bitte buchstabieren?'" },
       { category: "soz_al", target: "Kurze Frage:", translit: "", tr: "Kısa bir soru:", register: "notr", note: "Söze girmenin en kibar ve doğal yolu. Toplantıda, derste, dükkânda çalışır; arkasına doğrudan sorunu ekle." },
       { category: "soz_al", target: "Entschuldigung, ...", translit: "", tr: "Affedersiniz, ... / Pardon, ...", register: "notr", note: "Hem söz almak hem dikkat çekmek için. 'Entschuldigen Sie' daha resmî, arkadaşlar arasında 'Sorry' de çok yaygın." },
-      { category: "onay_iste", target: "Stimmt das so?", translit: "", tr: "Böyle doğru mu?", register: "notr", note: "Kurduğun cümleden emin değilken. Kişi eki yok, her ortamda güvenli. 'Sagt man das so?' (Böyle mi deniyor?) de çok kullanılır." },
+      { category: "onay_iste", target: "Stimmt das so?", translit: "", tr: "Böyle doğru mu?", register: "notr", note: "Kurduğun cümleden emin değilken. Çekimli kişi yok, her ortamda güvenli. 'Sagt man das so?' (Böyle mi deniyor?) de çok kullanılır." },
     ],
     fillers: [
       { target: "also ...", translit: "", tr: "yani ... / şey ..." },
-      { target: "ähm ...", translit: "", tr: "ıııı ... (Almanca duraklama sesi)" },
+      { target: "ähm ...", translit: "", tr: "ıııı ... (Almanca duraklama sesi, 'em' gibi)" },
       { target: "na ja ...", translit: "", tr: "şey işte ... / valla ..." },
       { target: "Moment ...", translit: "", tr: "bir saniye ..." },
       { target: "wie sagt man ...", translit: "", tr: "nasıl deniyordu ..." },
@@ -184,28 +184,28 @@ export const NEGOTIATION_KITS: Record<LanguageId, NegotiationKit> = {
     circumlocution: [
       { target: "So ein Ding, mit dem man ...", translit: "", tr: "Şey işte, onunla ... yapılan bir şey" },
       { target: "Das ist so was wie ...", translit: "", tr: "Şeye benzer bir şey ..." },
-      { target: "Ich weiß das Wort nicht, aber ...", translit: "", tr: "Kelimeyi bilmiyorum ama ..." },
+      { target: "Mir fällt das Wort nicht ein, aber ...", translit: "", tr: "Kelime aklıma gelmiyor ama ..." },
       { target: "Das braucht man, wenn ...", translit: "", tr: "Bu, ... olduğunda lazım olan şey" },
     ],
-    teacherCue: "Hoca kasıtlı anlamamış gibi yaparken: \"Hä? Wie meinst du das?\" (Hä, vi maynst du das?) — \"Häh? Nasıl yani?\" Ya da: \"Das versteh ich jetzt nicht.\" (Das ferşte iş yetst niht) — \"Şimdi bunu anlamadım.\"",
-    turkishTrap: "Türk öğrencinin en büyük tuzağı nezaketi Türkçedeki gibi uzatmakla sağlamaya çalışmak: panik anında \"Entschuldigen Sie bitte vielmals, könnten Sie eventuell so freundlich sein und das noch einmal wiederholen?\" gibi kitaptan ezberlenmiş devasa bir cümleye girip yarısında kilitlenmek. Almancada kibarlık cümle uzunluğuyla değil, doğru biçim (Sie) ve tek bir \"bitte\" ile sağlanır; \"Noch mal, bitte.\" tamamen kibardır. İkinci tuzak, Türkçede \"Ne?\" demenin görece normal olmasından dolayı Almancada \"Was?\" deyip sert/kaba duyulmak — doğrusu \"Wie bitte?\". Üçüncüsü, Türkçede kişi ayrımını ses tonu ve \"-sınız\" ile kolayca çevirdiğimiz için Almancada du/Sie'yi karıştırmak: satıcıya, garsona, memura, yaşlıya \"Kannst du...\" demek Türkçede birine durduk yere \"sen\" demek gibi rahatsız edicidir. Emin değilken fiil çekimi içermeyen onarım ifadelerine sığın: \"Wie bitte?\", \"Noch mal, bitte.\", \"Etwas langsamer, bitte.\", \"Wie schreibt man das?\" — hepsi du/Sie sorunundan bağımsızdır. Son olarak, anlamadığını gizlemek için Türk öğrenci sık sık gülümseyip \"ja, ja\" diyor; Almanca konuşan biri bunu gerçek onay sayar ve konuşma tamamen yanlış yöne gider.",
+    teacherCue: "Hoca kasıtlı anlamamış gibi yaparken: \"Hä? Wie meinst du das?\" (He? Vi maynst du das?) — \"Häh? Nasıl yani?\" Ya da: \"Das versteh ich jetzt nicht.\" (Das ferşte ih yetst niht) — \"Şimdi bunu anlamadım.\" Not: 'ich' ve 'nicht' içindeki ch sesi Türkçedeki 'hile'nin h'si gibi ince bir h'dir; İngilizce 'ch' gibi okuma.",
+    turkishTrap: "Türk öğrencinin en büyük tuzağı nezaketi Türkçedeki gibi uzatmakla sağlamaya çalışmak: panik anında \"Entschuldigen Sie bitte vielmals, könnten Sie eventuell so freundlich sein und das noch einmal wiederholen?\" gibi kitaptan ezberlenmiş devasa bir cümleye girip yarısında kilitlenmek. Almancada kibarlık cümle uzunluğuyla değil, doğru biçim (Sie) ve tek bir \"bitte\" ile sağlanır; \"Noch mal, bitte.\" tamamen kibardır. İkinci tuzak, Türkçede \"Ne?\" demenin görece normal olmasından dolayı Almancada \"Was?\" deyip sert/kaba duyulmak — doğrusu \"Wie bitte?\". Üçüncüsü, Türkçede kişi ayrımını ses tonu ve \"-sınız\" ile kolayca çevirdiğimiz için Almancada du/Sie'yi karıştırmak: satıcıya, garsona, memura, yaşlıya \"Kannst du...\" demek Türkçede birine durduk yere \"sen\" demek gibi rahatsız edicidir. Emin değilken çekimli fiil içermeyen onarım ifadelerine sığın: \"Wie bitte?\", \"Noch mal, bitte.\", \"Etwas langsamer, bitte.\", \"Wie schreibt man das?\" — hepsi du/Sie sorunundan bağımsızdır. Son olarak, anlamadığını gizlemek için Türk öğrenci sık sık gülümseyip \"ja, ja\" diyor; Almanca konuşan biri bunu gerçek onay sayar ve konuşma tamamen yanlış yöne gider.",
   },
   // --- İtalyanca ---
   it: {
     phrases: [
-      { category: "anlamadim", target: "Non ho capito.", translit: "", tr: "Anlamadım.", register: "notr", note: "En güvenli, her yerde geçer. \"Non capisco\" da olur ama geçmiş zamanlı hâli daha doğal." },
-      { category: "anlamadim", target: "Come scusa?", translit: "", tr: "Efendim? / Pardon, nasıl?", register: "samimi", note: "Sen diliyle. Resmîde \"Come scusi?\" de. \"Cosa?\" tek başına kaba durur." },
+      { category: "anlamadim", target: "Non ho capito.", translit: "", tr: "Anlamadım.", register: "notr", note: "En güvenli, her yerde geçer. \"h\" hiç okunmaz. \"Non capisco\" da olur ama geçmiş zamanlı hâli daha doğal." },
+      { category: "anlamadim", target: "Come scusa?", translit: "", tr: "Efendim? / Pardon, nasıl?", register: "samimi", note: "Sen diliyle. Resmîde \"Come scusi?\" de. Sadece \"Come?\" de gayet normaldir; \"Cosa?\" tek başına ters durur." },
       { category: "tekrar", target: "Puoi ripetere?", translit: "", tr: "Tekrar eder misin?", register: "samimi", note: "Resmîde \"Può ripetere?\". Başına \"Scusa,\" eklemek yeterli nezaket." },
-      { category: "tekrar", target: "Un'altra volta, per favore.", translit: "", tr: "Bir kere daha, lütfen.", register: "notr" },
-      { category: "yavas", target: "Più lentamente, per favore.", translit: "", tr: "Biraz daha yavaş, lütfen.", register: "notr", note: "Konuşma dilinde çoğu kişi \"più piano\" der; o da aynı işi görür." },
-      { category: "yavas", target: "Puoi parlare più piano?", translit: "", tr: "Daha yavaş konuşabilir misin?", register: "samimi", note: "\"Piano\" burada \"sessiz\" değil \"yavaş\" demek." },
-      { category: "teyit", target: "Cioè... vuoi dire che...?", translit: "", tr: "Yani... şunu mu demek istiyorsun?", register: "notr", note: "\"Cioè\" İtalyanların en çok kullandığı müzakere kelimesi; tek başına da \"yani?\" diye sorabilirsin." },
-      { category: "teyit", target: "Ho capito bene?", translit: "", tr: "Doğru mu anladım?", register: "notr" },
-      { category: "kelime_sor", target: "Come si dice...?", translit: "", tr: "... nasıl denir?", register: "notr", note: "Nesneyi gösterip \"Come si dice questo?\" demek yeterli." },
-      { category: "kelime_sor", target: "Come si chiama questo?", translit: "", tr: "Bunun adı ne?", register: "notr", note: "Eşya için \"si chiama\"; kişi için değil." },
-      { category: "yazilis_sor", target: "Come si scrive?", translit: "", tr: "Nasıl yazılıyor?", register: "notr", note: "Harf harf isteyeceksen \"Me lo fai lo spelling?\" de; İtalyanlar harfleri şehir adıyla söyler (A come Ancona)." },
+      { category: "tekrar", target: "Ancora una volta, per favore.", translit: "", tr: "Bir kere daha, lütfen.", register: "notr", note: "\"Un'altra volta\" deme: o çoğu zaman \"başka bir sefere (şimdi değil)\" anlamına gelir ve reddetmek gibi algılanır." },
+      { category: "yavas", target: "Più lentamente, per favore.", translit: "", tr: "Biraz daha yavaş, lütfen.", register: "notr", note: "Tek anlamlı, karışmaz. Konuşma dilinde çoğu kişi \"più piano\" der." },
+      { category: "yavas", target: "Puoi parlare più piano?", translit: "", tr: "Daha yavaş konuşabilir misin?", register: "samimi", note: "\"Piano\" bağlama göre \"yavaş\" ya da \"alçak sesle\" demek; ikisi de karşılanır. Karışmasın istersen \"più lentamente\" kullan." },
+      { category: "teyit", target: "Cioè... vuoi dire che...?", translit: "", tr: "Yani... şunu mu demek istiyorsun?", register: "samimi", note: "\"vuoi\" sen dilidir; resmîde \"vuole dire che...?\". \"Cioè\" İtalyanların en sık kullandığı bağlayıcı/dolgu sözü; tek başına \"Cioè?\" diye de sorabilirsin." },
+      { category: "teyit", target: "Ho capito bene?", translit: "", tr: "Doğru mu anladım?", register: "notr", note: "Hitap içermediği için hem samimi hem resmî ortamda kullanılır." },
+      { category: "kelime_sor", target: "Come si dice...?", translit: "", tr: "... nasıl denir?", register: "notr", note: "Nesneyi gösterip \"Come si dice questo in italiano?\" demek yeterli." },
+      { category: "kelime_sor", target: "Come si chiama questo?", translit: "", tr: "Bunun adı ne?", register: "notr", note: "\"chi\" = ki/ky okunur. Aynı kalıbı kişiye sorarsan (\"Come si chiama?\") \"adınız ne?\" anlamına gelir, dikkat." },
+      { category: "yazilis_sor", target: "Come si scrive?", translit: "", tr: "Nasıl yazılıyor?", register: "notr", note: "Harf harf isteyeceksen \"Puoi farmi lo spelling?\" ya da \"Me lo scrivi?\" de; İtalyanlar harfleri şehir adıyla söyler (A come Ancona)." },
       { category: "soz_al", target: "Scusa, posso dire una cosa?", translit: "", tr: "Pardon, bir şey söyleyebilir miyim?", register: "samimi", note: "Resmîde \"Scusi, posso...\". Sadece \"Scusa\" ile de araya girilir, kaba değil." },
-      { category: "soz_al", target: "Aspetta, un attimo.", translit: "", tr: "Dur, bir saniye.", register: "samimi", note: "Çok yaygın ama sadece arkadaş/akran arasında; müdüre \"Aspetti un attimo\" de." },
+      { category: "soz_al", target: "Aspetta un attimo.", translit: "", tr: "Dur, bir saniye.", register: "samimi", note: "Araya virgül konmaz. Çok yaygın ama sadece arkadaş/akran arasında; müdüre \"Aspetti un attimo\" de." },
       { category: "onay_iste", target: "Si dice così?", translit: "", tr: "Böyle mi deniyor?", register: "notr", note: "Kendi cümleni kurduktan sonra ekle; hoca hemen düzeltir." },
     ],
     fillers: [
@@ -219,61 +219,63 @@ export const NEGOTIATION_KITS: Record<LanguageId, NegotiationKit> = {
       { target: "È una cosa che serve per...", translit: "", tr: "Şey için kullanılan bir şey..." },
       { target: "È come un/una..., ma...", translit: "", tr: "Şeye benziyor ama..." },
       { target: "Non so la parola, ma è quando...", translit: "", tr: "Kelimeyi bilmiyorum ama şu durum var ki..." },
-      { target: "Quella cosa lì, per...", translit: "", tr: "Şu şey işte, ... için olan." },
+      { target: "Quella cosa lì che si usa per...", translit: "", tr: "Şu şey işte, ... için kullanılan." },
     ],
     teacherCue: "Scusa, non ho capito. Cosa vuoi dire? / In che senso?",
-    turkishTrap: "Türk öğrenci Türkçedeki nezaket refleksini birebir taşıyıp her cümlenin başına \"per favore\" ve \"scusi\" yığar; İtalyanca'da bu aşırı resmî ve mesafeli durur, arkadaş sohbetinde \"Come scusi?\" demek karşıdakini garipsetir. Tersi de olur: \"Cosa?\" veya \"Eh?\" tek başına söylenince Türkçedeki \"Ne?\" kadar masum değil, ters ve sinirli algılanır; doğru orta yol \"Come scusa?\" veya \"Come?\"dir. Ayrıca Türkçede sık kullanılan doğrudan emir mantığıyla \"Ripeti!\" denmesi kabalık sayılır, soru biçimi (\"Puoi ripetere?\") şarttır. Son olarak Türk öğrenci anlamadığında susup gülümseme eğilimindedir; İtalyan muhatap bunu \"anladı\" sanır ve hızlanır, bu yüzden \"Aspetta\" veya \"Cioè?\" ile konuşmayı kesmek öğrenilmesi gereken en kritik alışkanlıktır.",
+    turkishTrap: "Türk öğrenci Türkçedeki nezaket refleksini birebir taşıyıp her cümlenin başına \"per favore\" ve \"scusi\" yığar; İtalyanca'da bu aşırı resmî ve mesafeli durur, arkadaş sohbetinde \"Come scusi?\" demek karşıdakini garipsetir. Tersi de olur: \"Cosa?\" veya \"Eh?\" tek başına söylenince Türkçedeki \"Ne?\" kadar masum değil, ters ve sinirli algılanır; doğru orta yol \"Come?\" veya \"Come scusa?\"dır. Ayrıca Türkçede sık kullanılan doğrudan emir mantığıyla \"Ripeti!\" denmesi kabalık sayılır, soru biçimi (\"Puoi ripetere?\") şarttır. Bir başka tuzak: \"bir kez daha\" derken Türkçeden çevirip \"un'altra volta\" demek; bu İtalyancada \"başka bir sefere\" gibi anlaşılır, doğrusu \"ancora una volta\"dır. Son olarak Türk öğrenci anlamadığında susup gülümseme eğilimindedir; İtalyan muhatap bunu \"anladı\" sanır ve hızlanır, bu yüzden \"Aspetta\" veya \"Cioè?\" ile konuşmayı kesmek öğrenilmesi gereken en kritik alışkanlıktır.",
   },
   // --- Rusça ---
   ru: {
     phrases: [
-      { category: "anlamadim", target: "Не по́нял / Не поняла́", translit: "ni ponyal / ni panyalá", tr: "Anlamadım", register: "notr", note: "Erkekseniz 'не понял', kadınsanız 'не поняла'. Cinsiyete göre değişir, karıştırmayın." },
-      { category: "anlamadim", target: "Извини́те, я не по́нял", translit: "izvinítye, ya ni ponyal", tr: "Pardon, anlamadım", register: "resmi", note: "вы formu. Tanımadığınız kişiye, memura, satıcıya bu." },
-      { category: "tekrar", target: "Что́?", translit: "şto", tr: "Ne?", register: "samimi", note: "Tek başına kaba durur. Yabancıya 'Что-что?' (şto-şto) veya 'Прости́те?' deyin." },
+      { category: "anlamadim", target: "Не по́нял / Не поняла́", translit: "ni ponyal / ni panilá", tr: "Anlamadım", register: "notr", note: "Erkekseniz 'не понял', kadınsanız 'не поняла'. Tek başına düz tonla söyleyin; yükselen/sert tonla 'Не понял?!' meydan okuma gibi duyulur. Yumuşatmak için başına 'Я' ekleyin: 'Я не по́нял'." },
+      { category: "anlamadim", target: "Извини́те, я не по́нял", translit: "izviníti, ya ni ponyal", tr: "Pardon, anlamadım", register: "resmi", note: "вы formu. Tanımadığınız kişiye, memura, satıcıya bu. 'Прости́те' (prastíti) ile başlamak bir tık daha kibar." },
+      { category: "tekrar", target: "Что?", translit: "şto", tr: "Ne?", register: "samimi", note: "Tek başına kaba durur. Yabancıya 'Что-что?' (şto-şto) veya 'Прости́те?' (prastíti) deyin." },
       { category: "tekrar", target: "Повтори́те, пожа́луйста", translit: "paftaríti, pajálusta", tr: "Tekrar eder misiniz lütfen", register: "resmi", note: "Samimide 'Повтори́, пожа́луйста' (paftarí)." },
-      { category: "yavas", target: "Помедленнее, пожа́луйста", translit: "pamédlinniye, pajálusta", tr: "Biraz daha yavaş lütfen", register: "notr", note: "En doğal hali. 'Говори́те ме́дленно' kitabî kalır." },
-      { category: "yavas", target: "Ты сли́шком бы́стро", translit: "tı slişkam bıstra", tr: "Çok hızlısın", register: "samimi", note: "Sadece ты dediğiniz kişiye; вы ise 'Вы сли́шком бы́стро'." },
-      { category: "teyit", target: "То́ есть...?", translit: "to yest'", tr: "Yani...?", register: "notr", note: "Söyleneni kendi cümlenizle özetlemeden önce en çok kullanılan açılış." },
-      { category: "teyit", target: "Пра́вильно?", translit: "právil'na", tr: "Doğru mu?", register: "notr", note: "Cümlenin sonuna eklenir. 'Да?' de aynı işi görür ve daha samimidir." },
+      { category: "yavas", target: "Поме́дленнее, пожа́луйста", translit: "pamédliniye, pajálusta", tr: "Biraz daha yavaş lütfen", register: "notr", note: "En doğal hali. Fiille söylemek isterseniz 'Говори́те поме́дленнее'; 'Говори́те ме́дленно' kitabî kalır." },
+      { category: "yavas", target: "Ты сли́шком бы́стро говори́шь", translit: "tı slişkam bıstra gavaríş", tr: "Çok hızlı konuşuyorsun", register: "samimi", note: "Fiili düşürmeyin, 'Ты сли́шком бы́стро' yarım kalır. вы ise 'Вы сли́шком бы́стро говори́те' (gavaríti)." },
+      { category: "teyit", target: "То есть...?", translit: "to yest'", tr: "Yani...?", register: "notr", note: "Söyleneni kendi cümlenizle özetlemeden önce en çok kullanılan açılış." },
+      { category: "teyit", target: "Пра́вильно?", translit: "právilna", tr: "Doğru mu?", register: "notr", note: "Cümlenin sonuna eklenir. 'Так?' ve 'Да?' de aynı işi görür, daha samimidir." },
       { category: "kelime_sor", target: "Как э́то называ́ется?", translit: "kak eta nazıváyitsa", tr: "Bunun adı ne?", register: "notr", note: "Nesneyi gösterip söyleyin. En sık duyulan kalıp budur." },
       { category: "kelime_sor", target: "Что зна́чит...?", translit: "şto znáçit", tr: "... ne demek?", register: "notr", note: "Sonuna kelimeyi olduğu gibi ekleyin: 'Что зна́чит «сро́чно»?'" },
       { category: "yazilis_sor", target: "Как э́то пи́шется?", translit: "kak eta píşitsa", tr: "Nasıl yazılıyor?", register: "notr", note: "Harf harf istemek için 'По бу́квам, пожа́луйста' (pa búkvam)." },
+      { category: "yazilis_sor", target: "Напиши́те, пожа́луйста", translit: "napişíti, pajálusta", tr: "Yazar mısınız lütfen", register: "resmi", note: "Duyduğunuzu çözemediğinizde en pratik kurtarma. Samimide 'Напиши́' (napişí)." },
       { category: "soz_al", target: "Мо́жно вопро́с?", translit: "mójna vaprós", tr: "Bir şey sorabilir miyim?", register: "notr", note: "Araya girmenin en zararsız yolu. 'Извини́те' ile başlatmak daha da yumuşatır." },
-      { category: "soz_al", target: "Секу́ндочку", translit: "sikúndaçku", tr: "Bir saniye", register: "samimi", note: "Küçültme eki onu nazik yapar; 'Секу́нда' demeyin, sert durur." },
+      { category: "soz_al", target: "Секу́ндочку", translit: "sikúndaçku", tr: "Bir saniye", register: "notr", note: "Küçültme eki onu nazik yapar; mağazada, telefonda herkese söylenir. 'Секу́нду' (sikúndu) de doğrudur ama daha kuru; yalın 'Секу́нда' yanlış." },
       { category: "onay_iste", target: "Так мо́жно сказа́ть?", translit: "tak mójna skazát'", tr: "Böyle denir mi?", register: "notr", note: "Kendi cümlenizi söyleyip hemen ardından sorun; doğallık onayı ister." },
+      { category: "onay_iste", target: "Я пра́вильно говорю́?", translit: "ya právilna gavaryú", tr: "Doğru mu söylüyorum?", register: "notr", note: "Telaffuz ve dilbilgisi için ikisi de geçerli. Cevap olarak 'Да, пра́вильно' duyarsınız." },
     ],
     fillers: [
       { target: "ну...", translit: "nu", tr: "şey... eee..." },
       { target: "как сказа́ть...", translit: "kak skazát'", tr: "nasıl desem..." },
       { target: "э́то са́мое...", translit: "eta sámaye", tr: "şey işte... şu..." },
-      { target: "в о́бщем", translit: "v óbşim", tr: "genel olarak, işte" },
-      { target: "коро́че", translit: "karoçi", tr: "kısacası" },
+      { target: "в о́бщем", translit: "v ópşim", tr: "genel olarak, işte" },
+      { target: "коро́че", translit: "karóçi", tr: "kısacası" },
     ],
     circumlocution: [
-      { target: "Э́то тако́е..., кото́рое...", translit: "eta takóye..., katóraye...", tr: "Şey işte, şöyle bir şey ki..." },
+      { target: "Э́то така́я шту́ка, кото́рая...", translit: "eta takáya ştúka, katóraya...", tr: "Şey işte, şöyle bir şey ki..." },
       { target: "Э́то как...", translit: "eta kak", tr: "Şey gibi bir şey..." },
-      { target: "Я не зна́ю сло́во, но э́то для...", translit: "ya ni znáyu slóva, no eta dlya", tr: "Kelimeyi bilmiyorum ama şunun için kullanılıyor..." },
+      { target: "Я не зна́ю, как сказа́ть, но э́то для...", translit: "ya ni znáyu, kak skazát', no eta dlya", tr: "Nasıl denir bilmiyorum ama şunun için kullanılıyor..." },
       { target: "Ну, э́то когда́...", translit: "nu, eta kagdá", tr: "Yani, şu durumda olan şey..." },
     ],
     teacherCue: "Что-что? Я не по́нял, повтори́те, пожа́луйста. (şto-şto? ya ni ponyal, paftaríti, pajálusta)",
-    turkishTrap: "Türk öğrenci Rusçada nezaketi 'пожалуйста' eklemekle çözdüğünü sanır ama asıl sorun ты/вы seçimidir: Türkçede 'siz' kullanımı esnek olduğu için öğrenci tanımadığı kişiye rahatça 'Повтори́!' veya kuru bir 'Что?' der; Ruslar bunu emir ve kabalık olarak duyar, özellikle 'Что?' tek başına neredeyse sitem gibidir. İkinci tuzak, Türkçede kendi cinsiyetini fiilde belirtme alışkanlığı olmadığı için kadın öğrencinin panikte 'Не по́нял' demesi; küçük görünse de kulağı tırmalar. Üçüncüsü, Türkçedeki 'Anlamadım'ın yumuşaklığını Rusçaya taşımaya çalışıp 'Я вас совсе́м не понима́ю' gibi uzun ve dramatik cümleler kurmak: onarım ifadesi uzadıkça panik büyür, iki kelime yeter. Son olarak Türkçedeki 'efendim?' refleksiyle Rusçada karşılık aranır ama birebir karşılığı yoktur; onun yerine 'Прости́те?' (prastíti) ya da 'Что-что?' kullanılmalıdır.",
+    turkishTrap: "Türk öğrenci Rusçada nezaketi 'пожалуйста' eklemekle çözdüğünü sanır ama asıl sorun ты/вы seçimidir: Türkçede 'siz' kullanımı esnek olduğu için öğrenci tanımadığı kişiye rahatça 'Повтори́!' veya kuru bir 'Что?' der; Ruslar bunu emir ve kabalık olarak duyar, özellikle 'Что?' tek başına neredeyse sitem gibidir. İkinci tuzak, Türkçede kendi cinsiyetini fiilde belirtme alışkanlığı olmadığı için kadın öğrencinin panikte 'Не по́нял' demesi; küçük görünse de kulağı tırmalar. Üçüncüsü, tonlama: 'Не по́нял' yükselen ve sert tonla söylenince onarım değil meydan okuma ('ne demek şimdi bu?') gibi duyulur, düz ve alçalan tonla söyleyin. Dördüncüsü, Türkçedeki 'Anlamadım'ın yumuşaklığını Rusçaya taşımaya çalışıp 'Я вас совсе́м не понима́ю' gibi uzun ve dramatik cümleler kurmak: onarım ifadesi uzadıkça panik büyür, iki kelime yeter. Son olarak Türkçedeki 'efendim?' refleksiyle Rusçada karşılık aranır ama birebir karşılığı yoktur; onun yerine 'Прости́те?' (prastíti) ya da 'Что-что?' kullanılmalıdır.",
   },
   // --- Farsça ---
   fa: {
     phrases: [
-      { category: "anlamadim", target: "متوجه نشدم", translit: "motevejjeh naşodam", tr: "Anlamadım.", register: "notr", note: "En güvenli, her yerde geçer. Konuşmada \"motevejje naşodam\" diye kaynaşır." },
-      { category: "anlamadim", target: "نفهمیدم", translit: "nafahmidam", tr: "Anlamadım.", register: "samimi", note: "Arkadaş arasında doğal; resmî ortamda biraz kaba durur, orada متوجه نشدم kullan." },
-      { category: "tekrar", target: "ببخشید؟", translit: "bebahşid?", tr: "Efendim? / Pardon?", register: "notr", note: "Tek kelimelik en pratik \"tekrar eder misin\". Sonu yukarı tonlanmalı." },
-      { category: "tekrar", target: "یه بار دیگه بگید", translit: "ye bâr dige begid", tr: "Bir daha söyler misiniz.", register: "notr", note: "Yazılı hâli: یک بار دیگر بگویید. Samimi versiyonu: ye bâr dige begu." },
-      { category: "yavas", target: "یواش‌تر لطفاً", translit: "yavâştar lotfan", tr: "Daha yavaş lütfen.", register: "notr", note: "ZWNJ: یواش‌تر. \"Âheste\" kitabi kalır, sokakta \"yavâş\" denir." },
-      { category: "yavas", target: "آروم‌تر بگید", translit: "ârumtar begid", tr: "Yavaş söyleyin.", register: "samimi", note: "Yazılı: آرام‌تر. Tahran konuşmasında \"ârâm\" > \"ârum\"." },
-      { category: "teyit", target: "یعنی چی؟", translit: "ya'ni çi?", tr: "Yani ne demek?", register: "samimi", note: "Çok sık. Resmîde یعنی چه؟ (ya'ni çe?) de." },
+      { category: "anlamadim", target: "متوجه نشدم", translit: "motevecceh naşodam", tr: "Anlamadım.", register: "notr", note: "En güvenli, her yerde geçer. Konuşmada \"motevecce naşodam\" diye kaynaşır. ج harfi Türkçedeki c'dir (j değil), ش ise ş'dir." },
+      { category: "anlamadim", target: "نفهمیدم", translit: "nafahmidam", tr: "Anlamadım.", register: "samimi", note: "Arkadaş arasında doğal; resmî ortamda sert/suçlayıcı durabilir, orada متوجه نشدم kullan." },
+      { category: "tekrar", target: "ببخشید؟", translit: "bebahşid?", tr: "Efendim? / Pardon?", register: "notr", note: "Tek kelimelik en pratik \"tekrar eder misin\". Sonu yukarı tonlanmalı. Alternatif: بله؟ (bale?)" },
+      { category: "tekrar", target: "می‌شه یه بار دیگه بگید؟", translit: "mişe ye bâr dige begid?", tr: "Bir daha söyler misiniz?", register: "notr", note: "Çıplak \"یه بار دیگه بگید\" emir gibi durur; başına می‌شه gelince nazikleşir. ZWNJ: می‌شه. Yazılı: یک بار دیگر بگویید. Samimi: ye bâr dige begu." },
+      { category: "yavas", target: "می‌شه یواش‌تر صحبت کنید؟", translit: "mişe yavâştar sohbat konid?", tr: "Daha yavaş konuşur musunuz?", register: "notr", note: "ZWNJ: یواش‌تر، می‌شه. Tek başına \"یواش‌تر لطفاً\" çoğu zaman \"daha sessiz\" diye anlaşılır; fiili söylemek gerekir. \"Âheste\" kitabi kalır." },
+      { category: "yavas", target: "آروم‌تر بگید", translit: "ârumtar begid", tr: "Yavaş söyleyin.", register: "notr", note: "بگید zaten nazik çoğul biçim; kelime konuşma diline ait ama hitap nötr. Yazılı: آرام‌تر. Samimi hitapta: آروم‌تر بگو (ârumtar begu)." },
+      { category: "teyit", target: "یعنی چی؟", translit: "ya'ni çi?", tr: "Yani ne demek?", register: "samimi", note: "Çok sık ama tonu sert olursa itiraz gibi duyulur. Resmîde یعنی چه؟ (ya'ni çe?) de." },
       { category: "teyit", target: "یعنی ... درسته؟", translit: "ya'ni ... doroste?", tr: "Yani ... öyle mi?", register: "notr", note: "Anladığını kendi kelimenle söyleyip sonuna ekle; müzakerenin bel kemiği." },
-      { category: "kelime_sor", target: "این چی می‌شه فارسی؟", translit: "in çi mişe fârsi?", tr: "Bunun Farsçası ne?", register: "samimi", note: "Nesneyi gösterirken kullan. Resmî: این به فارسی چه می‌شود؟" },
+      { category: "kelime_sor", target: "این به فارسی چی می‌شه؟", translit: "in be fârsi çi mişe?", tr: "Bunun Farsçası ne?", register: "samimi", note: "به olmadan \"این چی می‌شه فارسی؟\" eksik durur. Nesneyi gösterirken kullan. Resmî: این به فارسی چه می‌شود؟" },
       { category: "kelime_sor", target: "اسمش چیه؟", translit: "esmeş çiye?", tr: "Bunun adı ne?", register: "samimi", note: "Yazılı: اسمش چیست؟ Konuşmada چیست asla denmez, hep چیه." },
-      { category: "yazilis_sor", target: "چطور می‌نویسن؟", translit: "çetor minevisan?", tr: "Nasıl yazılıyor?", register: "notr", note: "ZWNJ: می‌نویسن. Yazılı hâli می‌نویسند." },
-      { category: "soz_al", target: "ببخشید، یه سؤال", translit: "bebahşid, ye so'âl", tr: "Pardon, bir soru.", register: "notr", note: "Araya girmenin en nazik kısa yolu. \"ye\" = یک'in konuşma hâli." },
-      { category: "soz_al", target: "یه لحظه", translit: "ye lahze", tr: "Bir saniye.", register: "samimi", note: "Karşıdakini durdurup düşünmek için. Tonu yumuşak tut, emir gibi çıkmasın." },
+      { category: "yazilis_sor", target: "اینو چطور می‌نویسن؟", translit: "ino çetor minevisan?", tr: "Bu nasıl yazılıyor?", register: "notr", note: "ZWNJ: می‌نویسن. Nesnesiz \"چطور می‌نویسن؟\" havada kalır; اینو ekle. Yazılı hâli: این را چطور می‌نویسند؟" },
+      { category: "soz_al", target: "ببخشید، یه سؤال داشتم", translit: "bebahşid, ye so'âl dâştam", tr: "Pardon, bir sorum olacaktı.", register: "notr", note: "Ta'ârof gereği geçmiş zaman (داشتم) nezaketi artırır; \"یه سؤال\" tek başına kesik durur. \"ye\" = یک'in konuşma hâli. Hemze: سؤال." },
+      { category: "soz_al", target: "یه لحظه", translit: "ye lahze", tr: "Bir saniye.", register: "samimi", note: "Karşıdakini durdurup düşünmek için. Tonu yumuşak tut; nazik hâli یه لحظه ببخشید (ye lahze bebahşid)." },
       { category: "onay_iste", target: "درست گفتم؟", translit: "dorost goftam?", tr: "Doğru mu söyledim?", register: "notr", note: "Telaffuz/dilbilgisi onayı için. \"doroste?\" ise anlam onayı içindir." },
     ],
     fillers: [
@@ -285,11 +287,11 @@ export const NEGOTIATION_KITS: Record<LanguageId, NegotiationKit> = {
     ],
     circumlocution: [
       { target: "یه چیزیه که...", translit: "ye çiziye ke...", tr: "Bir şey ki..." },
-      { target: "شبیه ... است", translit: "şabih-e ... e", tr: "... gibi bir şey." },
+      { target: "شبیه ... می‌مونه", translit: "şabih-e ... mimune", tr: "... gibi bir şey." },
       { target: "برای اینه که...", translit: "barâye ine ke...", tr: "Şunun için kullanılır..." },
       { target: "اسمش یادم رفته", translit: "esmeş yâdam rafte", tr: "Adı aklımdan çıktı." },
     ],
-    teacherCue: "ببخشید، متوجه نشدم. می‌شه یه بار دیگه بگید؟ (bebahşid, motevejjeh nashodam. mişe ye bâr dige begid?)",
-    turkishTrap: "Türk öğrenci Farsçadaki hazır kalıpları Türkçeden birebir çevirmeye kalkıyor: \"anlamadım\" için \"نفهمیدم\" (nafahmidam) fiilini seçiyor ama bu Farsçada sert, hatta suçlayıcı tınlayabiliyor; nötr ortamda \"متوجه نشدم\" (motevejjeh nashodam) gerekiyor. İkinci büyük tuzak, Türkçedeki \"-misiniz\" nezaketini Farsçaya taşırken ders kitabı dilini kullanmak: \"چیست\", \"یک بار دیگر\", \"آرام\" gibi yazılı biçimler Tahran'da yapmacık duyuluyor; sokakta \"چیه\", \"یه بار دیگه\", \"آروم\" var. Üçüncüsü, Farsçanın ta'ârof kültüründe soru sormanın \"ببخشید\" ile açılması beklenir; Türk öğrenci doğrudan soruya girip kaba görünür. Son olarak iki farklı \"yani\" karışır: \"یعنی چی؟\" anlamı sorar, \"یعنی ... درسته؟\" ise kendi anladığını teyit ettirir; öğrenci ikincisini hiç kullanmadığı için karşısındaki anlaşıldığını sanır ve konuşma yanlış yerden devam eder.",
+    teacherCue: "ببخشید، متوجه نشدم. می‌شه یه بار دیگه بگید؟ (bebahşid, motevecceh naşodam. mişe ye bâr dige begid?)",
+    turkishTrap: "Türk öğrenci Farsçadaki hazır kalıpları Türkçeden birebir çevirmeye kalkıyor: \"anlamadım\" için \"نفهمیدم\" (nafahmidam) fiilini seçiyor ama bu Farsçada sert, hatta suçlayıcı tınlayabiliyor; nötr ortamda \"متوجه نشدم\" (motevecceh naşodam) gerekiyor. İkinci büyük tuzak, Türkçedeki \"-misiniz\" nezaketini Farsçaya taşırken ders kitabı dilini kullanmak: \"چیست\", \"یک بار دیگر\", \"آرام\" gibi yazılı biçimler Tahran'da yapmacık duyuluyor; sokakta \"چیه\", \"یه بار دیگه\", \"آروم\" var. Üçüncüsü, Farsçada rica çıplak emir kipiyle değil \"می‌شه ...؟\" kalıbıyla kurulur ve soru \"ببخشید\" ile açılır; öğrenci doğrudan \"بگید\" deyip kaba görünür. Dördüncüsü, \"یواش\" hem \"yavaş\" hem \"sessiz\" demek olduğu için tek başına \"یواش‌تر\" demek \"daha alçak sesle\" diye anlaşılabiliyor; fiili (صحبت کنید / بگید) eklemek gerekiyor. Son olarak iki farklı \"yani\" karışır: \"یعنی چی؟\" anlamı sorar, \"یعنی ... درسته؟\" ise kendi anladığını teyit ettirir; öğrenci ikincisini hiç kullanmadığı için karşısındaki anlaşıldığını sanır ve konuşma yanlış yerden devam eder. Okunuşlarda da Türkçe ses değerleri şart: ج = c (motevecceh), ش = ş, چ = ç, خ = h; \"j\" harfi yalnız ژ içindir.",
   },
 };

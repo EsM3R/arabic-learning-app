@@ -59,7 +59,10 @@ jobs:
       - name: TypeScript denetimi
         run: npx tsc --noEmit
 
-      # Saf mantık modüllerinin testleri (SRS, istatistik, metin işleme).
+      # İki katman: saf mantık (node --test, saniyeler) ve EKRAN testleri
+      # (jest + react-native-testing-library). İkincisi, Akıcılık Odası'ndaki
+      # gibi ekranla zamanlayıcı arasındaki dikişte yaşayan hataları tutuyor —
+      # saf testler onu yakalayamıyordu.
       - name: Testler
         run: npm test
 
