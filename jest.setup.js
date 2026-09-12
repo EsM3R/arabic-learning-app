@@ -11,6 +11,17 @@ jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock")
 );
 
+/**
+ * Expo'nun akış destekli fetch'i node altında yüklenemez (yerel Response
+ * sınıfını genişletir). Testlerde ağa çıkan bir yol yok; sağlayıcı modülleri
+ * yalnızca IMPORT edilebilsin diye taklit ediliyor.
+ */
+jest.mock("expo/fetch", () => ({
+  fetch: jest.fn(async () => {
+    throw new Error("Testte ağ çağrısı yapılmamalı");
+  }),
+}));
+
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(async () => {}),
   notificationAsync: jest.fn(async () => {}),
@@ -24,26 +35,62 @@ jest.mock("expo-speech", () => ({
   getAvailableVoicesAsync: jest.fn(async () => []),
 }));
 
-jest.mock("expo-file-system", () => ({
-  Paths: { document: "/doc", cache: "/cache" },
-  File: class {
-    constructor() {
-      this.exists = false;
-      this.uri = "file:///doc/x.json";
+/**
+ * Bellek içi dosya sistemi. Yedek alma/geri yükleme YAZIP OKUMA çevrimidir:
+ * sahte bir File yalnız "çökmedi" der, yazılanın geri okunabildiğini söylemez.
+ * __fs testten sürülür (dosya yerleştirmek, yazılanı denetlemek için).
+ */
+const fsFiles = new Map();
+global.__fs = fsFiles;
+jest.mock("expo-file-system", () => {
+  const join = (base, name) => `${String(base).replace(/\/$/, "")}/${name}`;
+  class MockFile {
+    constructor(base, name) {
+      this.uri = name === undefined ? String(base) : join(base, name);
     }
-    create() {}
-    write() {}
-    delete() {}
-  },
-  Directory: class {
-    constructor() {
-      this.exists = true;
+    get exists() {
+      return global.__fs.has(this.uri);
     }
-    create() {}
-    list() {
-      return [];
+    create() {
+      if (!global.__fs.has(this.uri)) global.__fs.set(this.uri, "");
     }
-  },
+    write(text) {
+      global.__fs.set(this.uri, String(text));
+    }
+    text() {
+      const v = global.__fs.get(this.uri);
+      if (v === undefined) throw new Error(`Dosya yok: ${this.uri}`);
+      return Promise.resolve(v);
+    }
+    delete() {
+      global.__fs.delete(this.uri);
+    }
+  }
+  return {
+    Paths: { document: "file:///doc", cache: "file:///cache" },
+    File: MockFile,
+    Directory: class {
+      constructor(base, name) {
+        this.uri = name === undefined ? String(base) : join(base, name);
+        this.exists = true;
+      }
+      create() {}
+      list() {
+        return [...global.__fs.keys()]
+          .filter((u) => u.startsWith(`${this.uri}/`))
+          .map((u) => new MockFile(u));
+      }
+    },
+  };
+});
+
+jest.mock("expo-sharing", () => ({
+  isAvailableAsync: jest.fn(async () => true),
+  shareAsync: jest.fn(async () => {}),
+}));
+
+jest.mock("expo-document-picker", () => ({
+  getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
 }));
 
 /**
