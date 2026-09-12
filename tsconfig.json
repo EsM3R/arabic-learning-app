@@ -6,6 +6,9 @@
     // modda uzantılı import ister. tsc yalnızca tip denetimi yapar (Metro
     // kendi derleyicisini kullanır), o yüzden noEmit + uzantı iznini açıyoruz.
     "noEmit": true,
+    // Ekran testleri jest kullanıyor (uitests/); saf testler node:test.
+    // İkisinin küresel adları çakışmasın diye jest tipleri açıkça yükleniyor.
+    "types": ["jest", "node"],
     "allowImportingTsExtensions": true
   }
 }
