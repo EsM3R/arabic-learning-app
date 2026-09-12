@@ -58,6 +58,8 @@ export interface Profile {
   apiKeys?: Record<string, string>;
   /** Sağlayıcı başına seçilen model. */
   models?: Record<string, string>;
+  /** Sert harcama tavanı (TL). Yoksa varsayılan uygulanır — bkz. src/budget.ts. */
+  budget?: { dailyTry: number; monthlyTry: number };
   /** Aktif dil paketi ("ar", "en", "fr"… bkz. src/languages.ts). Eski kayıtlarda yoktur → "ar". */
   activeLanguage?: string;
   /** Aktif dilin ilerlemesi — dil değişince langprog deposuna taşınır. */

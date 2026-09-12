@@ -1,4 +1,5 @@
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
+import { BudgetExceededError, budgetStatus, normalizeLimits } from "./budget";
 import { normalizePronunciationItems, sanitizeMinimalPairs } from "./hvpt";
 import { getActivePack } from "./languages";
 import {
@@ -33,6 +34,7 @@ import {
   topicFromModule,
 } from "./reading";
 import { normalizeCurriculumModules } from "./structparse";
+import { USD_TRY, usageSummary } from "./usage";
 import {
   Assessment,
   ChatMessage,
@@ -75,6 +77,32 @@ export interface ChatOptions {
 
 const MAX_TOOL_ROUNDS = 12;
 
+/**
+ * Harcama tavanı bekçisi — para harcayan HER çağrının önünde durur.
+ *
+ * Tek yerde toplanmasının sebebi şu: ekran ekran kontrol konsaydı, sonradan
+ * eklenen bir çağrı yolu sessizce tavansız kalırdı ve bunu kimse fark etmezdi
+ * (fatura gelene kadar). Burada olunca yeni bir çağrı yolu eklemek, bekçiyi
+ * atlamak için ayrıca uğraşmayı gerektirir.
+ *
+ * Sınama çağrısı (testConnection) bilerek dışarıda: tek turluk, araçsız ve
+ * birkaç token'lık bir istek — üstelik "neden çalışmıyor" sorusunun cevabını
+ * bulmanın tek yolu. Tavan dolduğunda teşhis aracını da kapatmak, kullanıcıyı
+ * karanlıkta bırakırdı.
+ */
+async function guardBudget(profile: Profile): Promise<void> {
+  let spent;
+  try {
+    spent = await usageSummary();
+  } catch {
+    // Sayacı okuyamadıysak dersi KESMEYİZ. Bekçinin işi harcamayı durdurmak;
+    // depo arızasında öğrenciyi çalışmaktan alıkoymak koruma değil zarardır.
+    return;
+  }
+  const status = budgetStatus(spent, normalizeLimits(profile.budget), USD_TRY);
+  if (status.state === "blocked") throw new BudgetExceededError(status);
+}
+
 function requireKey(profile: Profile): ReturnType<typeof activeSetup> {
   const setup = activeSetup(profile);
   if (!setup.apiKey.trim()) {
@@ -99,6 +127,7 @@ export async function agenticChat(
 ): Promise<AgenticReply> {
   const { tools = TEACHER_TOOLS, maxRounds = MAX_TOOL_ROUNDS, effort = "high" } = opts;
   const sys: SystemPrompt = typeof system === "string" ? { stable: system } : system;
+  await guardBudget(ctx.profile);
   const { provider, model, apiKey } = requireKey(ctx.profile);
 
   return provider.chat({
@@ -138,9 +167,12 @@ export async function testConnection(
   if (early) return early;
 
   // Süre sınırı: sağlayıcı cevap vermezse kullanıcı sonsuza kadar beklemesin.
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("timed out")), TEST_TIMEOUT_MS)
-  );
+  // Zamanlayıcı finally'de TEMİZLENİR: yarışı istek kazandığında geride kalan
+  // bir zamanlayıcı, iş bitmiş olsa da olay döngüsünü boşuna meşgul tutar.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("timed out")), TEST_TIMEOUT_MS);
+  });
   try {
     const reply = await Promise.race([
       provider.chat({
@@ -158,6 +190,8 @@ export async function testConnection(
     return successResult(reply.text, model);
   } catch (e) {
     return classifyError(e instanceof Error ? e.message : String(e));
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -191,6 +225,7 @@ export async function generateCurriculum(
   assessment: Assessment,
   observations?: string
 ): Promise<Curriculum> {
+  await guardBudget(profile);
   const { provider, model, apiKey } = requireKey(profile);
   const parsed = await provider.structured<{ modules: CurriculumModule[] }>({
     system: curriculumSystem(profile.name, assessment, observations),
@@ -328,6 +363,7 @@ export async function generateReadingText(
   vocab: VocabCard[],
   opts: ReadingOptions
 ): Promise<ReadingText> {
+  await guardBudget(profile);
   const { provider, model, apiKey } = requireKey(profile);
   const pack = getActivePack();
   const level = profile.assessment?.readingLevel ?? "A1";
@@ -364,6 +400,7 @@ export async function generatePronunciationSet(
   vocabWords: string[],
   strugglingWords: string[] = []
 ): Promise<PronunciationSet> {
+  await guardBudget(profile);
   const { provider, model, apiKey } = requireKey(profile);
   const parsed = await provider.structured<{
     items: PronunciationItem[];

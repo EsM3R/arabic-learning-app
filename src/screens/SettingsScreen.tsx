@@ -39,6 +39,8 @@ import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { Profile } from "../types";
 import { formatTry, usageSummary, UsageSummary } from "../usage";
+import { USD_TRY } from "../pricing";
+import { budgetStatus, DEFAULT_BUDGET, normalizeLimits } from "../budget";
 import { buildLabel } from "../buildInfo";
 
 interface Props {
@@ -87,6 +89,17 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
     void usageSummary().then(setUsage);
   }, []);
 
+  // Tavan alanları metin olarak tutulur: kullanıcı yazarken alanı boşaltabilir,
+  // sayıya çevirmek kaydetme anında yapılır (yazarken 0'a düşmesin).
+  const savedLimits = normalizeLimits(profile.budget);
+  const [daily, setDaily] = useState(String(savedLimits.dailyTry));
+  const [monthly, setMonthly] = useState(String(savedLimits.monthlyTry));
+  const draftLimits = normalizeLimits({
+    dailyTry: daily.trim() === "" ? savedLimits.dailyTry : Number(daily),
+    monthlyTry: monthly.trim() === "" ? savedLimits.monthlyTry : Number(monthly),
+  });
+  const budget = usage ? budgetStatus(usage, draftLimits, USD_TRY) : null;
+
   const save = () => {
     const key = (keys[selected] ?? "").trim();
     if (!key) {
@@ -113,6 +126,7 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
       provider: selected,
       apiKeys: trimmedKeys,
       models: trimmedModels,
+      budget: draftLimits,
       // Eski alan Anthropic anahtarıyla uyumlu kalsın
       apiKey: trimmedKeys.anthropic ?? profile.apiKey,
     });
@@ -285,6 +299,43 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
                 Token sayılarından hesaplanan tahmindir; kesin tutar sağlayıcının
                 faturasıdır. {buildLabel()}
               </Text>
+            </View>
+          )}
+
+          {/* Sert tavan: göstermek koruma değil, DURDURMAK korumadır. */}
+          <Text style={styles.label}>Harcama tavanı</Text>
+          <Text style={styles.hint}>
+            Tavan dolunca uygulama yeni istek göndermez — ders, okuma metni, telaffuz
+            seti, hepsi durur. 0 yazarsan o sınır kapanır (önerilmez). Rakamlar
+            tahmindir; kesin tutar sağlayıcının faturasıdır.
+          </Text>
+          <View style={styles.budgetRow}>
+            <View style={styles.budgetField}>
+              <Text style={styles.budgetLabel}>Günlük (TL)</Text>
+              <TextInput
+                style={styles.input}
+                value={daily}
+                onChangeText={setDaily}
+                keyboardType="number-pad"
+                placeholder={String(DEFAULT_BUDGET.dailyTry)}
+                placeholderTextColor={colors.inkFaint}
+              />
+            </View>
+            <View style={styles.budgetField}>
+              <Text style={styles.budgetLabel}>Aylık (TL)</Text>
+              <TextInput
+                style={styles.input}
+                value={monthly}
+                onChangeText={setMonthly}
+                keyboardType="number-pad"
+                placeholder={String(DEFAULT_BUDGET.monthlyTry)}
+                placeholderTextColor={colors.inkFaint}
+              />
+            </View>
+          </View>
+          {budget && budget.state !== "ok" && (
+            <View style={[styles.warnBox, budget.state === "blocked" && styles.blockBox]}>
+              <Text style={styles.warnText}>{budget.message}</Text>
             </View>
           )}
 
@@ -551,6 +602,11 @@ function makeStyles(colors: Palette) {
     marginTop: 4,
   },
   warnText: { fontSize: 12.5, color: colors.ink, lineHeight: 19 },
+  /** Tavan DOLDUĞUNDA uyarı sarısı yetmez: bu bir engel, uyarı değil. */
+  blockBox: { backgroundColor: colors.dangerSoft },
+  budgetRow: { flexDirection: "row", gap: 12, marginTop: 8 },
+  budgetField: { flex: 1 },
+  budgetLabel: { fontSize: 11.5, color: colors.inkSoft, fontWeight: "700", marginBottom: 6 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

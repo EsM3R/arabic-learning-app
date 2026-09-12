@@ -4,6 +4,7 @@ import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
 import Header from "../components/Header";
 import { agenticChat } from "../claude";
+import { isBudgetError } from "../budget";
 import { getActivePack } from "../languages";
 import { extractArabic } from "../speech";
 import { markSpoken } from "../speechinput";
@@ -233,7 +234,12 @@ export default function LessonScreen({
       if (ctx.pendingNavigation) setSuggestion(ctx.pendingNavigation);
       armIdleTimer();
     } catch (e) {
-      Alert.alert("Bağlantı hatası", e instanceof Error ? e.message : String(e));
+      // Harcama tavanı bir ARIZA değil, uygulamanın bilerek verdiği karar.
+      // "Bağlantı hatası" demek kullanıcıyı olmayan bir sorunu aramaya iter.
+      Alert.alert(
+        isBudgetError(e) ? "Harcama tavanı doldu" : "Bağlantı hatası",
+        e instanceof Error ? e.message : String(e)
+      );
       setMessages(history);
     } finally {
       // Araçlar profili zaten diske yazdı; burada UI durumunu senkronlıyoruz.
