@@ -254,3 +254,56 @@ test("ekran kapanınca mikrofon AÇIK KALMAZ", async () => {
   });
   expect(mockMod.stop).not.toHaveBeenCalled();
 });
+
+// --- eller serbest kip (Konuşma Odası) ---------------------------------------
+
+test("ELLER SERBEST: öğrenci susunca dinleme kendi kapanır ve teslim edilir", async () => {
+  // Gerçek konuşmadaki gibi: düğme yok, susunca sıra geçer.
+  jest.useFakeTimers();
+  function HostAuto() {
+    api = useDictation({ onResult: (t) => heard.push(t), autoStopMs: 2000 });
+    return <Text>{api.listening ? "dinliyor" : "kapalı"}</Text>;
+  }
+  render(<HostAuto />);
+  fire("start");
+  fire("result", result("البيت", false));
+  act(() => {
+    jest.advanceTimersByTime(1500);
+  });
+  expect(mockMod.stop).not.toHaveBeenCalled(); // henüz sessizlik dolmadı
+  fire("result", result("البيت كبير", false)); // konuşmaya devam etti → sayaç baştan
+  act(() => {
+    jest.advanceTimersByTime(1500);
+  });
+  expect(mockMod.stop).not.toHaveBeenCalled();
+  act(() => {
+    jest.advanceTimersByTime(600);
+  });
+  expect(mockMod.stop).toHaveBeenCalledTimes(1); // 2 sn sessizlik → kapandı
+});
+
+test("ELLER SERBEST: hiç ses gelmediyse sayaç ÇALIŞMAZ — boş odada kapanıp durmasın", async () => {
+  jest.useFakeTimers();
+  function HostAuto() {
+    api = useDictation({ onResult: (t) => heard.push(t), autoStopMs: 2000 });
+    return <Text>x</Text>;
+  }
+  render(<HostAuto />);
+  fire("start");
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(mockMod.stop).not.toHaveBeenCalled();
+});
+
+test("basılı-tut kipinde (autoStopMs yok) sessizlik sayacı hiç kurulmaz", async () => {
+  // Yavaş konuşan öğrenci kesilmesin diye bitişe orada öğrenci karar verir.
+  jest.useFakeTimers();
+  mount();
+  fire("start");
+  fire("result", result("البيت", false));
+  act(() => {
+    jest.advanceTimersByTime(30_000);
+  });
+  expect(mockMod.stop).not.toHaveBeenCalled();
+});

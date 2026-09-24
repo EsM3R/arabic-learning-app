@@ -67,6 +67,7 @@ export const NAV_SCREENS = [
   "reading",
   "shadowing",
   "fluency",
+  "conversation",
 ] as const;
 
 // ---------------------------------------------------------------------------

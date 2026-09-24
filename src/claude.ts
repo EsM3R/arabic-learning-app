@@ -22,10 +22,14 @@ import {
 import type { TestResult } from "./connectiontest";
 import {
   curriculumSystem,
+  debriefSystem,
+  debriefUserMessage,
   pronunciationSystem,
   readingTextSystem,
   readingTextUserMessage,
 } from "./prompts";
+import { normalizeDebrief } from "./conversation";
+import type { Debrief, Scenario } from "./conversation";
 import {
   buildReadingRequest,
   finalizeReading,
@@ -428,4 +432,67 @@ export async function generatePronunciationSet(
     minimalPairs: sanitizeMinimalPairs(parsed.minimalPairs ?? [], getActivePack().script),
     createdAt: new Date().toISOString(),
   };
+}
+
+
+const DEBRIEF_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string" },
+    goalReached: { type: ["boolean", "null"] },
+    corrections: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          said: { type: "string" },
+          better: { type: "string" },
+          why: { type: "string" },
+        },
+        required: ["said", "better", "why"],
+        additionalProperties: false,
+      },
+    },
+    keep: { type: "array", items: { type: "string" } },
+    phrases: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          target: { type: "string" },
+          translit: { type: "string" },
+          tr: { type: "string" },
+        },
+        required: ["target", "translit", "tr"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["summary", "goalReached", "corrections", "keep", "phrases"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Konuşma sonrası değerlendirme — Konuşma Odası'nın ikinci yarısı.
+ * Konuşma sırasında bilerek düzeltilmeyen her şey burada tek parça gelir.
+ */
+export async function generateDebrief(
+  profile: Profile,
+  scenario: Scenario | null,
+  turns: ChatMessage[]
+): Promise<Debrief> {
+  await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const parsed = await provider.structured<unknown>({
+    system: debriefSystem(profile, scenario),
+    userMessage: debriefUserMessage(
+      turns.filter((t): t is ChatMessage & { role: "user" | "assistant" } =>
+        t.role === "user" || t.role === "assistant"
+      )
+    ),
+    schema: DEBRIEF_SCHEMA as unknown as Record<string, unknown>,
+    model,
+    apiKey,
+  });
+  return normalizeDebrief(parsed);
 }

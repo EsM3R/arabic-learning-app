@@ -142,3 +142,100 @@ export function speakSequence(
     },
   };
 }
+
+/**
+ * AKIŞLI KONUŞMA KUYRUĞU — Konuşma Odası'nın ses motoru.
+ *
+ * speakSequence hazır bir listeyi okur; burada liste akış hâlinde büyür:
+ * model cevabı damla damla gelirken tamamlanan her cümle push() ile eklenir
+ * ve kuyruk boşsa hemen okunmaya başlar. Böylece ilk ses, cevabın sonunu
+ * değil ilk cümleyi bekler — konuşma hissinin yarısı bu gecikmede.
+ *
+ * finish(): "başka cümle gelmeyecek" işareti. Kuyruk boşalınca onIdle
+ * çağrılır — ekran o anda mikrofonu açar (sıra öğrencide).
+ * cancel(): her şeyi keser; onIdle ÇAĞRILMAZ (kesilen konuşmanın ardından
+ * mikrofon açılırsa öğrenci yarım kalan bir sıraya cevap vermek zorunda kalır).
+ */
+export interface SpeechQueue {
+  push: (sentence: string) => void;
+  finish: () => void;
+  cancel: () => void;
+  /** Şu an konuşuyor mu (kuyrukta ya da ağızda cümle var). */
+  readonly speaking: boolean;
+}
+
+export function createSpeechQueue(opts: {
+  rate?: number;
+  onSentence?: (text: string) => void;
+  onIdle?: () => void;
+} = {}): SpeechQueue {
+  const pack = getActivePack();
+  const queue: string[] = [];
+  let busy = false;
+  let finished = false;
+  let cancelled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const clear = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const next = () => {
+    if (cancelled) return;
+    if (queue.length === 0) {
+      busy = false;
+      if (finished) opts.onIdle?.();
+      return;
+    }
+    busy = true;
+    const text = queue.shift()!;
+    const toSpeak = extractScript(text, pack.script) || text;
+    if (!toSpeak.trim()) {
+      next();
+      return;
+    }
+    opts.onSentence?.(text);
+    let advanced = false;
+    const done = () => {
+      if (advanced || cancelled) return;
+      advanced = true;
+      clear();
+      next();
+    };
+    // Bekçi: bazı Android TTS motorları onDone/onError'ı hiç çağırmaz.
+    timer = setTimeout(done, 6000 + toSpeak.length * 180);
+    Speech.speak(toSpeak, {
+      language: pack.ttsLocale,
+      rate: opts.rate ?? 0.95,
+      onDone: done,
+      onError: done,
+    });
+  };
+
+  return {
+    push: (sentence) => {
+      if (cancelled || !sentence.trim()) return;
+      queue.push(sentence);
+      if (!busy) next();
+    },
+    finish: () => {
+      finished = true;
+      // Hiç cümle gelmediyse (boş cevap) ya da kuyruk zaten bittiyse
+      // onIdle'ı buradan tetikle; yoksa sıra öğrenciye hiç geçmez.
+      if (!busy && queue.length === 0 && !cancelled) opts.onIdle?.();
+    },
+    cancel: () => {
+      cancelled = true;
+      queue.length = 0;
+      busy = false;
+      clear();
+      Speech.stop();
+    },
+    get speaking() {
+      return busy || queue.length > 0;
+    },
+  };
+}

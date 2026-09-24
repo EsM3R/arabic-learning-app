@@ -35,6 +35,17 @@ export interface DictationOptions {
   onResult: (text: string) => void;
   /** Hedef dil yerine başka bir dili dinlemek için. */
   lang?: string;
+  /**
+   * ELLER SERBEST kip (Konuşma Odası): öğrenci bir şey söyledikten sonra bu
+   * kadar ms yeni parça gelmezse dinleme kendiliğinden kapanır ve metin
+   * teslim edilir. Düğme yok — gerçek konuşmadaki gibi susunca sıra geçer.
+   *
+   * Basılı-tut kipinden farkı: orada bitişe öğrenci karar verir (yavaş
+   * konuşan kesilmesin diye); burada sessizlik karar verir ama süre
+   * Android'in kendi eşiğinden (~1 sn) çok daha uzun tutulur.
+   * Hiç ses gelmediyse sayaç çalışmaz — boş odada mikrofon kapanıp durmasın.
+   */
+  autoStopMs?: number;
 }
 
 /** Tanıma hatalarını öğrencinin anlayacağı Türkçeye çevirir. */
@@ -73,6 +84,25 @@ export function useDictation(opts: DictationOptions): DictationState {
   const delivered = useRef(false);
   const startedAt = useRef(0);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Eller serbest kipte sessizlik sayacı — her yeni parçada baştan kurulur. */
+  const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearSilence = () => {
+    if (silenceTimer.current) {
+      clearTimeout(silenceTimer.current);
+      silenceTimer.current = null;
+    }
+  };
+
+  /** Bir parça duyuldu: sessizlik sayacını (varsa) yeniden kur. */
+  const armSilence = () => {
+    if (!opts.autoStopMs) return;
+    clearSilence();
+    silenceTimer.current = setTimeout(() => {
+      silenceTimer.current = null;
+      doStop();
+    }, opts.autoStopMs);
+  };
 
   // Bekleyen gecikmeli durdurma ekran kapanınca da temizlenmeli: yoksa
   // zamanlayıcı sökülmüş bileşenin üstünde ateşler (setState uyarısı) ve
@@ -80,6 +110,7 @@ export function useDictation(opts: DictationOptions): DictationState {
   useEffect(
     () => () => {
       if (stopTimer.current) clearTimeout(stopTimer.current);
+      if (silenceTimer.current) clearTimeout(silenceTimer.current);
       try {
         ExpoSpeechRecognitionModule.abort();
       } catch {
@@ -129,15 +160,19 @@ export function useDictation(opts: DictationOptions): DictationState {
       interim.current = text;
       setPartial(collected());
     }
+    // Eller serbest kip: parça geldi, sessizlik sayacı baştan.
+    if (text.trim()) armSilence();
   });
 
   useSpeechRecognitionEvent("end", () => {
+    clearSilence();
     setListening(false);
     setPartial("");
     deliver(); // bitiş kararı öğrencinin: düğmeyi bıraktı
   });
 
   useSpeechRecognitionEvent("error", (ev) => {
+    clearSilence();
     setListening(false);
     setPartial("");
     const code = String(ev.error);
@@ -186,6 +221,7 @@ export function useDictation(opts: DictationOptions): DictationState {
   };
 
   const doStop = () => {
+    clearSilence();
     if (stopTimer.current) {
       clearTimeout(stopTimer.current);
       stopTimer.current = null;

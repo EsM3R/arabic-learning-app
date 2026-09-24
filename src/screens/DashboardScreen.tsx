@@ -62,6 +62,7 @@ interface Props {
   onOpenReading: () => void;
   onOpenShadowing: () => void;
   onOpenFluency: () => void;
+  onOpenConversation: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
   onOpenLevel: () => void;
   /** Panelden kurulan müfredatı profile yazar. */
@@ -82,6 +83,7 @@ export default function DashboardScreen({
   onOpenReading,
   onOpenShadowing,
   onOpenFluency,
+  onOpenConversation,
   onSwitchLanguage,
   onOpenLevel,
   onCurriculumBuilt,
@@ -329,6 +331,7 @@ export default function DashboardScreen({
     else if (s.screen === "reading") onOpenReading();
     else if (s.screen === "shadowing") onOpenShadowing();
     else if (s.screen === "fluency") onOpenFluency();
+    else if (s.screen === "conversation") onOpenConversation();
     else if (s.screen === "mistakes") onOpenMistakes();
     else if (s.screen === "module") {
       const target = curriculum?.modules.find((m) => m.id === s.moduleId);
@@ -634,6 +637,26 @@ export default function DashboardScreen({
         </View>
 
         <SectionHeader title="Çalış" hint="Hocanla konuş, oku, telaffuz et" />
+
+        {/* KONUŞMA ODASI — nihai hedef konuşmaksa giriş kapısı bu olmalı.
+            Ses-önce: metin kutusu yok, balon yok; hoca konuşur, sen konuşursun. */}
+        <TouchableOpacity onPress={onOpenConversation} activeOpacity={0.85}>
+          <LinearGradient
+            colors={[colors.deep, colors.deepAlt]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.chatButton}
+          >
+            <Text style={styles.chatButtonEmoji}>🎙️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.chatButtonTitle}>Konuşma Odası</Text>
+              <Text style={styles.chatButtonSub}>
+                Sesli sohbet ve rol sahneleri — yazmak yok, konuşmak var
+              </Text>
+            </View>
+            <Text style={styles.chatButtonArrow}>›</Text>
+          </LinearGradient>
+        </TouchableOpacity>
 
         <TouchableOpacity onPress={onFreeChat} activeOpacity={0.85}>
           <LinearGradient

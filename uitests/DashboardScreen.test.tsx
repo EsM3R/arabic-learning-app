@@ -145,6 +145,7 @@ async function open(p: Profile = profile()) {
       onOpenReading={count("reading")}
       onOpenShadowing={count("shadowing")}
       onOpenFluency={count("fluency")}
+      onOpenConversation={count("conversation")}
       onSwitchLanguage={count("switchLanguage")}
       onOpenLevel={count("level")}
       onCurriculumBuilt={(c) => builtCurricula.push(c)}

@@ -15,6 +15,8 @@ import type {
   Track,
   VocabCard,
 } from "./types.ts";
+import { conversationRules, sceneRules, transcriptForDebrief, turkishPolicy } from "./conversation.ts";
+import type { Scenario } from "./conversation.ts";
 
 /**
  * Tüm öğretmen kişiliğinin temeli. Dil paketi (persona, içerik biçimi,
@@ -444,4 +446,79 @@ TEKRAR KELİMELERİ${req.coldStart ? " (defterdekilerin tamamı — hepsini göm
 ${review.join(sep) || "(bu sefer yok)"}
 
 Okuma metnimi hazırla.`;
+}
+
+
+// ---------------------------------------------------------------------------
+// KONUŞMA ODASI
+// ---------------------------------------------------------------------------
+
+/**
+ * Konuşma turu promptu. Ders promptundan bilerek AYRI: ders promptu hocaya
+ * "kısa anlat, örnek ver, alıştırma sor" der — bu bir öğretmen monoloğu
+ * tarifidir. Burada anlatım yok, sıra alma var. Sahne verilirse hoca
+ * karakterdedir ve düzeltmez; verilmezse hoca hocadır ama yine konuşma
+ * kurallarıyla (kısa sıra, soruyla bitir, sesli ortam).
+ *
+ * BASE()'in "açıklamaları Türkçe yap" ve "hata yaparsa düzelt" kuralları
+ * burada bilerek EZİLİYOR: konuşma sırasında düzeltilen öğrenci konuşmayı
+ * bırakıp dinlemeye geçer. Düzeltme sahne sonunda ayrıca gelir.
+ */
+export function conversationSystem(profile: Profile, scenario: Scenario | null): string {
+  const p = getActivePack();
+  const level = profile.assessment?.speakingLevel ?? "A1";
+  const mode = scenario
+    ? `Şu an görev: ROL SAHNESİ. ${sceneRules(scenario)}`
+    : `Şu an görev: SESLİ SOHBET. Sen ${p.teacherName}'sın ama şu an ders anlatmıyorsun, SOHBET EDİYORSUN: ${p.rolePartner} gibi. Öğrencinin hayatından, gününden, ilgi alanlarından konuş; onu konuşturmak için soru sor. Hata duyduğunda: anlamı bozmuyorsa GEÇ (sohbet sonunda toplu bakacaksın); anlamı bozuyorsa doğal bir muhatap gibi teyit sorusuyla düzelt ("yani ... mi demek istedin?"), açıklama yapma.`;
+  return `${p.persona}
+
+${mode}
+
+Öğrencinin adı ${profile.name}. Konuşma seviyesi: ${level}.
+DİL POLİTİKASI: ${turkishPolicy(level)}
+
+KONUŞMA KURALLARI (bunlar önceki bütün kurallardan önce gelir):
+${conversationRules()}
+
+Bazı mesajlar "[Uygulama bildirimi: ...]" biçiminde gelir; bunlar öğrenciden değil uygulamadan gelir, öğrenci görmez. Cevabında bildirimden söz etme. "[sesli]" ile başlayan mesajı öğrenci KONUŞARAK söyledi; metin ses tanımanın duyduğudur, küçük sapmaları görmezden gel.`;
+}
+
+export const KICKOFF_CONVERSATION = `${EVENT_PREFIX} Öğrenci konuşma odasına girdi ve seni dinliyor. Sen başla: kısa bir selam, tek bir soru.]`;
+
+export function kickoffScene(s: Scenario): string {
+  return `${EVENT_PREFIX} Sahne başlıyor: "${s.title}". Karakterine gir ve sahneyi aç — durumu kuran tek bir cümle, sonra sıra öğrencide.]`;
+}
+
+/**
+ * Sahne sonrası DEĞERLENDİRME promptu. Konuşma sırasında bilerek
+ * yapılmayan düzeltmelerin hepsi burada, tek parça. Yapılandırılmış çıktı
+ * ister; ekran bunu kartlar hâlinde gösterir ve kalıpları deftere yazar.
+ */
+export function debriefSystem(profile: Profile, scenario: Scenario | null): string {
+  const p = getActivePack();
+  const level = profile.assessment?.speakingLevel ?? "A1";
+  const goal = scenario
+    ? `Sahne: "${scenario.title}". Öğrencinin hedefi: ${scenario.goal}. goalReached alanında hedefe ulaşıp ulaşmadığını dürüstçe söyle.`
+    : "Bu serbest bir sohbetti; goalReached null olsun.";
+  return `${p.persona}
+
+Şu an görev: KONUŞMA DEĞERLENDİRMESİ. Az önce ${profile.name} (seviye ${level}) ile bir konuşma yapıldı; transkript aşağıda. Konuşma sırasında bilerek düzeltme yapılmadı — hepsi şimdi, tek seferde.
+
+${goal}
+
+Kurallar:
+- corrections: öğrencinin GERÇEKTEN söylediği cümleler (said, aynen), doğal/doğru hâli (better, hedef dilde) ve TEK cümlelik Türkçe gerekçe (why). En fazla 6; anlamı bozanlar önce. Ses tanıma gürültüsü olabilecek küçük yazım sapmalarını düzeltme sayma.
+- keep: gerçekten iyi yaptığı 1-3 şey — süs değil, somut ("hesabı istemeyi doğru kalıpla yaptı").
+- phrases: bir dahaki sefere hazır olsun diye 2-4 kalıp: target (hedef dilde, ${p.script === "latin" ? "olduğu gibi" : "harekeli/tam yazım"}), translit (Türkçe okunuşa yakın; Latin dillerde boş), tr (Türkçe).
+- summary: 2-3 cümle Türkçe; sıcak ama dürüst. Nasıl geçtiğini ve bir dahaki sefere tek bir odak noktasını söyle.
+Yalnız JSON döndür.`;
+}
+
+export function debriefUserMessage(
+  turns: { role: "user" | "assistant"; content: string }[]
+): string {
+  return `TRANSKRİPT:
+${transcriptForDebrief(turns)}
+
+Değerlendirmeyi hazırla.`;
 }
