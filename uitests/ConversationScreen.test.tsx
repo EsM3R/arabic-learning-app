@@ -24,7 +24,7 @@ import { loadMistakes, loadVocab } from "../src/storage";
 import type { Profile } from "../src/types";
 
 /** Ses modeli ağı: varsayılan reddeder; ses testleri sesli cevap verdirir. */
-const mockVoiceFetch = jest.fn(async () => {
+const mockVoiceFetch = jest.fn<Promise<unknown>, unknown[]>(async () => {
   throw new Error("ses ağı kapalı");
 });
 jest.mock("expo/fetch", () => ({ fetch: (...a: unknown[]) => mockVoiceFetch(...a) }));
