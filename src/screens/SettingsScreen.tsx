@@ -41,6 +41,10 @@ import { Profile } from "../types";
 import { formatTry, usageSummary, UsageSummary } from "../usage";
 import { USD_TRY } from "../pricing";
 import { budgetStatus, DEFAULT_BUDGET, normalizeLimits } from "../budget";
+import { previewVoice } from "../openaiVoice";
+import { neuralVoiceActive, normalizeVoice, OPENAI_VOICES } from "../voice";
+import type { VoiceSettings } from "../voice";
+import { getActivePack } from "../languages";
 import { buildLabel } from "../buildInfo";
 
 interface Props {
@@ -100,6 +104,23 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
   });
   const budget = usage ? budgetStatus(usage, draftLimits, USD_TRY) : null;
 
+  // Ses tercihi. Ses modeli OpenAI anahtarı ister; anahtar yoksa tercih
+  // kaydedilir ama telefon sesi kullanılır — bunu ekran açıkça söyler.
+  const [voice, setVoice] = useState<VoiceSettings>(() => normalizeVoice(profile.voice));
+  const openaiDraftKey = (keys.openai ?? "").trim();
+  const voiceReady = neuralVoiceActive(voice, openaiDraftKey);
+  const [previewing, setPreviewing] = useState(false);
+  const tryVoice = async () => {
+    setPreviewing(true);
+    try {
+      await previewVoice(openaiDraftKey, voice.voiceId, getActivePack().greeting);
+    } catch (e) {
+      Alert.alert("Ses denenemedi", errText(e));
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const save = () => {
     const key = (keys[selected] ?? "").trim();
     if (!key) {
@@ -127,6 +148,7 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
       apiKeys: trimmedKeys,
       models: trimmedModels,
       budget: draftLimits,
+      voice,
       // Eski alan Anthropic anahtarıyla uyumlu kalsın
       apiKey: trimmedKeys.anthropic ?? profile.apiKey,
     });
@@ -443,6 +465,80 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
             cihazından sağlayıcıya gider.
           </Text>
 
+          {/* SES: "ChatGPT akıcı konuşuyor, bizimki robot" şikâyetinin cevabı.
+              Onlarda ses sunucudaki ses modelinden gelir; burada aynı modele
+              gidiliyor. Telefon sesi yedek olarak duruyor. */}
+          <Text style={[styles.label, { marginTop: 20 }]}>Hocanın sesi</Text>
+          <View style={styles.chips}>
+            {(["device", "openai"] as const).map((prov) => (
+              <TouchableOpacity
+                key={prov}
+                style={[styles.chip, voice.provider === prov && styles.chipOn]}
+                onPress={() => setVoice({ ...voice, provider: prov })}
+              >
+                <Text style={[styles.chipText, voice.provider === prov && styles.chipTextOn]}>
+                  {prov === "device" ? "📱 Telefon sesi" : "✨ OpenAI ses modeli"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {voice.provider === "openai" && (
+            <>
+              {!voiceReady && (
+                <View style={styles.warnBox}>
+                  <Text style={styles.warnText}>
+                    Ses modeli için OpenAI anahtarı gerekir (sohbet için Claude kullanmaya devam
+                    edebilirsin; anahtar yalnız ses için). Yukarıdan OpenAI'ı seçip anahtarı
+                    yapıştır, sonra sağlayıcını geri değiştir. Anahtar girilene kadar telefon
+                    sesi kullanılır.
+                  </Text>
+                </View>
+              )}
+              <View style={styles.chips}>
+                {OPENAI_VOICES.map((v) => (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={[styles.chip, voice.voiceId === v.id && styles.chipOn]}
+                    onPress={() => setVoice({ ...voice, voiceId: v.id })}
+                  >
+                    <Text style={[styles.chipText, voice.voiceId === v.id && styles.chipTextOn]}>
+                      {v.label} · {v.note}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[styles.row, voice.transcribe && styles.rowActive]}
+                onPress={() => setVoice({ ...voice, transcribe: !voice.transcribe })}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.radio, voice.transcribe && styles.radioOn]}>
+                  {voice.transcribe && <View style={styles.radioDot} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>Senin sesini de ses modeli çözsün</Text>
+                  <Text style={styles.rowMeta}>
+                    Arapça ve Farsçada telefonun tanımasından çok daha iyi. Konuşma Odası'nda
+                    canlı ara metin yerine sustuğunda çözülür. ≈ 0,15 TL/dk.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.testButton, (!voiceReady || previewing) && styles.testButtonOff]}
+                disabled={!voiceReady || previewing}
+                onPress={() => void tryVoice()}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.testButtonText}>
+                  {previewing ? "Sentezleniyor…" : "🔊 Sesi dene"}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.hint}>
+                Hoca ≈ 0,75 TL/dk konuşma. Harcama tavanına dahildir.
+              </Text>
+            </>
+          )}
+
           <TouchableOpacity style={styles.saveButton} onPress={save} activeOpacity={0.85}>
             <Text style={styles.saveText}>Kaydet</Text>
           </TouchableOpacity>
@@ -604,6 +700,8 @@ function makeStyles(colors: Palette) {
   warnText: { fontSize: 12.5, color: colors.ink, lineHeight: 19 },
   /** Tavan DOLDUĞUNDA uyarı sarısı yetmez: bu bir engel, uyarı değil. */
   blockBox: { backgroundColor: colors.dangerSoft },
+  chipOn: { backgroundColor: colors.accentSoft, borderColor: "transparent" },
+  chipTextOn: { color: colors.accentDark, fontWeight: "800" },
   budgetRow: { flexDirection: "row", gap: 12, marginTop: 8 },
   budgetField: { flex: 1 },
   budgetLabel: { fontSize: 11.5, color: colors.inkSoft, fontWeight: "700", marginBottom: 6 },

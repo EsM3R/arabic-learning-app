@@ -54,8 +54,17 @@ jest.mock("expo-file-system", () => {
     create() {
       if (!global.__fs.has(this.uri)) global.__fs.set(this.uri, "");
     }
-    write(text) {
-      global.__fs.set(this.uri, String(text));
+    write(content) {
+      // İkili içerik (ses klibi) de yazılabilir; testte bayt sayısı yeter.
+      global.__fs.set(this.uri, content instanceof Uint8Array ? content : String(content));
+    }
+    bytes() {
+      const v = global.__fs.get(this.uri);
+      if (v === undefined) throw new Error(`Dosya yok: ${this.uri}`);
+      return Promise.resolve(v instanceof Uint8Array ? v : new TextEncoder().encode(String(v)));
+    }
+    base64() {
+      return Promise.resolve("");
     }
     text() {
       const v = global.__fs.get(this.uri);
@@ -97,7 +106,16 @@ jest.mock("expo-document-picker", () => ({
  * Ses kaydı: gerçek mikrofon yok. Kaydedici durumu __recorder üzerinden
  * sürülebilir ki "izin verilmedi" gibi yollar da test edilebilsin.
  */
-const recorderState = { isRecording: false, uri: null, permission: true, prepared: 0, played: [] };
+const recorderState = {
+  isRecording: false,
+  uri: null,
+  permission: true,
+  prepared: 0,
+  played: [],
+  /** Kayıt tabanlı dinleme testleri ses düzeyini buradan sürer (dB). */
+  metering: undefined,
+  durationMillis: 0,
+};
 global.__recorder = recorderState;
 jest.mock("expo-audio", () => ({
   RecordingPresets: { HIGH_QUALITY: {} },
@@ -122,11 +140,38 @@ jest.mock("expo-audio", () => ({
       global.__recorder.isRecording = false;
       global.__recorder.uri = "file:///rec.m4a";
     },
+    getStatus: () => ({
+      isRecording: global.__recorder.isRecording,
+      metering: global.__recorder.metering,
+      durationMillis: global.__recorder.durationMillis,
+      url: global.__recorder.uri,
+    }),
   }),
   useAudioPlayer: () => ({
     replace: (src) => global.__recorder.played.push(src),
     play: jest.fn(),
   }),
+  /**
+   * Kancasız oynatıcı (ses modeli klipleri). play() çağrılınca klip
+   * __recorder.played'e düşer ve bir sonraki tick'te "bitti" olayı gelir —
+   * kuyruk testleri sıralı akışı böyle ölçer.
+   */
+  createAudioPlayer: (src) => {
+    const listeners = [];
+    return {
+      addListener: (_name, fn) => {
+        listeners.push(fn);
+        return { remove: () => {} };
+      },
+      play: () => {
+        global.__recorder.played.push(src);
+        setTimeout(() => {
+          for (const fn of listeners) fn({ didJustFinish: true, playing: false, isLoaded: true });
+        }, 0);
+      },
+      remove: () => {},
+    };
+  },
 }));
 
 jest.mock("expo-linear-gradient", () => {

@@ -284,3 +284,34 @@ test("dosya seçimi İPTAL edilirse hiçbir uyarı çıkmaz, ekran kilitlenmez",
   await waitFor(() => expect(screen.getByText("Yedekten dön")).toBeTruthy());
   expect(alerts).toHaveLength(0);
 });
+
+// --- hocanın sesi -----------------------------------------------------------
+
+test("ses tercihi KAYDEDİLİR", async () => {
+  await open();
+  fireEvent.press(screen.getByText(/OpenAI ses modeli/));
+  fireEvent.press(screen.getByText(/Nova ·/));
+  fireEvent.press(screen.getByText(/Senin sesini de ses modeli çözsün/));
+  fireEvent.press(screen.getByText("Kaydet"));
+  await waitFor(() => expect(saved).toHaveLength(1));
+  expect(saved[0].voice).toEqual({ provider: "openai", voiceId: "nova", transcribe: true });
+});
+
+test("OpenAI anahtarı yokken ses modeli seçilirse NE OLACAĞI söylenir, sınama kapalı", async () => {
+  // Sessizce telefon sesine düşmek, kullanıcıyı "neden hâlâ robot" diye
+  // bırakırdı.
+  await open();
+  fireEvent.press(screen.getByText(/OpenAI ses modeli/));
+  expect(screen.getByText(/OpenAI anahtarı gerekir/)).toBeTruthy();
+  expect(screen.getByText(/Anahtar girilene kadar telefon sesi/)).toBeTruthy();
+  const tryBtn = screen.getByText(/Sesi dene/);
+  fireEvent.press(tryBtn); // devre dışı: hiçbir şey olmamalı
+  await act(async () => {});
+  expect(alerts.some((a) => /Ses denenemedi/.test(a.title ?? ""))).toBe(false);
+});
+
+test("telefon sesi seçiliyken ses modeli ayarları GÖRÜNMEZ", async () => {
+  await open();
+  expect(screen.queryByText(/Sesi dene/)).toBeNull();
+  expect(screen.queryByText(/Nova ·/)).toBeNull();
+});

@@ -60,6 +60,8 @@ export interface Profile {
   models?: Record<string, string>;
   /** Sert harcama tavanı (TL). Yoksa varsayılan uygulanır — bkz. src/budget.ts. */
   budget?: { dailyTry: number; monthlyTry: number };
+  /** Ses tercihi: telefon TTS'i mi, ses modeli mi — bkz. src/voice.ts. */
+  voice?: { provider: "device" | "openai"; voiceId: string; transcribe: boolean };
   /** Aktif dil paketi ("ar", "en", "fr"… bkz. src/languages.ts). Eski kayıtlarda yoktur → "ar". */
   activeLanguage?: string;
   /** Aktif dilin ilerlemesi — dil değişince langprog deposuna taşınır. */

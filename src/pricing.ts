@@ -30,6 +30,12 @@ const PRICES: { match: RegExp; price: Price }[] = [
   // ayrıldı ve istekleri BU modele, BU fiyatlardan yönleniyor — o yüzden tek
   // kural bütün deepseek adlarını kapsıyor. Yoğun saatte gerçek fatura 2 katı.
   { match: /^deepseek/, price: { input: 0.15, output: 0.6, cacheRead: 0.003, cacheWrite: 0.15 } },
+  // SES: sohbetle aynı sayaca yazılır ki harcama tavanı sesi de kapsasın.
+  // openai-tts: "input" = KARAKTER sayısı. gpt-4o-mini-tts ≈ $0,015/dk ses,
+  // bir dakika konuşma ≈ 900 karakter → ≈ $17 / 1M karakter.
+  { match: /^openai-tts/, price: { input: 17, output: 0, cacheRead: 0, cacheWrite: 0 } },
+  // openai-stt: "input" = SANİYE. gpt-4o-mini-transcribe ≈ $0,003/dk → $50 / 1M sn.
+  { match: /^openai-stt/, price: { input: 50, output: 0, cacheRead: 0, cacheWrite: 0 } },
 ];
 
 /** Bilinmeyen model: sessizce sıfır saymak yerine orta bir tahmin kullan. */

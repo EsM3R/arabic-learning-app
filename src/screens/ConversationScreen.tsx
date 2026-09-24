@@ -25,6 +25,10 @@ import { conversationSystem, KICKOFF_CONVERSATION, kickoffScene } from "../promp
 import { isRtl, containsTargetScript } from "../scripts";
 import { createSpeechQueue } from "../speech";
 import type { SpeechQueue } from "../speech";
+import { createNeuralSpeechQueue } from "../openaiVoice";
+import { keyFor } from "../providers";
+import { useRecorderDictation } from "../useRecorderDictation";
+import { neuralTranscribeActive, neuralVoiceActive, normalizeVoice } from "../voice";
 import { markSpoken } from "../speechinput";
 import { newCard } from "../srs";
 import { recordStats } from "../statsStore";
@@ -81,6 +85,16 @@ export default function ConversationScreen({ profile, onBack }: Props) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const pack = getActivePack();
   const level = profile.assessment?.speakingLevel ?? "A1";
+  /**
+   * Ses modeli: tercih "openai" VE anahtar varsa hoca ChatGPT'nin sesiyle
+   * konuşur, öğrencinin sesi de (istenirse) aynı modelle çözülür. Yoksa
+   * telefonun TTS'i ve tanıması — robot ama çalışır.
+   */
+  const voice = normalizeVoice(profile.voice);
+  const openaiKey = keyFor(profile, "openai");
+  const neural = neuralVoiceActive(voice, openaiKey);
+  const neuralStt = neuralTranscribeActive(voice, openaiKey);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
 
   const [phase, setPhase] = useState<Phase>("pick");
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -147,12 +161,22 @@ export default function ConversationScreen({ profile, onBack }: Props) {
   }, []);
 
   // ------------------------------------------------------------------ mikrofon
-  const dictation = useDictation({
+  // İki kanca da her çizimde çağrılır (hooks kuralı); yalnız biri kullanılır.
+  const phoneDictation = useDictation({
     autoStopMs: handsFree ? SILENCE_MS : undefined,
     onResult: (said) => {
       void onStudentSaid(said);
     },
   });
+  const recorderDictation = useRecorderDictation({
+    apiKey: openaiKey,
+    enabled: neuralStt,
+    silenceMs: SILENCE_MS,
+    onResult: (said) => {
+      void onStudentSaid(said);
+    },
+  });
+  const dictation = neuralStt ? recorderDictation : phoneDictation;
 
   const startListening = () => {
     if (!alive.current) return;
@@ -173,10 +197,20 @@ export default function ConversationScreen({ profile, onBack }: Props) {
     setNowSaying("");
     buffer.current = "";
     queue.current?.cancel();
-    const q = createSpeechQueue({
-      onSentence: (s) => setNowSaying(s),
-      onIdle: onTeacherDone,
-    });
+    const q = neural
+      ? createNeuralSpeechQueue({
+          apiKey: openaiKey,
+          voiceId: voice.voiceId,
+          onSentence: (s) => setNowSaying(s),
+          onIdle: onTeacherDone,
+          // Sentez düşerse cümle telefon sesiyle okunur; kullanıcı bunu
+          // "robot ses" olarak duyar — neden olduğunu da görsün.
+          onFallback: (reason) => setVoiceNote(`Ses modeli cevap vermedi, telefon sesi kullanıldı: ${reason}`),
+        })
+      : createSpeechQueue({
+          onSentence: (s) => setNowSaying(s),
+          onIdle: onTeacherDone,
+        });
     queue.current = q;
 
     const ctx: AgentContext = { profile: profileRef.current, profileChanged: false };
@@ -565,6 +599,11 @@ export default function ConversationScreen({ profile, onBack }: Props) {
           </Text>
         )}
         {dictation.error && <Text style={styles.errText}>{dictation.error}</Text>}
+        {voiceNote && <Text style={styles.voiceNote}>{voiceNote}</Text>}
+        <Text style={styles.voiceTag}>
+          {neural ? `ses: OpenAI · ${voice.voiceId}` : "ses: telefon"}
+          {neuralStt ? " · tanıma: OpenAI" : " · tanıma: telefon"}
+        </Text>
       </View>
 
       <View style={styles.controls}>
@@ -681,6 +720,8 @@ function makeStyles(colors: Palette) {
     saying: { fontSize: 18, color: colors.ink, textAlign: "center", lineHeight: 28, paddingHorizontal: 12 },
     partial: { fontSize: 15, color: colors.inkSoft, textAlign: "center", lineHeight: 22, paddingHorizontal: 12, fontStyle: "italic" },
     errText: { fontSize: 13, color: colors.danger, textAlign: "center", lineHeight: 19 },
+    voiceNote: { fontSize: 11.5, color: colors.gold, textAlign: "center", lineHeight: 16, paddingHorizontal: 16 },
+    voiceTag: { fontSize: 10.5, color: colors.inkFaint, letterSpacing: 0.3, marginTop: 6 },
     controls: { padding: 18, gap: 10 },
     micButton: {
       backgroundColor: colors.accent,

@@ -23,6 +23,18 @@ import { flushStats, loadStatsSummary } from "../src/statsStore";
 import { loadMistakes, loadVocab } from "../src/storage";
 import type { Profile } from "../src/types";
 
+/** Ses modeli ağı: varsayılan reddeder; ses testleri sesli cevap verdirir. */
+const mockVoiceFetch = jest.fn(async () => {
+  throw new Error("ses ağı kapalı");
+});
+jest.mock("expo/fetch", () => ({ fetch: (...a: unknown[]) => mockVoiceFetch(...a) }));
+const okAudio = async () => ({
+  ok: true,
+  status: 200,
+  arrayBuffer: async () => new Uint8Array(4).buffer,
+  json: async () => ({}),
+});
+
 /** Model taklidi: metni parça parça akıtır, sonra tamamını döndürür. */
 const mockChat = jest.fn();
 const mockDebrief = jest.fn();
@@ -97,6 +109,10 @@ beforeEach(async () => {
   Speech.speak.mockImplementation((_t: string, o: { onDone?: () => void }) => o.onDone?.());
   dict().started = 0;
   dict().stopped = 0;
+  mockVoiceFetch.mockReset();
+  mockVoiceFetch.mockImplementation(async () => {
+    throw new Error("ses ağı kapalı");
+  });
 });
 
 async function openRoom(level = "A2") {
@@ -314,4 +330,49 @@ test("harcama tavanı 'bağlantı hatası' gibi gösterilmez", async () => {
   } finally {
     spy.mockRestore();
   }
+});
+
+// --- ses modeli ---------------------------------------------------------------
+
+/** OpenAI ses tercihi + anahtarlı profil. */
+function neuralProfile(transcribe = false): Profile {
+  return {
+    ...profile("A2"),
+    provider: "anthropic",
+    apiKeys: { anthropic: "sk-ant-x", openai: "sk-openai" },
+    voice: { provider: "openai", voiceId: "nova", transcribe },
+  } as unknown as Profile;
+}
+
+test("ses modeli seçiliyse hoca TELEFON TTS'iyle DEĞİL ses modeliyle konuşur", async () => {
+  mockVoiceFetch.mockImplementation(okAudio);
+  const Speech = require("expo-speech");
+  render(<ConversationScreen profile={neuralProfile()} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
+  await startScene(/ile sesli sohbet/);
+  await waitFor(() => expect(dict().started).toBe(1)); // sıra yine öğrenciye geçti
+  expect(Speech.speak).not.toHaveBeenCalled(); // robot ses devrede değil
+  expect(screen.getAllByText(/ses: OpenAI · nova/).length).toBeGreaterThan(0);
+  expect(mockVoiceFetch).toHaveBeenCalled(); // ses gerçekten modele gitti
+});
+
+test("ses tercihi OpenAI ama ANAHTAR YOK → sessizce telefon sesine düşer", async () => {
+  const p = { ...neuralProfile(), apiKeys: { anthropic: "sk-ant-x" } } as unknown as Profile;
+  const Speech = require("expo-speech");
+  render(<ConversationScreen profile={p} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
+  await startScene(/ile sesli sohbet/);
+  await waitFor(() => expect(dict().started).toBe(1));
+  expect(Speech.speak).toHaveBeenCalled();
+  expect(screen.getAllByText(/ses: telefon/).length).toBeGreaterThan(0);
+});
+
+test("tanıma da ses modeline verilince telefonun tanıması AÇILMAZ", async () => {
+  mockVoiceFetch.mockImplementation(okAudio);
+  render(<ConversationScreen profile={neuralProfile(true)} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
+  await startScene(/ile sesli sohbet/);
+  await act(async () => {});
+  expect(dict().started).toBe(0); // telefon tanıması değil, kayıt yolu
+  expect(screen.getAllByText(/tanıma: OpenAI/).length).toBeGreaterThan(0);
 });
