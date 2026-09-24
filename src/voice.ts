@@ -38,23 +38,40 @@ export interface VoiceSettings {
   voiceId: string;
   /** Öğrencinin sesi de ses modeliyle çözülsün (Whisper ailesi). */
   transcribe: boolean;
+  /**
+   * Konuşma Odası'nın BEYNİ. "deepseek": DeepSeek anahtarı varsa oda onu
+   * kullanır (≈ 1 TL/oturum), ders ekranları aktif sağlayıcıda kalır.
+   * "active": oda da aktif sağlayıcıyı kullanır.
+   */
+  brain: "deepseek" | "active";
 }
 
+/**
+ * VARSAYILAN: DeepSeek beyin + OpenAI ses. Kullanıcının kararı: konuşmada
+ * pahalı olan kısım beyin değil ses; beyni ucuza, sesi iyisinden almak
+ * toplamı ≈ 8 TL/oturuma indiriyor. İkisi de ANAHTAR VARSA devreye girer;
+ * yoksa oda sessizce aktif sağlayıcıya ve telefon sesine düşer — Ayarlar bunu
+ * açıkça söyler.
+ */
 export const DEFAULT_VOICE: VoiceSettings = {
-  provider: "device",
+  provider: "openai",
   voiceId: DEFAULT_OPENAI_VOICE,
-  transcribe: false,
+  transcribe: true,
+  brain: "deepseek",
 };
 
 /** Depodan gelen bozuk/eksik değer güvenli tercihe düşer. */
 export function normalizeVoice(raw: unknown): VoiceSettings {
   const r = (raw ?? {}) as Partial<Record<keyof VoiceSettings, unknown>>;
-  const provider = r.provider === "openai" ? "openai" : "device";
+  // Eksik alan varsayılana düşer; yalnız AÇIKÇA yazılmış tercih korunur.
+  const provider = r.provider === "device" ? "device" : "openai";
   const voiceId =
     typeof r.voiceId === "string" && OPENAI_VOICES.some((v) => v.id === r.voiceId)
       ? r.voiceId
       : DEFAULT_OPENAI_VOICE;
-  return { provider, voiceId, transcribe: r.transcribe === true };
+  const transcribe = typeof r.transcribe === "boolean" ? r.transcribe : DEFAULT_VOICE.transcribe;
+  const brain = r.brain === "active" ? "active" : "deepseek";
+  return { provider, voiceId, transcribe, brain };
 }
 
 /**

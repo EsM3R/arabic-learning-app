@@ -21,7 +21,8 @@ interface Props {
     name: string,
     apiKey: string,
     languageId: LanguageId,
-    providerId: ProviderId
+    providerId: ProviderId,
+    voiceKey?: string
   ) => void;
 }
 
@@ -35,7 +36,10 @@ export default function SetupScreen({ onDone }: Props) {
   const [name, setName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [languageId, setLanguageId] = useState<LanguageId>("ar");
-  const [providerId, setProviderId] = useState<ProviderId>("anthropic");
+  // Varsayılan beyin DeepSeek: en ucuz sağlayıcı. Ses ayrıca OpenAI'dan.
+  const [providerId, setProviderId] = useState<ProviderId>("deepseek");
+  /** Ses için OpenAI anahtarı — isteğe bağlı; beyin OpenAI ise zaten var. */
+  const [voiceKey, setVoiceKey] = useState("");
 
   const pack = LANGUAGE_PACKS[languageId];
   const provider =
@@ -58,7 +62,7 @@ export default function SetupScreen({ onDone }: Props) {
       );
       return;
     }
-    onDone(name.trim(), key, languageId, providerId);
+    onDone(name.trim(), key, languageId, providerId, voiceKey.trim() || undefined);
   };
 
   const next = () => (step === STEPS - 1 ? finish() : setStep(step + 1));
@@ -84,6 +88,8 @@ export default function SetupScreen({ onDone }: Props) {
               setApiKey={setApiKey}
               providerId={providerId}
               setProviderId={setProviderId}
+              voiceKey={voiceKey}
+              setVoiceKey={setVoiceKey}
               pack={pack}
             />
           )}
@@ -274,6 +280,8 @@ function Connect({
   setApiKey,
   providerId,
   setProviderId,
+  voiceKey,
+  setVoiceKey,
   pack,
 }: {
   name: string;
@@ -282,6 +290,8 @@ function Connect({
   setApiKey: (v: string) => void;
   providerId: ProviderId;
   setProviderId: (v: ProviderId) => void;
+  voiceKey: string;
+  setVoiceKey: (v: string) => void;
   pack: (typeof LANGUAGE_PACKS)[LanguageId];
 }) {
   const colors = useTheme();
@@ -346,6 +356,28 @@ function Connect({
         {"\n"}Anahtar yalnızca bu cihazda saklanır. Sonradan panelden
         değiştirebilirsin.
       </Text>
+
+      {providerId !== "openai" && (
+        <>
+          <Text style={[styles.label, { marginTop: 16 }]}>
+            Hocanın sesi için OpenAI anahtarı (isteğe bağlı)
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={voiceKey}
+            onChangeText={setVoiceKey}
+            placeholder="sk-… (boş bırakırsan telefon sesi)"
+            placeholderTextColor={colors.inkFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+          />
+          <Text style={styles.hint}>
+            Konuşma Odası'nda hoca ChatGPT'nin sesiyle konuşur ve seni o tanır (≈ 7 TL /
+            20 dk). Boşsa telefonun sesi kullanılır; sonradan Ayarlar'dan ekleyebilirsin.
+          </Text>
+        </>
+      )}
     </View>
   );
 }

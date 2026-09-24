@@ -22,7 +22,7 @@ function lastAlert() {
   return alerts[alerts.length - 1];
 }
 
-const done: { name: string; key: string; lang: string; provider: string }[] = [];
+const done: { name: string; key: string; lang: string; provider: string; voiceKey?: string }[] = [];
 
 beforeEach(() => {
   alerts.length = 0;
@@ -37,7 +37,9 @@ beforeEach(() => {
 function open() {
   render(
     <SetupScreen
-      onDone={(name, key, lang, provider) => done.push({ name, key, lang, provider })}
+      onDone={(name, key, lang, provider, voiceKey) =>
+        done.push({ name, key, lang, provider, voiceKey })
+      }
     />
   );
 }
@@ -62,7 +64,7 @@ test("adımlar sırayla ilerler ve GERİ dönülebilir", async () => {
 
 test("ADSIZ kurulum bitmez", async () => {
   await toLastStep();
-  fireEvent.changeText(screen.getByPlaceholderText(/sk-ant-|anahtarı yapıştır/), "sk-ant-x");
+  fireEvent.changeText(screen.getByPlaceholderText(/^sk-…$/), "sk-x");
   fireEvent.press(screen.getByText(/Başlayalım/));
   expect(lastAlert()?.title).toMatch(/Eksik bilgi/);
   expect(done).toHaveLength(0);
@@ -79,10 +81,10 @@ test("ANAHTARSIZ kurulum bitmez", async () => {
 test("ÖNEKİ tutmayan anahtar kapıda yakalanır — ilk derste değil", async () => {
   await toLastStep();
   fireEvent.changeText(screen.getByPlaceholderText(/örn\. Mehmet/), "Mehmet");
-  fireEvent.changeText(screen.getByPlaceholderText(/sk-ant-|anahtarı yapıştır/), "yanlis");
+  fireEvent.changeText(screen.getByPlaceholderText(/^sk-…$/), "yanlis");
   fireEvent.press(screen.getByText(/Başlayalım/));
   expect(lastAlert()?.title).toMatch(/hatalı görünüyor/);
-  expect(lastAlert()?.body).toMatch(/sk-ant-/); // ne beklendiğini de söyler
+  expect(lastAlert()?.body).toMatch(/"sk-"/); // ne beklendiğini de söyler
   expect(done).toHaveLength(0);
 });
 
@@ -91,14 +93,14 @@ test("dört değer de OLDUĞU GİBİ dışarı verilir", async () => {
   // anlaşılmaz bir kimlik hatası olarak geri döner.
   await toLastStep();
   fireEvent.changeText(screen.getByPlaceholderText(/örn\. Mehmet/), "  Mehmet  ");
-  fireEvent.changeText(screen.getByPlaceholderText(/sk-ant-|anahtarı yapıştır/), " sk-ant-abc ");
+  fireEvent.changeText(screen.getByPlaceholderText(/^sk-…$/), " sk-abc ");
   fireEvent.press(screen.getByText(/Başlayalım/));
 
   expect(done).toHaveLength(1);
   expect(done[0].name).toBe("Mehmet");
-  expect(done[0].key).toBe("sk-ant-abc");
+  expect(done[0].key).toBe("sk-abc");
   expect(done[0].lang).toBe("ar"); // varsayılan dil
-  expect(done[0].provider).toBe("anthropic");
+  expect(done[0].provider).toBe("deepseek"); // varsayılan beyin: en ucuz
 });
 
 test("seçilen DİL kuruluma taşınır", async () => {
@@ -111,7 +113,7 @@ test("seçilen DİL kuruluma taşınır", async () => {
 
   await waitFor(() => expect(screen.getByPlaceholderText(/örn\. Mehmet/)).toBeTruthy());
   fireEvent.changeText(screen.getByPlaceholderText(/örn\. Mehmet/), "Mehmet");
-  fireEvent.changeText(screen.getByPlaceholderText(/sk-ant-|anahtarı yapıştır/), "sk-ant-abc");
+  fireEvent.changeText(screen.getByPlaceholderText(/^sk-…$/), "sk-abc");
   fireEvent.press(screen.getByText(/Başlayalım/));
 
   expect(done[0].lang).toBe("ru");
@@ -128,4 +130,23 @@ test("seçilen SAĞLAYICI kuruluma taşınır ve öneki ona göre denetlenir", a
   expect(done).toHaveLength(1);
   expect(done[0].provider).toBe("gemini");
   expect(done[0].key).toBe("AIza-bir-anahtar");
+});
+
+test("ses için OpenAI anahtarı İSTEĞE BAĞLI verilebilir — beyin DeepSeek kalır", async () => {
+  // Varsayılan kombinasyon: DeepSeek beyin + OpenAI ses. Kurulumda ikinci
+  // anahtar isteğe bağlı; boş bırakan telefon sesiyle başlar.
+  await toLastStep();
+  fireEvent.changeText(screen.getByPlaceholderText(/örn\. Mehmet/), "Mehmet");
+  fireEvent.changeText(screen.getByPlaceholderText(/^sk-…$/), "sk-deepseek");
+  fireEvent.changeText(screen.getByPlaceholderText(/telefon sesi/), " sk-openai ");
+  fireEvent.press(screen.getByText(/Başlayalım/));
+  expect(done[0].provider).toBe("deepseek");
+  expect(done[0].key).toBe("sk-deepseek");
+  expect(done[0].voiceKey).toBe("sk-openai");
+});
+
+test("beyin OpenAI seçilince ayrı ses anahtarı SORULMAZ — aynı anahtar", async () => {
+  await toLastStep();
+  fireEvent.press(screen.getByText("OpenAI (ChatGPT)"));
+  expect(screen.queryByPlaceholderText(/telefon sesi/)).toBeNull();
 });

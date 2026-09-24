@@ -94,6 +94,14 @@ export default function ConversationScreen({ profile, onBack }: Props) {
   const openaiKey = keyFor(profile, "openai");
   const neural = neuralVoiceActive(voice, openaiKey);
   const neuralStt = neuralTranscribeActive(voice, openaiKey);
+  /**
+   * Odanın beyni: tercih DeepSeek ve anahtarı varsa oda o sağlayıcıyla
+   * konuşur, ders ekranları aktif sağlayıcıda kalır. Konuşmada araç yok ve
+   * cevaplar kısa; ucuz modelin en iyi olduğu iş tam da bu.
+   */
+  const deepseekKey = keyFor(profile, "deepseek");
+  const useDeepseek = voice.brain === "deepseek" && !!deepseekKey.trim();
+  const brainProfile: Profile = useDeepseek ? { ...profile, provider: "deepseek" } : profile;
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
 
   const [phase, setPhase] = useState<Phase>("pick");
@@ -114,7 +122,7 @@ export default function ConversationScreen({ profile, onBack }: Props) {
   const startedAt = useRef(0);
   const handsFreeRef = useRef(true);
   const alive = useRef(true);
-  const profileRef = useRef(profile);
+  const profileRef = useRef(brainProfile);
   /** Sahne, state'ten önce ref'te: ilk tur state oturmadan koşar. */
   const scenarioRef = useRef<Scenario | null>(null);
 
@@ -125,8 +133,9 @@ export default function ConversationScreen({ profile, onBack }: Props) {
     handsFreeRef.current = handsFree;
   }, [handsFree]);
   useEffect(() => {
-    profileRef.current = profile;
-  }, [profile]);
+    profileRef.current = brainProfile;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, useDeepseek]);
 
   // Varlığın nefesi: dinlerken hızlı, konuşurken orta, düşünürken yavaş.
   const breath = useRef(new Animated.Value(1)).current;
@@ -601,7 +610,8 @@ export default function ConversationScreen({ profile, onBack }: Props) {
         {dictation.error && <Text style={styles.errText}>{dictation.error}</Text>}
         {voiceNote && <Text style={styles.voiceNote}>{voiceNote}</Text>}
         <Text style={styles.voiceTag}>
-          {neural ? `ses: OpenAI · ${voice.voiceId}` : "ses: telefon"}
+          {`beyin: ${useDeepseek ? "DeepSeek" : (profile.provider ?? "anthropic")}`}
+          {neural ? ` · ses: OpenAI ${voice.voiceId}` : " · ses: telefon"}
           {neuralStt ? " · tanıma: OpenAI" : " · tanıma: telefon"}
         </Text>
       </View>

@@ -87,18 +87,24 @@ test("metering gelmeyen cihazda çökmez, üst sınırlara güvenir", () => {
   for (let t = 0; t < 5000; t += 150) assert.equal(g.sample(t, undefined), "wait");
 });
 
-test("ses tercihi: bozuk kayıt telefona düşer, geçerli seçim korunur", () => {
+test("VARSAYILAN: DeepSeek beyin + OpenAI ses — kullanıcının kararı", () => {
+  assert.equal(DEFAULT_VOICE.provider, "openai");
+  assert.equal(DEFAULT_VOICE.brain, "deepseek");
+  assert.equal(DEFAULT_VOICE.transcribe, true);
   assert.deepEqual(normalizeVoice(undefined), DEFAULT_VOICE);
+});
+
+test("ses tercihi: bozuk alan varsayılana düşer, AÇIK seçim korunur", () => {
   assert.deepEqual(normalizeVoice({ provider: "openai", voiceId: "uydurma", transcribe: "evet" }), {
     provider: "openai",
     voiceId: DEFAULT_VOICE.voiceId,
-    transcribe: false,
+    transcribe: DEFAULT_VOICE.transcribe,
+    brain: "deepseek",
   });
-  assert.deepEqual(normalizeVoice({ provider: "openai", voiceId: "nova", transcribe: true }), {
-    provider: "openai",
-    voiceId: "nova",
-    transcribe: true,
-  });
+  assert.deepEqual(
+    normalizeVoice({ provider: "device", voiceId: "nova", transcribe: false, brain: "active" }),
+    { provider: "device", voiceId: "nova", transcribe: false, brain: "active" }
+  );
   assert.ok(OPENAI_VOICES.some((v) => v.id === DEFAULT_VOICE.voiceId));
 });
 

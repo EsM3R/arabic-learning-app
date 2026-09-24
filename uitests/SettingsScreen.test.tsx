@@ -289,19 +289,18 @@ test("dosya seçimi İPTAL edilirse hiçbir uyarı çıkmaz, ekran kilitlenmez",
 
 test("ses tercihi KAYDEDİLİR", async () => {
   await open();
-  fireEvent.press(screen.getByText(/OpenAI ses modeli/));
   fireEvent.press(screen.getByText(/Nova ·/));
-  fireEvent.press(screen.getByText(/Senin sesini de ses modeli çözsün/));
+  fireEvent.press(screen.getByText(/Senin sesini de ses modeli çözsün/)); // varsayılan açık → kapat
+  fireEvent.press(screen.getByText(/🧠 Anthropic/)); // odanın beyni: aktif sağlayıcı
   fireEvent.press(screen.getByText("Kaydet"));
   await waitFor(() => expect(saved).toHaveLength(1));
-  expect(saved[0].voice).toEqual({ provider: "openai", voiceId: "nova", transcribe: true });
+  expect(saved[0].voice).toEqual({ provider: "openai", voiceId: "nova", transcribe: false, brain: "active" });
 });
 
 test("OpenAI anahtarı yokken ses modeli seçilirse NE OLACAĞI söylenir, sınama kapalı", async () => {
   // Sessizce telefon sesine düşmek, kullanıcıyı "neden hâlâ robot" diye
-  // bırakırdı.
+  // bırakırdı. (Ses modeli artık varsayılan; seçmeye gerek yok.)
   await open();
-  fireEvent.press(screen.getByText(/OpenAI ses modeli/));
   expect(screen.getByText(/OpenAI anahtarı gerekir/)).toBeTruthy();
   expect(screen.getByText(/Anahtar girilene kadar telefon sesi/)).toBeTruthy();
   const tryBtn = screen.getByText(/Sesi dene/);
@@ -310,8 +309,14 @@ test("OpenAI anahtarı yokken ses modeli seçilirse NE OLACAĞI söylenir, sına
   expect(alerts.some((a) => /Ses denenemedi/.test(a.title ?? ""))).toBe(false);
 });
 
-test("telefon sesi seçiliyken ses modeli ayarları GÖRÜNMEZ", async () => {
+test("telefon sesi seçilince ses modeli ayarları GÖRÜNMEZ", async () => {
   await open();
+  fireEvent.press(screen.getByText(/Telefon sesi/));
   expect(screen.queryByText(/Sesi dene/)).toBeNull();
   expect(screen.queryByText(/Nova ·/)).toBeNull();
+});
+
+test("DeepSeek anahtarı yokken oda beyninin ne olacağı söylenir", async () => {
+  await open();
+  expect(screen.getByText(/DeepSeek anahtarı yok — oda şimdilik/)).toBeTruthy();
 });

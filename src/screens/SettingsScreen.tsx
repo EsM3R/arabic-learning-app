@@ -468,6 +468,33 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
           {/* SES: "ChatGPT akıcı konuşuyor, bizimki robot" şikâyetinin cevabı.
               Onlarda ses sunucudaki ses modelinden gelir; burada aynı modele
               gidiliyor. Telefon sesi yedek olarak duruyor. */}
+          <Text style={[styles.label, { marginTop: 20 }]}>Konuşma Odası beyni</Text>
+          <Text style={styles.hint}>
+            Konuşmada pahalı olan beyin değil ses. Beyni DeepSeek'ten almak oturumu
+            ≈ 8 TL'ye indirir; ders ekranları yine yukarıdaki sağlayıcıyı kullanır.
+          </Text>
+          <View style={styles.chips}>
+            {(["deepseek", "active"] as const).map((b) => (
+              <TouchableOpacity
+                key={b}
+                style={[styles.chip, voice.brain === b && styles.chipOn]}
+                onPress={() => setVoice({ ...voice, brain: b })}
+              >
+                <Text style={[styles.chipText, voice.brain === b && styles.chipTextOn]}>
+                  {b === "deepseek" ? "🪙 DeepSeek (ucuz)" : `🧠 ${meta.label}`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {voice.brain === "deepseek" && !(keys.deepseek ?? "").trim() && (
+            <View style={styles.warnBox}>
+              <Text style={styles.warnText}>
+                DeepSeek anahtarı yok — oda şimdilik {meta.label} ile konuşur. Anahtar için
+                yukarıdan DeepSeek'i seçip yapıştır, sonra sağlayıcını geri al.
+              </Text>
+            </View>
+          )}
+
           <Text style={[styles.label, { marginTop: 20 }]}>Hocanın sesi</Text>
           <View style={styles.chips}>
             {(["device", "openai"] as const).map((prov) => (

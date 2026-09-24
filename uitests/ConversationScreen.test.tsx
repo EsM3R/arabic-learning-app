@@ -352,7 +352,7 @@ test("ses modeli seçiliyse hoca TELEFON TTS'iyle DEĞİL ses modeliyle konuşur
   await startScene(/ile sesli sohbet/);
   await waitFor(() => expect(dict().started).toBe(1)); // sıra yine öğrenciye geçti
   expect(Speech.speak).not.toHaveBeenCalled(); // robot ses devrede değil
-  expect(screen.getAllByText(/ses: OpenAI · nova/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/ses: OpenAI nova/).length).toBeGreaterThan(0);
   expect(mockVoiceFetch).toHaveBeenCalled(); // ses gerçekten modele gitti
 });
 
@@ -375,4 +375,45 @@ test("tanıma da ses modeline verilince telefonun tanıması AÇILMAZ", async ()
   await act(async () => {});
   expect(dict().started).toBe(0); // telefon tanıması değil, kayıt yolu
   expect(screen.getAllByText(/tanıma: OpenAI/).length).toBeGreaterThan(0);
+});
+
+// --- odanın beyni ---------------------------------------------------------------
+
+test("DeepSeek anahtarı varsa oda DEEPSEEK ile konuşur, ders sağlayıcısı değişmez", async () => {
+  // Varsayılan kombinasyon: ucuz beyin + iyi ses. Oda DeepSeek'e gider ama
+  // profilin kendisi (ders ekranları) Claude'da kalır.
+  const p = {
+    ...profile("A2"),
+    provider: "anthropic",
+    apiKeys: { anthropic: "sk-ant-x", deepseek: "sk-ds" },
+  } as unknown as Profile;
+  render(<ConversationScreen profile={p} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
+  await startScene(/ile sesli sohbet/);
+  const ctx = mockChat.mock.calls[0][2] as { profile: { provider: string } };
+  expect(ctx.profile.provider).toBe("deepseek");
+  expect(p.provider).toBe("anthropic"); // dışarıdaki profil dokunulmadı
+  expect(screen.getAllByText(/beyin: DeepSeek/).length).toBeGreaterThan(0);
+});
+
+test("DeepSeek anahtarı YOKSA oda aktif sağlayıcıyla konuşur — sessiz arıza yok", async () => {
+  await openRoom();
+  await startScene(/ile sesli sohbet/);
+  const ctx = mockChat.mock.calls[0][2] as { profile: { provider?: string } };
+  expect(ctx.profile.provider ?? "anthropic").not.toBe("deepseek");
+  expect(screen.getAllByText(/beyin: anthropic/).length).toBeGreaterThan(0);
+});
+
+test("beyin tercihi 'aktif' ise DeepSeek anahtarı olsa da kullanılmaz", async () => {
+  const p = {
+    ...profile("A2"),
+    provider: "anthropic",
+    apiKeys: { anthropic: "sk-ant-x", deepseek: "sk-ds" },
+    voice: { provider: "device", voiceId: "ash", transcribe: false, brain: "active" },
+  } as unknown as Profile;
+  render(<ConversationScreen profile={p} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
+  await startScene(/ile sesli sohbet/);
+  const ctx = mockChat.mock.calls[0][2] as { profile: { provider: string } };
+  expect(ctx.profile.provider).toBe("anthropic");
 });

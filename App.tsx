@@ -158,7 +158,8 @@ export default function App() {
     name: string,
     apiKey: string,
     languageId: LanguageId,
-    providerId: string
+    providerId: string,
+    voiceKey?: string
   ) => {
     setActiveLanguage(languageId);
     setLang(getActiveLanguageId());
@@ -167,7 +168,9 @@ export default function App() {
       // Eski alan yalnızca Anthropic anahtarını taşır (geriye dönük uyumluluk)
       apiKey: providerId === "anthropic" ? apiKey : "",
       provider: providerId,
-      apiKeys: { [providerId]: apiKey },
+      // Ses için OpenAI anahtarı ayrıca verilmişse yanına yazılır: beyin
+      // DeepSeek, ses OpenAI — varsayılan kombinasyon.
+      apiKeys: voiceKey ? { [providerId]: apiKey, openai: voiceKey } : { [providerId]: apiKey },
       activeLanguage: languageId,
       assessment: defaultAssessment(), // sıfırdan başlangıç — tespit yok
       completedModuleIds: [],
