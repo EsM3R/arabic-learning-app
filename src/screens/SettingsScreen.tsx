@@ -41,9 +41,9 @@ import { Profile } from "../types";
 import { formatTry, usageSummary, UsageSummary } from "../usage";
 import { USD_TRY } from "../pricing";
 import { budgetStatus, DEFAULT_BUDGET, normalizeLimits } from "../budget";
-import { previewVoice } from "../openaiVoice";
-import { neuralVoiceActive, normalizeVoice, OPENAI_VOICES } from "../voice";
-import type { VoiceSettings } from "../voice";
+import { backendFor, previewVoice } from "../neuralVoice";
+import { normalizeVoice, voicesFor } from "../voice";
+import type { VoiceProvider, VoiceSettings } from "../voice";
 import { getActivePack } from "../languages";
 import { buildLabel } from "../buildInfo";
 
@@ -107,13 +107,16 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
   // Ses tercihi. Ses modeli OpenAI anahtarı ister; anahtar yoksa tercih
   // kaydedilir ama telefon sesi kullanılır — bunu ekran açıkça söyler.
   const [voice, setVoice] = useState<VoiceSettings>(() => normalizeVoice(profile.voice));
-  const openaiDraftKey = (keys.openai ?? "").trim();
-  const voiceReady = neuralVoiceActive(voice, openaiDraftKey);
+  // Sınama EKRANDAKİ taslak anahtarlarla: yeni yapıştırılmış, kaydedilmemiş olabilir.
+  const voiceBackend = backendFor(voice, { openai: keys.openai, gemini: keys.gemini });
+  const voiceReady = voiceBackend !== null;
+  const voiceProviderLabel = voice.provider === "gemini" ? "Gemini" : "OpenAI";
   const [previewing, setPreviewing] = useState(false);
   const tryVoice = async () => {
+    if (!voiceBackend) return;
     setPreviewing(true);
     try {
-      await previewVoice(openaiDraftKey, voice.voiceId, getActivePack().greeting);
+      await previewVoice(voiceBackend, getActivePack().greeting);
     } catch (e) {
       Alert.alert("Ses denenemedi", errText(e));
     } finally {
@@ -497,32 +500,38 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
 
           <Text style={[styles.label, { marginTop: 20 }]}>Hocanın sesi</Text>
           <View style={styles.chips}>
-            {(["device", "openai"] as const).map((prov) => (
+            {(["gemini", "openai", "device"] as VoiceProvider[]).map((prov) => (
               <TouchableOpacity
                 key={prov}
                 style={[styles.chip, voice.provider === prov && styles.chipOn]}
-                onPress={() => setVoice({ ...voice, provider: prov })}
+                onPress={() =>
+                  setVoice(normalizeVoice({ ...voice, provider: prov, voiceId: undefined }))
+                }
               >
                 <Text style={[styles.chipText, voice.provider === prov && styles.chipTextOn]}>
-                  {prov === "device" ? "📱 Telefon sesi" : "✨ OpenAI ses modeli"}
+                  {prov === "device"
+                    ? "📱 Telefon sesi"
+                    : prov === "gemini"
+                      ? "✨ Gemini (ücretsiz kota)"
+                      : "✨ OpenAI"}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-          {voice.provider === "openai" && (
+          {voice.provider !== "device" && (
             <>
               {!voiceReady && (
                 <View style={styles.warnBox}>
                   <Text style={styles.warnText}>
-                    Ses modeli için OpenAI anahtarı gerekir (sohbet için Claude kullanmaya devam
-                    edebilirsin; anahtar yalnız ses için). Yukarıdan OpenAI'ı seçip anahtarı
-                    yapıştır, sonra sağlayıcını geri değiştir. Anahtar girilene kadar telefon
-                    sesi kullanılır.
+                    Ses modeli için {voiceProviderLabel} anahtarı gerekir (sohbet için başka
+                    sağlayıcı kullanmaya devam edebilirsin; anahtar yalnız ses için). Yukarıdan{" "}
+                    {voiceProviderLabel}'ı seçip anahtarı yapıştır, sonra sağlayıcını geri
+                    değiştir. Anahtar girilene kadar telefon sesi kullanılır.
                   </Text>
                 </View>
               )}
               <View style={styles.chips}>
-                {OPENAI_VOICES.map((v) => (
+                {voicesFor(voice.provider).map((v) => (
                   <TouchableOpacity
                     key={v.id}
                     style={[styles.chip, voice.voiceId === v.id && styles.chipOn]}
@@ -546,7 +555,7 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
                   <Text style={styles.rowTitle}>Senin sesini de ses modeli çözsün</Text>
                   <Text style={styles.rowMeta}>
                     Arapça ve Farsçada telefonun tanımasından çok daha iyi. Konuşma Odası'nda
-                    canlı ara metin yerine sustuğunda çözülür. ≈ 0,15 TL/dk.
+                    canlı ara metin yerine sustuğunda çözülür.
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -561,7 +570,9 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
                 </Text>
               </TouchableOpacity>
               <Text style={styles.hint}>
-                Hoca ≈ 0,75 TL/dk konuşma. Harcama tavanına dahildir.
+                {voice.provider === "gemini"
+                  ? "Gemini'nin ücretsiz kotasında ses için ödeme yok (kota aşılırsa istekler reddedilir, telefon sesi devreye girer). Sayaç yine de ücretli tarifeye göre tahmin yazar — tavan ihtiyatlı kalsın diye."
+                  : "Hoca ≈ 0,75 TL/dk konuşma, tanıma ≈ 0,15 TL/dk. Harcama tavanına dahildir."}
               </Text>
             </>
           )}

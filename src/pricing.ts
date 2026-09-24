@@ -36,6 +36,11 @@ const PRICES: { match: RegExp; price: Price }[] = [
   { match: /^openai-tts/, price: { input: 17, output: 0, cacheRead: 0, cacheWrite: 0 } },
   // openai-stt: "input" = SANİYE. gpt-4o-mini-transcribe ≈ $0,003/dk → $50 / 1M sn.
   { match: /^openai-stt/, price: { input: 50, output: 0, cacheRead: 0, cacheWrite: 0 } },
+  // Gemini ses: ücretsiz kotada gerçek maliyet 0. Sayaç yine de ÜCRETLİ
+  // tarifeye göre yazar — tavan ihtiyatlı kalsın; eksik saymak fazla
+  // saymaktan tehlikeli. gemini-tts karakter (≈ $13/1M), gemini-stt saniye.
+  { match: /^gemini-tts/, price: { input: 13, output: 0, cacheRead: 0, cacheWrite: 0 } },
+  { match: /^gemini-stt/, price: { input: 50, output: 0, cacheRead: 0, cacheWrite: 0 } },
 ];
 
 /** Bilinmeyen model: sessizce sıfır saymak yerine orta bir tahmin kullan. */

@@ -334,29 +334,50 @@ test("harcama tavanı 'bağlantı hatası' gibi gösterilmez", async () => {
 
 // --- ses modeli ---------------------------------------------------------------
 
-/** OpenAI ses tercihi + anahtarlı profil. */
-function neuralProfile(transcribe = false): Profile {
+/** Ses modeli tercihi + anahtarlı profil (varsayılan: Gemini, ücretsiz kota). */
+function neuralProfile(transcribe = false, provider: "gemini" | "openai" = "gemini"): Profile {
   return {
     ...profile("A2"),
     provider: "anthropic",
-    apiKeys: { anthropic: "sk-ant-x", openai: "sk-openai" },
-    voice: { provider: "openai", voiceId: "nova", transcribe },
+    apiKeys: { anthropic: "sk-ant-x", openai: "sk-openai", gemini: "g-key" },
+    voice: { provider, voiceId: provider === "gemini" ? "Kore" : "nova", transcribe },
   } as unknown as Profile;
 }
 
-test("ses modeli seçiliyse hoca TELEFON TTS'iyle DEĞİL ses modeliyle konuşur", async () => {
-  mockVoiceFetch.mockImplementation(okAudio);
+/** Gemini TTS cevabı: base64 ham PCM. */
+const okGeminiAudio = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({
+    candidates: [
+      { content: { parts: [{ inlineData: { mimeType: "audio/L16;codec=pcm;rate=24000", data: "AAAA" } }] } },
+    ],
+  }),
+});
+
+test("Gemini seçiliyse hoca TELEFON TTS'iyle DEĞİL Gemini sesiyle konuşur", async () => {
+  mockVoiceFetch.mockImplementation(okGeminiAudio);
   const Speech = require("expo-speech");
   render(<ConversationScreen profile={neuralProfile()} onBack={() => {}} />);
   await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
   await startScene(/ile sesli sohbet/);
   await waitFor(() => expect(dict().started).toBe(1)); // sıra yine öğrenciye geçti
   expect(Speech.speak).not.toHaveBeenCalled(); // robot ses devrede değil
-  expect(screen.getAllByText(/ses: OpenAI nova/).length).toBeGreaterThan(0);
-  expect(mockVoiceFetch).toHaveBeenCalled(); // ses gerçekten modele gitti
+  expect(screen.getAllByText(/ses: Gemini Kore/).length).toBeGreaterThan(0);
+  expect(String(mockVoiceFetch.mock.calls[0][0])).toMatch(/generativelanguage/);
 });
 
-test("ses tercihi OpenAI ama ANAHTAR YOK → sessizce telefon sesine düşer", async () => {
+test("OpenAI seçiliyse ses OpenAI'dan gelir", async () => {
+  mockVoiceFetch.mockImplementation(okAudio);
+  render(<ConversationScreen profile={neuralProfile(false, "openai")} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
+  await startScene(/ile sesli sohbet/);
+  await waitFor(() => expect(dict().started).toBe(1));
+  expect(screen.getAllByText(/ses: OpenAI nova/).length).toBeGreaterThan(0);
+  expect(String(mockVoiceFetch.mock.calls[0][0])).toMatch(/openai\.com/);
+});
+
+test("ses tercihi Gemini ama ANAHTAR YOK → sessizce telefon sesine düşer", async () => {
   const p = { ...neuralProfile(), apiKeys: { anthropic: "sk-ant-x" } } as unknown as Profile;
   const Speech = require("expo-speech");
   render(<ConversationScreen profile={p} onBack={() => {}} />);
@@ -368,13 +389,13 @@ test("ses tercihi OpenAI ama ANAHTAR YOK → sessizce telefon sesine düşer", a
 });
 
 test("tanıma da ses modeline verilince telefonun tanıması AÇILMAZ", async () => {
-  mockVoiceFetch.mockImplementation(okAudio);
+  mockVoiceFetch.mockImplementation(okGeminiAudio);
   render(<ConversationScreen profile={neuralProfile(true)} onBack={() => {}} />);
   await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());
   await startScene(/ile sesli sohbet/);
   await act(async () => {});
   expect(dict().started).toBe(0); // telefon tanıması değil, kayıt yolu
-  expect(screen.getAllByText(/tanıma: OpenAI/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/tanıma: Gemini/).length).toBeGreaterThan(0);
 });
 
 // --- odanın beyni ---------------------------------------------------------------
@@ -409,7 +430,7 @@ test("beyin tercihi 'aktif' ise DeepSeek anahtarı olsa da kullanılmaz", async 
     ...profile("A2"),
     provider: "anthropic",
     apiKeys: { anthropic: "sk-ant-x", deepseek: "sk-ds" },
-    voice: { provider: "device", voiceId: "ash", transcribe: false, brain: "active" },
+    voice: { provider: "device", voiceId: "Kore", transcribe: false, brain: "active" },
   } as unknown as Profile;
   render(<ConversationScreen profile={p} onBack={() => {}} />);
   await waitFor(() => expect(screen.getByText(/sesli sohbet/)).toBeTruthy());

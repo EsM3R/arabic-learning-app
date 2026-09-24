@@ -38,7 +38,7 @@ export default function SetupScreen({ onDone }: Props) {
   const [languageId, setLanguageId] = useState<LanguageId>("ar");
   // Varsayılan beyin DeepSeek: en ucuz sağlayıcı. Ses ayrıca OpenAI'dan.
   const [providerId, setProviderId] = useState<ProviderId>("deepseek");
-  /** Ses için OpenAI anahtarı — isteğe bağlı; beyin OpenAI ise zaten var. */
+  /** Ses için Gemini anahtarı — isteğe bağlı (ücretsiz kota); beyin Gemini ise zaten var. */
   const [voiceKey, setVoiceKey] = useState("");
 
   const pack = LANGUAGE_PACKS[languageId];
@@ -357,24 +357,25 @@ function Connect({
         değiştirebilirsin.
       </Text>
 
-      {providerId !== "openai" && (
+      {providerId !== "gemini" && (
         <>
           <Text style={[styles.label, { marginTop: 16 }]}>
-            Hocanın sesi için OpenAI anahtarı (isteğe bağlı)
+            Hocanın sesi için Gemini anahtarı (isteğe bağlı, ücretsiz)
           </Text>
           <TextInput
             style={styles.input}
             value={voiceKey}
             onChangeText={setVoiceKey}
-            placeholder="sk-… (boş bırakırsan telefon sesi)"
+            placeholder="Gemini anahtarı (boş bırakırsan telefon sesi)"
             placeholderTextColor={colors.inkFaint}
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
           />
           <Text style={styles.hint}>
-            Konuşma Odası'nda hoca ChatGPT'nin sesiyle konuşur ve seni o tanır (≈ 7 TL /
-            20 dk). Boşsa telefonun sesi kullanılır; sonradan Ayarlar'dan ekleyebilirsin.
+            Konuşma Odası'nda hoca gerçek bir ses modeliyle konuşur ve seni o tanır.
+            Gemini'nin ücretsiz kotası bunun için yeter; anahtar aistudio.google.com'dan.
+            Boşsa telefonun sesi kullanılır; sonradan Ayarlar'dan ekleyebilirsin.
           </Text>
         </>
       )}

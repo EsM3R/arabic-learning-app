@@ -168,9 +168,9 @@ export default function App() {
       // Eski alan yalnızca Anthropic anahtarını taşır (geriye dönük uyumluluk)
       apiKey: providerId === "anthropic" ? apiKey : "",
       provider: providerId,
-      // Ses için OpenAI anahtarı ayrıca verilmişse yanına yazılır: beyin
-      // DeepSeek, ses OpenAI — varsayılan kombinasyon.
-      apiKeys: voiceKey ? { [providerId]: apiKey, openai: voiceKey } : { [providerId]: apiKey },
+      // Ses için Gemini anahtarı ayrıca verilmişse yanına yazılır: beyin
+      // DeepSeek, ses Gemini (ücretsiz kota) — varsayılan kombinasyon.
+      apiKeys: voiceKey ? { [providerId]: apiKey, gemini: voiceKey } : { [providerId]: apiKey },
       activeLanguage: languageId,
       assessment: defaultAssessment(), // sıfırdan başlangıç — tespit yok
       completedModuleIds: [],

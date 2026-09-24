@@ -31,10 +31,36 @@ export const DEFAULT_OPENAI_VOICE = "ash";
 export const TTS_MODEL = "gpt-4o-mini-tts";
 export const STT_MODEL = "gpt-4o-mini-transcribe";
 
+/** Gemini önceden tanımlı sesler (gemini-*-tts). Seçim ekranı için Türkçe not. */
+export const GEMINI_VOICES: { id: string; label: string; note: string }[] = [
+  { id: "Kore", label: "Kore", note: "kadın, kararlı" },
+  { id: "Puck", label: "Puck", note: "erkek, neşeli" },
+  { id: "Charon", label: "Charon", note: "erkek, açıklayıcı" },
+  { id: "Zephyr", label: "Zephyr", note: "kadın, parlak" },
+  { id: "Fenrir", label: "Fenrir", note: "erkek, coşkulu" },
+  { id: "Leda", label: "Leda", note: "kadın, genç" },
+  { id: "Orus", label: "Orus", note: "erkek, kararlı" },
+  { id: "Aoede", label: "Aoede", note: "kadın, rahat" },
+  { id: "Enceladus", label: "Enceladus", note: "erkek, nefesli" },
+  { id: "Sulafat", label: "Sulafat", note: "kadın, sıcak" },
+];
+export const DEFAULT_GEMINI_VOICE = "Kore";
+
+export type VoiceProvider = "device" | "openai" | "gemini";
+
+export function voicesFor(provider: VoiceProvider): { id: string; label: string; note: string }[] {
+  if (provider === "gemini") return GEMINI_VOICES;
+  if (provider === "openai") return OPENAI_VOICES;
+  return [];
+}
+
 /** Kullanıcının ses tercihi (profile.voice). */
 export interface VoiceSettings {
-  /** "device" = telefonun TTS'i; "openai" = ses modeli (OpenAI anahtarı gerekir). */
-  provider: "device" | "openai";
+  /**
+   * "device" = telefonun TTS'i; "gemini" = Gemini ses modeli (ücretsiz kota);
+   * "openai" = OpenAI ses modeli. İkisi de kendi anahtarını ister.
+   */
+  provider: VoiceProvider;
   voiceId: string;
   /** Öğrencinin sesi de ses modeliyle çözülsün (Whisper ailesi). */
   transcribe: boolean;
@@ -47,15 +73,15 @@ export interface VoiceSettings {
 }
 
 /**
- * VARSAYILAN: DeepSeek beyin + OpenAI ses. Kullanıcının kararı: konuşmada
- * pahalı olan kısım beyin değil ses; beyni ucuza, sesi iyisinden almak
- * toplamı ≈ 8 TL/oturuma indiriyor. İkisi de ANAHTAR VARSA devreye girer;
- * yoksa oda sessizce aktif sağlayıcıya ve telefon sesine düşer — Ayarlar bunu
- * açıkça söyler.
+ * VARSAYILAN: DeepSeek beyin + GEMİNİ ses. Kullanıcının kararı: konuşmada
+ * pahalı olan kısım beyin değil ses; Gemini'nin ücretsiz kotası sesi
+ * sıfıra, DeepSeek beyni ≈ 1 TL/oturuma indiriyor. İkisi de ANAHTAR VARSA
+ * devreye girer; yoksa oda sessizce aktif sağlayıcıya ve telefon sesine
+ * düşer — Ayarlar bunu açıkça söyler.
  */
 export const DEFAULT_VOICE: VoiceSettings = {
-  provider: "openai",
-  voiceId: DEFAULT_OPENAI_VOICE,
+  provider: "gemini",
+  voiceId: DEFAULT_GEMINI_VOICE,
   transcribe: true,
   brain: "deepseek",
 };
@@ -64,29 +90,97 @@ export const DEFAULT_VOICE: VoiceSettings = {
 export function normalizeVoice(raw: unknown): VoiceSettings {
   const r = (raw ?? {}) as Partial<Record<keyof VoiceSettings, unknown>>;
   // Eksik alan varsayılana düşer; yalnız AÇIKÇA yazılmış tercih korunur.
-  const provider = r.provider === "device" ? "device" : "openai";
+  const provider: VoiceProvider =
+    r.provider === "device" || r.provider === "openai" ? r.provider : "gemini";
+  const list = voicesFor(provider);
+  const fallback = provider === "openai" ? DEFAULT_OPENAI_VOICE : DEFAULT_GEMINI_VOICE;
   const voiceId =
-    typeof r.voiceId === "string" && OPENAI_VOICES.some((v) => v.id === r.voiceId)
-      ? r.voiceId
-      : DEFAULT_OPENAI_VOICE;
+    typeof r.voiceId === "string" && list.some((v) => v.id === r.voiceId) ? r.voiceId : fallback;
   const transcribe = typeof r.transcribe === "boolean" ? r.transcribe : DEFAULT_VOICE.transcribe;
   const brain = r.brain === "active" ? "active" : "deepseek";
   return { provider, voiceId, transcribe, brain };
 }
 
-/**
- * Ses modeli kullanılabilir mi: tercih "openai" VE OpenAI anahtarı var.
- * Anahtarsız tercih sessizce telefona düşer — kullanıcıya bunu Ayarlar söyler.
- */
-export function neuralVoiceActive(voice: VoiceSettings, openaiKey: string | undefined): boolean {
-  return voice.provider === "openai" && !!openaiKey?.trim();
+/** Seçili ses sağlayıcısının anahtarı; telefon sesinde ya da anahtar yoksa "". */
+export function voiceKeyFor(
+  voice: VoiceSettings,
+  keys: { openai?: string; gemini?: string }
+): string {
+  if (voice.provider === "gemini") return (keys.gemini ?? "").trim();
+  if (voice.provider === "openai") return (keys.openai ?? "").trim();
+  return "";
 }
 
-export function neuralTranscribeActive(
-  voice: VoiceSettings,
-  openaiKey: string | undefined
-): boolean {
-  return neuralVoiceActive(voice, openaiKey) && voice.transcribe;
+/**
+ * Ses modeli kullanılabilir mi: tercih telefon değil VE o sağlayıcının
+ * anahtarı var. Anahtarsız tercih sessizce telefona düşer — kullanıcıya bunu
+ * Ayarlar söyler. `key` = seçili sağlayıcının anahtarı (bkz. voiceKeyFor).
+ */
+export function neuralVoiceActive(voice: VoiceSettings, key: string | undefined): boolean {
+  return voice.provider !== "device" && !!key?.trim();
+}
+
+export function neuralTranscribeActive(voice: VoiceSettings, key: string | undefined): boolean {
+  return neuralVoiceActive(voice, key) && voice.transcribe;
+}
+
+// ---------------------------------------------------------------------------
+// Ham PCM → WAV (Gemini TTS ham 16 bit PCM döndürür; oynatıcı başlık ister)
+// ---------------------------------------------------------------------------
+
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const B64_LOOKUP: Record<string, number> = {};
+for (let i = 0; i < B64.length; i += 1) B64_LOOKUP[B64[i]] = i;
+
+/** base64 → bayt. Bağımlılık yok; Hermes'te atob her sürümde güvenilir değil. */
+export function base64ToBytes(b64: string): Uint8Array {
+  const clean = b64.replace(/[^A-Za-z0-9+/]/g, "");
+  const out: number[] = [];
+  let buf = 0;
+  let bits = 0;
+  for (const ch of clean) {
+    buf = (buf << 6) | B64_LOOKUP[ch];
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((buf >> bits) & 0xff);
+    }
+  }
+  return Uint8Array.from(out);
+}
+
+/** "audio/L16;codec=pcm;rate=24000" → 24000; belirsizse Gemini'nin varsayılanı. */
+export function pcmRateFromMime(mime: string | undefined): number {
+  const m = /rate=(\d+)/.exec(mime ?? "");
+  return m ? Number(m[1]) : 24000;
+}
+
+/** 16 bit mono PCM'i 44 baytlık WAV başlığıyla sarar. */
+export function wavFromPcm16(pcm: Uint8Array, sampleRate: number): Uint8Array {
+  const header = new ArrayBuffer(44);
+  const v = new DataView(header);
+  const str = (off: number, t: string) => {
+    for (let i = 0; i < t.length; i += 1) v.setUint8(off + i, t.charCodeAt(i));
+  };
+  const channels = 1;
+  const bytesPerSample = 2;
+  str(0, "RIFF");
+  v.setUint32(4, 36 + pcm.length, true);
+  str(8, "WAVE");
+  str(12, "fmt ");
+  v.setUint32(16, 16, true); // fmt boyutu
+  v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, channels, true);
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * channels * bytesPerSample, true);
+  v.setUint16(32, channels * bytesPerSample, true);
+  v.setUint16(34, 16, true);
+  str(36, "data");
+  v.setUint32(40, pcm.length, true);
+  const out = new Uint8Array(44 + pcm.length);
+  out.set(new Uint8Array(header), 0);
+  out.set(pcm, 44);
+  return out;
 }
 
 /** Ses tanıma için ISO-639-1 dil kodu. */

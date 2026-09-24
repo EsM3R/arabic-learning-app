@@ -10,14 +10,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  base64ToBytes,
   cleanForSpeech,
   createSilenceGate,
   DEFAULT_VOICE,
+  GEMINI_VOICES,
   neuralTranscribeActive,
   neuralVoiceActive,
   normalizeVoice,
   OPENAI_VOICES,
+  pcmRateFromMime,
   sttSeconds,
+  voiceKeyFor,
+  wavFromPcm16,
 } from "../src/voice.ts";
 
 const GATE = { silenceMs: 2000, noSpeechMs: 8000, maxMs: 45_000 };
@@ -87,34 +92,77 @@ test("metering gelmeyen cihazda çökmez, üst sınırlara güvenir", () => {
   for (let t = 0; t < 5000; t += 150) assert.equal(g.sample(t, undefined), "wait");
 });
 
-test("VARSAYILAN: DeepSeek beyin + OpenAI ses — kullanıcının kararı", () => {
-  assert.equal(DEFAULT_VOICE.provider, "openai");
+test("VARSAYILAN: DeepSeek beyin + GEMİNİ ses (ücretsiz kota) — kullanıcının kararı", () => {
+  assert.equal(DEFAULT_VOICE.provider, "gemini");
   assert.equal(DEFAULT_VOICE.brain, "deepseek");
   assert.equal(DEFAULT_VOICE.transcribe, true);
   assert.deepEqual(normalizeVoice(undefined), DEFAULT_VOICE);
+  assert.ok(GEMINI_VOICES.some((v) => v.id === DEFAULT_VOICE.voiceId));
 });
 
 test("ses tercihi: bozuk alan varsayılana düşer, AÇIK seçim korunur", () => {
-  assert.deepEqual(normalizeVoice({ provider: "openai", voiceId: "uydurma", transcribe: "evet" }), {
-    provider: "openai",
+  assert.deepEqual(normalizeVoice({ provider: "gemini", voiceId: "uydurma", transcribe: "evet" }), {
+    provider: "gemini",
     voiceId: DEFAULT_VOICE.voiceId,
     transcribe: DEFAULT_VOICE.transcribe,
     brain: "deepseek",
   });
   assert.deepEqual(
-    normalizeVoice({ provider: "device", voiceId: "nova", transcribe: false, brain: "active" }),
-    { provider: "device", voiceId: "nova", transcribe: false, brain: "active" }
+    normalizeVoice({ provider: "openai", voiceId: "nova", transcribe: false, brain: "active" }),
+    { provider: "openai", voiceId: "nova", transcribe: false, brain: "active" }
   );
-  assert.ok(OPENAI_VOICES.some((v) => v.id === DEFAULT_VOICE.voiceId));
+  assert.ok(OPENAI_VOICES.some((v) => v.id === "nova"));
 });
 
-test("ses modeli yalnız ANAHTAR VARSA etkin — yoksa sessizce telefona düşer", () => {
-  const v = normalizeVoice({ provider: "openai", voiceId: "ash", transcribe: true });
-  assert.equal(neuralVoiceActive(v, "sk-abc"), true);
-  assert.equal(neuralVoiceActive(v, ""), false);
-  assert.equal(neuralVoiceActive(v, undefined), false);
-  assert.equal(neuralTranscribeActive(v, "sk-abc"), true);
-  assert.equal(neuralTranscribeActive({ ...v, transcribe: false }, "sk-abc"), false);
+test("sağlayıcı değişince ses adı öbür sağlayıcıya SIZMAZ", () => {
+  // "Kore" OpenAI'da yok: sızsaydı istek 400 döner, telefon sesine düşerdi.
+  assert.equal(normalizeVoice({ provider: "openai", voiceId: "Kore" }).voiceId, "ash");
+  assert.equal(normalizeVoice({ provider: "gemini", voiceId: "nova" }).voiceId, "Kore");
+});
+
+test("ses modeli yalnız KENDİ anahtarı varsa etkin — yoksa sessizce telefona düşer", () => {
+  const g = normalizeVoice({ provider: "gemini", voiceId: "Kore", transcribe: true });
+  assert.equal(voiceKeyFor(g, { gemini: " g ", openai: "o" }), "g");
+  assert.equal(voiceKeyFor(g, { openai: "o" }), ""); // OpenAI anahtarı Gemini'ye yaramaz
+  assert.equal(neuralVoiceActive(g, "g"), true);
+  assert.equal(neuralVoiceActive(g, ""), false);
+  assert.equal(neuralTranscribeActive(g, "g"), true);
+  assert.equal(neuralTranscribeActive({ ...g, transcribe: false }, "g"), false);
+  const d = normalizeVoice({ provider: "device" });
+  assert.equal(voiceKeyFor(d, { gemini: "g", openai: "o" }), "");
+  assert.equal(neuralVoiceActive(d, "g"), false);
+});
+
+// --- ham PCM → WAV (Gemini TTS) ----------------------------------------------
+
+test("base64 doğru çözülür", () => {
+  assert.deepEqual(Array.from(base64ToBytes("AQID")), [1, 2, 3]);
+  assert.deepEqual(Array.from(base64ToBytes("AQ==")), [1]);
+  assert.deepEqual(Array.from(base64ToBytes("AQI=")), [1, 2]);
+});
+
+test("WAV başlığı doğru: RIFF, 16 bit mono, örnekleme hızı ve veri boyutu", () => {
+  // Yanlış başlıkla oynatıcı ya hiç çalmaz ya gürültü çalar — ekran çökmez.
+  const pcm = Uint8Array.from([0, 0, 255, 127]);
+  const wav = wavFromPcm16(pcm, 24000);
+  const v = new DataView(wav.buffer);
+  const tag = (o: number) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);
+  assert.equal(wav.length, 44 + 4);
+  assert.equal(tag(0), "RIFF");
+  assert.equal(tag(8), "WAVE");
+  assert.equal(v.getUint16(20, true), 1); // PCM
+  assert.equal(v.getUint16(22, true), 1); // mono
+  assert.equal(v.getUint32(24, true), 24000);
+  assert.equal(v.getUint32(28, true), 48000); // bayt/sn
+  assert.equal(v.getUint16(34, true), 16);
+  assert.equal(tag(36), "data");
+  assert.equal(v.getUint32(40, true), 4);
+  assert.deepEqual(Array.from(wav.slice(44)), [0, 0, 255, 127]);
+});
+
+test("örnekleme hızı mime'dan okunur, yoksa 24 kHz", () => {
+  assert.equal(pcmRateFromMime("audio/L16;codec=pcm;rate=16000"), 16000);
+  assert.equal(pcmRateFromMime(undefined), 24000);
 });
 
 test("sese giden metinden okunuş parantezi, madde ve emoji temizlenir, HAREKE kalır", () => {

@@ -25,10 +25,10 @@ import { conversationSystem, KICKOFF_CONVERSATION, kickoffScene } from "../promp
 import { isRtl, containsTargetScript } from "../scripts";
 import { createSpeechQueue } from "../speech";
 import type { SpeechQueue } from "../speech";
-import { createNeuralSpeechQueue } from "../openaiVoice";
+import { backendFor, createNeuralSpeechQueue } from "../neuralVoice";
 import { keyFor } from "../providers";
 import { useRecorderDictation } from "../useRecorderDictation";
-import { neuralTranscribeActive, neuralVoiceActive, normalizeVoice } from "../voice";
+import { normalizeVoice } from "../voice";
 import { markSpoken } from "../speechinput";
 import { newCard } from "../srs";
 import { recordStats } from "../statsStore";
@@ -91,9 +91,13 @@ export default function ConversationScreen({ profile, onBack }: Props) {
    * telefonun TTS'i ve tanıması — robot ama çalışır.
    */
   const voice = normalizeVoice(profile.voice);
-  const openaiKey = keyFor(profile, "openai");
-  const neural = neuralVoiceActive(voice, openaiKey);
-  const neuralStt = neuralTranscribeActive(voice, openaiKey);
+  const backend = useMemo(
+    () => backendFor(voice, { openai: keyFor(profile, "openai"), gemini: keyFor(profile, "gemini") }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [voice.provider, voice.voiceId, profile.apiKeys]
+  );
+  const neural = backend !== null;
+  const neuralStt = neural && voice.transcribe;
   /**
    * Odanın beyni: tercih DeepSeek ve anahtarı varsa oda o sağlayıcıyla
    * konuşur, ders ekranları aktif sağlayıcıda kalır. Konuşmada araç yok ve
@@ -178,8 +182,7 @@ export default function ConversationScreen({ profile, onBack }: Props) {
     },
   });
   const recorderDictation = useRecorderDictation({
-    apiKey: openaiKey,
-    enabled: neuralStt,
+    backend: neuralStt ? backend : null,
     silenceMs: SILENCE_MS,
     onResult: (said) => {
       void onStudentSaid(said);
@@ -206,10 +209,9 @@ export default function ConversationScreen({ profile, onBack }: Props) {
     setNowSaying("");
     buffer.current = "";
     queue.current?.cancel();
-    const q = neural
+    const q = backend
       ? createNeuralSpeechQueue({
-          apiKey: openaiKey,
-          voiceId: voice.voiceId,
+          backend,
           onSentence: (s) => setNowSaying(s),
           onIdle: onTeacherDone,
           // Sentez düşerse cümle telefon sesiyle okunur; kullanıcı bunu
@@ -611,8 +613,8 @@ export default function ConversationScreen({ profile, onBack }: Props) {
         {voiceNote && <Text style={styles.voiceNote}>{voiceNote}</Text>}
         <Text style={styles.voiceTag}>
           {`beyin: ${useDeepseek ? "DeepSeek" : (profile.provider ?? "anthropic")}`}
-          {neural ? ` · ses: OpenAI ${voice.voiceId}` : " · ses: telefon"}
-          {neuralStt ? " · tanıma: OpenAI" : " · tanıma: telefon"}
+          {backend ? ` · ses: ${backend.label}` : " · ses: telefon"}
+          {neuralStt ? ` · tanıma: ${voice.provider === "gemini" ? "Gemini" : "OpenAI"}` : " · tanıma: telefon"}
         </Text>
       </View>
 

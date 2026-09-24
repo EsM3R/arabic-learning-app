@@ -62,7 +62,7 @@ export interface Profile {
   budget?: { dailyTry: number; monthlyTry: number };
   /** Ses tercihi: telefon TTS'i mi, ses modeli mi — bkz. src/voice.ts. */
   voice?: {
-    provider: "device" | "openai";
+    provider: "device" | "openai" | "gemini";
     voiceId: string;
     transcribe: boolean;
     brain?: "deepseek" | "active";

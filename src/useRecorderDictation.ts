@@ -3,8 +3,8 @@
  *
  * useDictation telefonun tanımasını kullanır; hızlıdır ama Arapçada ve
  * Farsçada zayıf, ve aksanlı konuşmayı sık bozar. Bu kanca aynı arayüzü
- * (DictationState) sunar ama mikrofonu DOSYAYA kaydeder ve dosyayı OpenAI
- * tanımasına yollar — ChatGPT'nin duyduğu kalitede.
+ * (DictationState) sunar ama mikrofonu DOSYAYA kaydeder ve dosyayı ses
+ * modelinin tanımasına (Gemini ya da OpenAI) yollar.
  *
  * Bedeli: canlı ara metin yok (tanıma bittikten sonra gelir) ve sıra geçme
  * kararı ses DÜZEYİNDEN verilir (src/voice.ts createSilenceGate). Konuşma
@@ -19,17 +19,16 @@ import {
 } from "expo-audio";
 import { useEffect, useRef, useState } from "react";
 import { getActiveLanguageId } from "./languages";
-import { transcribe } from "./openaiVoice";
+import type { VoiceBackend } from "./neuralVoice";
 import type { DictationState } from "./useDictation";
 import { createSilenceGate, sttLanguage, sttSeconds } from "./voice";
 
 export interface RecorderDictationOptions {
-  apiKey: string;
+  /** Tanımayı yapacak arka uç; null ise kanca hiçbir şey yapmaz (hooks kuralı gereği yine çağrılır). */
+  backend: VoiceBackend | null;
   onResult: (text: string) => void;
   /** Konuşma bittikten sonra sıra geçmeden önceki sessizlik. */
   silenceMs: number;
-  /** Etkin değilken kanca hiçbir şey yapmaz (hooks kuralı gereği yine çağrılır). */
-  enabled: boolean;
 }
 
 const POLL_MS = 150;
@@ -86,8 +85,8 @@ export function useRecorderDictation(opts: RecorderDictationOptions): DictationS
     }
     setPartial("çözülüyor…");
     try {
-      const text = await transcribe(
-        opts.apiKey,
+      if (!opts.backend) throw new Error("Ses tanıma arka ucu yok.");
+      const text = await opts.backend.transcribe(
         uri,
         sttLanguage(getActiveLanguageId()),
         sttSeconds(durationMs)
@@ -102,7 +101,7 @@ export function useRecorderDictation(opts: RecorderDictationOptions): DictationS
   };
 
   const start = () => {
-    if (!opts.enabled) return;
+    if (!opts.backend) return;
     setError(null);
     setPartial("");
     stopping.current = false;

@@ -11,6 +11,7 @@ import { act, render } from "@testing-library/react-native";
 import React from "react";
 import { Text } from "react-native";
 import { useRecorderDictation } from "../src/useRecorderDictation";
+import { openaiBackend } from "../src/openaiVoice";
 import { setActiveLanguage } from "../src/languages";
 
 const mockFetch = jest.fn();
@@ -31,8 +32,7 @@ let api: { listening: boolean; partial: string; error: string | null; start: () 
 
 function Host({ enabled = true }: { enabled?: boolean }) {
   api = useRecorderDictation({
-    apiKey: "sk-x",
-    enabled,
+    backend: enabled ? openaiBackend("sk-x", "ash") : null,
     silenceMs: 2000,
     onResult: (t) => heard.push(t),
   });

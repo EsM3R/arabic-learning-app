@@ -132,21 +132,21 @@ test("seçilen SAĞLAYICI kuruluma taşınır ve öneki ona göre denetlenir", a
   expect(done[0].key).toBe("AIza-bir-anahtar");
 });
 
-test("ses için OpenAI anahtarı İSTEĞE BAĞLI verilebilir — beyin DeepSeek kalır", async () => {
-  // Varsayılan kombinasyon: DeepSeek beyin + OpenAI ses. Kurulumda ikinci
-  // anahtar isteğe bağlı; boş bırakan telefon sesiyle başlar.
+test("ses için Gemini anahtarı İSTEĞE BAĞLI verilebilir — beyin DeepSeek kalır", async () => {
+  // Varsayılan kombinasyon: DeepSeek beyin + Gemini ses (ücretsiz kota).
+  // Kurulumda ikinci anahtar isteğe bağlı; boş bırakan telefon sesiyle başlar.
   await toLastStep();
   fireEvent.changeText(screen.getByPlaceholderText(/örn\. Mehmet/), "Mehmet");
   fireEvent.changeText(screen.getByPlaceholderText(/^sk-…$/), "sk-deepseek");
-  fireEvent.changeText(screen.getByPlaceholderText(/telefon sesi/), " sk-openai ");
+  fireEvent.changeText(screen.getByPlaceholderText(/telefon sesi/), " g-key ");
   fireEvent.press(screen.getByText(/Başlayalım/));
   expect(done[0].provider).toBe("deepseek");
   expect(done[0].key).toBe("sk-deepseek");
-  expect(done[0].voiceKey).toBe("sk-openai");
+  expect(done[0].voiceKey).toBe("g-key");
 });
 
-test("beyin OpenAI seçilince ayrı ses anahtarı SORULMAZ — aynı anahtar", async () => {
+test("beyin Gemini seçilince ayrı ses anahtarı SORULMAZ — aynı anahtar", async () => {
   await toLastStep();
-  fireEvent.press(screen.getByText("OpenAI (ChatGPT)"));
+  fireEvent.press(screen.getByText("Google Gemini"));
   expect(screen.queryByPlaceholderText(/telefon sesi/)).toBeNull();
 });

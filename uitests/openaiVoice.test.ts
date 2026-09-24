@@ -11,7 +11,8 @@
  * İkinci dikiş yedek: sentez düşerse cümle KAYBOLMAZ, telefon sesiyle okunur.
  * Sessizlik yerine robot ses — ama cümle gider.
  */
-import { createNeuralSpeechQueue, synthesize, transcribe } from "../src/openaiVoice";
+import { createNeuralSpeechQueue } from "../src/neuralVoice";
+import { openaiBackend, synthesize, transcribe } from "../src/openaiVoice";
 import { setActiveLanguage } from "../src/languages";
 import { usageSummary } from "../src/usage";
 
@@ -65,8 +66,7 @@ test("cümleler SIRAYLA çalınır, hiçbiri iki kez ya da atlanarak değil", as
   const said: string[] = [];
   let idle = 0;
   const q = createNeuralSpeechQueue({
-    apiKey: "sk-x",
-    voiceId: "ash",
+    backend: openaiBackend("sk-x", "ash"),
     onSentence: (s) => said.push(s),
     onIdle: () => {
       idle += 1;
@@ -85,7 +85,7 @@ test("cümleler SIRAYLA çalınır, hiçbiri iki kez ya da atlanarak değil", as
 test("ÖN-GETİRME: ikinci cümlenin sentezi birinci çalınmadan başlar", async () => {
   // Sıralı yapılsaydı her cümle arasında sentez süresi kadar boşluk olurdu.
   deferFetch();
-  const q = createNeuralSpeechQueue({ apiKey: "sk-x", voiceId: "ash" });
+  const q = createNeuralSpeechQueue({ backend: openaiBackend("sk-x", "ash") });
   q.push("Bir.");
   q.push("İki.");
   await flush();
@@ -100,8 +100,7 @@ test("sentez DÜŞERSE cümle telefon sesiyle okunur, kaybolmaz", async () => {
   const Speech = require("expo-speech");
   const reasons: string[] = [];
   const q = createNeuralSpeechQueue({
-    apiKey: "sk-x",
-    voiceId: "ash",
+    backend: openaiBackend("sk-x", "ash"),
     onFallback: (r) => reasons.push(r),
   });
   q.push("Bir.");
@@ -119,8 +118,7 @@ test("cancel: kuyruk boşalır, onIdle ÇAĞRILMAZ, geç gelen ses çalınmaz", 
   deferFetch();
   let idle = 0;
   const q = createNeuralSpeechQueue({
-    apiKey: "sk-x",
-    voiceId: "ash",
+    backend: openaiBackend("sk-x", "ash"),
     onIdle: () => {
       idle += 1;
     },
@@ -140,8 +138,7 @@ test("cancel: kuyruk boşalır, onIdle ÇAĞRILMAZ, geç gelen ses çalınmaz", 
 test("boş cevapta finish() sırayı yine öğrenciye verir", () => {
   let idle = 0;
   const q = createNeuralSpeechQueue({
-    apiKey: "sk-x",
-    voiceId: "ash",
+    backend: openaiBackend("sk-x", "ash"),
     onIdle: () => {
       idle += 1;
     },

@@ -289,6 +289,7 @@ test("dosya seçimi İPTAL edilirse hiçbir uyarı çıkmaz, ekran kilitlenmez",
 
 test("ses tercihi KAYDEDİLİR", async () => {
   await open();
+  fireEvent.press(screen.getByText(/✨ OpenAI/));
   fireEvent.press(screen.getByText(/Nova ·/));
   fireEvent.press(screen.getByText(/Senin sesini de ses modeli çözsün/)); // varsayılan açık → kapat
   fireEvent.press(screen.getByText(/🧠 Anthropic/)); // odanın beyni: aktif sağlayıcı
@@ -297,11 +298,11 @@ test("ses tercihi KAYDEDİLİR", async () => {
   expect(saved[0].voice).toEqual({ provider: "openai", voiceId: "nova", transcribe: false, brain: "active" });
 });
 
-test("OpenAI anahtarı yokken ses modeli seçilirse NE OLACAĞI söylenir, sınama kapalı", async () => {
+test("Gemini anahtarı yokken ses modeli için NE OLACAĞI söylenir, sınama kapalı", async () => {
   // Sessizce telefon sesine düşmek, kullanıcıyı "neden hâlâ robot" diye
-  // bırakırdı. (Ses modeli artık varsayılan; seçmeye gerek yok.)
+  // bırakırdı. (Gemini sesi varsayılan; seçmeye gerek yok.)
   await open();
-  expect(screen.getByText(/OpenAI anahtarı gerekir/)).toBeTruthy();
+  expect(screen.getByText(/Gemini anahtarı gerekir/)).toBeTruthy();
   expect(screen.getByText(/Anahtar girilene kadar telefon sesi/)).toBeTruthy();
   const tryBtn = screen.getByText(/Sesi dene/);
   fireEvent.press(tryBtn); // devre dışı: hiçbir şey olmamalı
@@ -313,7 +314,25 @@ test("telefon sesi seçilince ses modeli ayarları GÖRÜNMEZ", async () => {
   await open();
   fireEvent.press(screen.getByText(/Telefon sesi/));
   expect(screen.queryByText(/Sesi dene/)).toBeNull();
+  expect(screen.queryByText(/Kore ·/)).toBeNull();
+});
+
+test("varsayılan ses GEMİNİ — ücretsiz kota; ses listesi Gemini sesleri", async () => {
+  await open();
+  expect(screen.getByText(/Kore ·/)).toBeTruthy();
   expect(screen.queryByText(/Nova ·/)).toBeNull();
+  expect(screen.getByText(/ücretsiz kotasında ses için ödeme yok/)).toBeTruthy();
+});
+
+test("sağlayıcı değişince ses listesi ve varsayılan ses DEĞİŞİR", async () => {
+  // Gemini'de "Kore", OpenAI'da "ash"; eski sesin adı öbür sağlayıcıya sızmasın.
+  await open();
+  fireEvent.press(screen.getByText(/✨ OpenAI/));
+  expect(screen.getByText(/Nova ·/)).toBeTruthy();
+  expect(screen.queryByText(/Kore ·/)).toBeNull();
+  fireEvent.press(screen.getByText("Kaydet"));
+  await waitFor(() => expect(saved).toHaveLength(1));
+  expect(saved[0].voice?.voiceId).toBe("ash");
 });
 
 test("DeepSeek anahtarı yokken oda beyninin ne olacağı söylenir", async () => {
