@@ -1,12 +1,21 @@
 name: APK derle
 
 # Telefona kurulabilir bir Android APK üretir.
-# Tetikleme: bu geliştirme dalına push, apk-v* etiketi, veya Actions sekmesinden elle.
+#
+# KOTA DERSİ (Eylül 2026): özel depoda ayda 2000 dakika ücretsiz; her derleme
+# ~15 dk. Her push'ta derlemek 60+ derlemede kotayı bitirdi ve iki hafta
+# boyunca hiçbir APK telefona ulaşmadı — kullanıcı eski sürümü test etti.
+# Artık push'ta yalnız commit mesajında "[apk]" varsa derlenir; ayrıca apk-v*
+# etiketi ve Actions sekmesinden elle. Testler her push'ta koşmaya devam
+# etmez — tsc ve testler derlemenin parçası; kodun sağlığı yerel koşuda ve
+# derleme öncesi denetlenir.
 on:
   workflow_dispatch:
   push:
     branches:
       - claude/arabic-learning-app-21ab83
+    tags:
+      - "apk-v*"
     paths-ignore:
       - "**.md"
 
@@ -18,6 +27,11 @@ jobs:
     name: Android release APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Atlanan iş dakika harcamaz. Push'ta yalnız "[apk]" işaretli commit'ler.
+    if: >-
+      github.event_name != 'push' ||
+      startsWith(github.ref, 'refs/tags/') ||
+      contains(github.event.head_commit.message, '[apk]')
 
     steps:
       - name: Kodu al
@@ -38,6 +52,13 @@ jobs:
 
       - name: Bağımlılıkları kur
         run: npm ci
+
+      # Gradle önbelleği: bağımlılıklar ve derleme çıktıları derlemeler arası
+      # saklanır — ~15 dakikalık derleme belirgin kısalır, kota daha yavaş erir.
+      - name: Gradle önbelleği
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       # Yanlış SDK'nın native modülü ağaca sızarsa gradle derlemesi GEÇER ama
       # uygulama açılışta çöker (NoClassDefFoundError). Burada yakalanmazsa
