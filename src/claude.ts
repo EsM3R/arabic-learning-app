@@ -503,6 +503,7 @@ export async function generateDebrief(
 const STEP_SCHEMA = {
   type: "object",
   properties: {
+    question: { type: "string" },
     trPiece: { type: "string" },
     trSoFar: { type: "string" },
     target: { type: "string" },
@@ -510,7 +511,7 @@ const STEP_SCHEMA = {
     translit: { type: "string" },
     note: { type: "string" },
   },
-  required: ["trPiece", "trSoFar", "target", "alts", "translit", "note"],
+  required: ["question", "trPiece", "trSoFar", "target", "alts", "translit", "note"],
   additionalProperties: false,
 } as const;
 

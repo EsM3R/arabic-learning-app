@@ -26,6 +26,7 @@ import {
 import type { BuildStep, ProgressMap } from "../src/sentencebuilding.ts";
 
 const step = (target: string, alts: string[] = []): BuildStep => ({
+  question: "",
   trPiece: "x",
   trSoFar: "x",
   target,

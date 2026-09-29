@@ -150,6 +150,12 @@ export function patternById(id: string): Pattern | undefined {
 
 /** Bir basamak: Türkçe cümlenin şimdiye kadarki parçası ve hedef dildeki tam hâli. */
 export interface BuildStep {
+  /**
+   * Bu adıma geçiren SORU — videodaki hocanın asıl hamlesi: "Seviyorum.
+   * NEYİ seviyorum? Uyanmayı. NASIL? Erken. NE ZAMAN? Sabahları." İlk adımda
+   * ya da bağlaç adımında "" olabilir.
+   */
+  question: string;
   /** Bu adımda eklenen Türkçe parça (vurgulanır). */
   trPiece: string;
   /** Türkçe cümlenin bu adıma kadar kurulmuş hâli. */
@@ -222,6 +228,7 @@ export function normalizeBuildSet(
         .map((st) => {
           const x = (st ?? {}) as Record<string, unknown>;
           return {
+            question: str(x.question),
             trPiece: str(x.trPiece),
             trSoFar: str(x.trSoFar),
             target: str(x.target),
@@ -260,6 +267,7 @@ export function normalizeBuildSet(
 export function reorderStep(sentence: BuildSentence): BuildStep | null {
   if (!sentence.reorder) return null;
   return {
+    question: "",
     trPiece: "",
     trSoFar: sentence.tr,
     target: sentence.reorder,

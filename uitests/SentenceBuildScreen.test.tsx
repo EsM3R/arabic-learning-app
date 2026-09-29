@@ -35,8 +35,8 @@ function videoSet(patternId: string, themeId: string) {
       {
         tr: "Kahvaltı yapmadan önce duş alırım.",
         steps: [
-          { trPiece: "duş alırım", trSoFar: "duş alırım", target: "I take a shower", alts: ["I have a shower"], translit: "", note: "duş almak = take a shower" },
-          { trPiece: "kahvaltı yapmadan önce", trSoFar: "Kahvaltı yapmadan önce duş alırım.", target: "Before I have breakfast, I take a shower.", alts: [], translit: "", note: "-madan önce = before" },
+          { question: "", trPiece: "duş alırım", trSoFar: "duş alırım", target: "I take a shower", alts: ["I have a shower"], translit: "", note: "duş almak = take a shower" },
+          { question: "Ne zaman?", trPiece: "kahvaltı yapmadan önce", trSoFar: "Kahvaltı yapmadan önce duş alırım.", target: "Before I have breakfast, I take a shower.", alts: [], translit: "", note: "-madan önce = before" },
         ],
         blocks: [{ target: "before", tr: "-madan önce", note: "iki eylemi bağlar", contrast: "ago sadece 'önce' demek: three days ago", alts: [] }],
         reorder: "I take a shower before I have breakfast.",
@@ -44,8 +44,8 @@ function videoSet(patternId: string, themeId: string) {
       {
         tr: "Eve vardığımda televizyonu açarım.",
         steps: [
-          { trPiece: "televizyonu açarım", trSoFar: "televizyonu açarım", target: "I turn on the TV", alts: [], translit: "", note: "elektronik: turn on" },
-          { trPiece: "eve vardığımda", trSoFar: "Eve vardığımda televizyonu açarım.", target: "When I arrive at home, I turn on the TV.", alts: [], translit: "", note: "-dığımda = when" },
+          { question: "", trPiece: "televizyonu açarım", trSoFar: "televizyonu açarım", target: "I turn on the TV", alts: [], translit: "", note: "elektronik: turn on" },
+          { question: "Ne zaman?", trPiece: "eve vardığımda", trSoFar: "Eve vardığımda televizyonu açarım.", target: "When I arrive at home, I turn on the TV.", alts: [], translit: "", note: "-dığımda = when" },
         ],
         blocks: [{ target: "turn on", tr: "açmak (cihaz)", note: "", contrast: "open kapı/pencere için", alts: [] }],
         reorder: "",
@@ -87,6 +87,9 @@ async function openAndStart() {
   await act(async () => {
     ok.onPress?.();
   });
+  // Yapı taşları cümleden ÖNCE — videodaki hoca da önce anlatıp sonra çevirir.
+  await waitFor(() => expect(screen.getByText(/Bu cümlede öğreneceklerin/)).toBeTruthy());
+  fireEvent.press(screen.getByText(/Kurmaya başla/));
   await waitFor(() => expect(screen.getByText(/Bu adımda ekle/)).toBeTruthy());
 }
 
@@ -133,6 +136,7 @@ test("cümle adım adım BÜYÜR, bağlaç ortaya alınarak ek adım söyletilir
   await waitFor(() => expect(screen.getByText(/Devam/)).toBeTruthy());
   fireEvent.press(screen.getByText(/Devam/));
   expect(screen.getByText("kahvaltı yapmadan önce")).toBeTruthy();
+  expect(screen.getByText("Ne zaman?")).toBeTruthy(); // videodaki gibi: soruyla büyüt
   expect(screen.getByText(/önceki: I take a shower/)).toBeTruthy();
 
   say("before I have breakfast, I take a shower");
@@ -144,7 +148,20 @@ test("cümle adım adım BÜYÜR, bağlaç ortaya alınarak ek adım söyletilir
   await waitFor(() => expect(screen.getByText("✓ Doğru")).toBeTruthy());
 });
 
-test("cümle bitince YAPI TAŞI ve KARIŞIKLIK notu gösterilir", async () => {
+test("YAPI TAŞI ve KARIŞIKLIK notu cümleye BAŞLAMADAN gösterilir", async () => {
+  render(<SentenceBuildScreen profile={profile} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/Günlük rutinim/)).toBeTruthy());
+  fireEvent.press(screen.getByText(/Günlük rutinim/));
+  const ok = alerts[alerts.length - 1].buttons!.find((b) => /Evet/.test(b.text ?? ""))!;
+  await act(async () => {
+    ok.onPress?.();
+  });
+  await waitFor(() => expect(screen.getByText(/= -madan önce/)).toBeTruthy());
+  expect(screen.getByText(/ago sadece 'önce' demek/)).toBeTruthy();
+  expect(screen.queryByText(/Bu adımda ekle/)).toBeNull(); // henüz kurulum yok
+});
+
+test("cümle bitince tam hâli, bağlacın öteki yeri ve özet gösterilir", async () => {
   await openAndStart();
   for (const t of [
     "I take a shower",
@@ -155,9 +172,8 @@ test("cümle bitince YAPI TAŞI ve KARIŞIKLIK notu gösterilir", async () => {
     await waitFor(() => expect(screen.getByText(/Devam/)).toBeTruthy());
     fireEvent.press(screen.getByText(/Devam/));
   }
-  await waitFor(() => expect(screen.getByText(/= -madan önce/)).toBeTruthy());
-  expect(screen.getByText(/ago sadece 'önce' demek/)).toBeTruthy();
-  expect(screen.getByText(/ya da: I take a shower before/)).toBeTruthy();
+  await waitFor(() => expect(screen.getByText(/ya da: I take a shower before/)).toBeTruthy());
+  expect(screen.getByText(/✓ before = -madan önce/)).toBeTruthy();
 });
 
 test("set SAKLANIR ve ikinci açılışta BEDAVA gelir", async () => {
@@ -169,7 +185,7 @@ test("set SAKLANIR ve ikinci açılışta BEDAVA gelir", async () => {
   render(<SentenceBuildScreen profile={profile} onBack={() => {}} />);
   await waitFor(() => expect(screen.getByText("hazır")).toBeTruthy());
   fireEvent.press(screen.getByText("Günlük rutinim")); // tema kartı (kayıtlı listede de geçiyor)
-  await waitFor(() => expect(screen.getByText(/Bu adımda ekle/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Kurmaya başla/)).toBeTruthy());
   expect(mockGen).toHaveBeenCalledTimes(1); // yeni istek yok
 });
 
@@ -207,6 +223,8 @@ test("set sonunda yapı taşları DEFTERE eklenir", async () => {
     fireEvent.press(screen.getByText(/Devam/));
   }
   fireEvent.press(screen.getByText(/Sıradaki cümle/));
+  await waitFor(() => expect(screen.getByText(/open kapı\/pencere için/)).toBeTruthy());
+  fireEvent.press(screen.getByText(/Kurmaya başla/));
   for (const t of ["I turn on the TV", "When I arrive at home, I turn on the TV."]) {
     say(t);
     await waitFor(() => expect(screen.getByText(/Devam/)).toBeTruthy());

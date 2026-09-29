@@ -555,10 +555,13 @@ ${known.length ? `Öğrencinin bildiği kelimelerden yararlan: ${known.slice(0, 
 YÖNTEM — bundan sapma:
 1. 7-8 Türkçe cümle yaz; hepsi AYNI HİKÂYENİN parçası, sırayla ilerlesin (birinci tekil şahıs, gerçek hayattan, sade). Odak kalıp cümlelerin en az yarısında geçsin.
 2. Her cümle 1-2 YAPI TAŞI öğretsin: bağlaç (önce/sonra/-ince/çünkü/ama/ancak), zaman ifadesi (sabahları, saat 7 gibi), günlük kalıp (duş almak, televizyonu açmak, evden çıkmak, yatağa girmek, otobüsle gitmek).
-3. Cümleyi ANA YÜKLEMDEN başlayarak DIŞARI DOĞRU kur: ilk adım yalnız özne+yüklem ("I like"), her yeni adım bir Türkçe parça ekler ve hedef dildeki cümlenin o ana kadarki TAM hâlini verir. Her adımın target'ı bir önceki adımın target'ını anlamca İÇERSİN. Adım sayısı 2-6.
-4. trPiece: bu adımda eklenen Türkçe parça. trSoFar: Türkçe cümlenin bu adıma kadarki hâli (Türkçe söz dizimiyle, doğal). note: bu adımda ne eklendiğini tek cümle Türkçe açıkla ("'erken' için early, fiilden sonra gelir").
+3. KURULUŞ SIRASI — iki durum var:
+   a) BAĞLAÇSIZ cümle: ANA YÜKLEMDEN başla ve SORU sorarak dışarı büyü. "Sabahları erken uyanmayı seviyorum" → adım 1: "seviyorum" → I like; adım 2 soru "Neyi seviyorum?" → "uyanmayı" → I like to wake up; adım 3 soru "Nasıl uyanmayı?" → "erken" → I like to wake up early; adım 4 soru "Ne zaman?" → "sabahları" → I like to wake up early in the morning.
+   b) BAĞLAÇLI cümle (-madan önce, -dıktan sonra, -dığımda, çünkü, ama): önce cümle iki kısma ve bir bağlaca ayrılır; BAĞLAÇLA BAŞLA, sonra bağlaçlı kısmı, sonra ana kısmı ekle. "Kahvaltı yapmadan önce duş alırım" → adım 1: "-madan önce" → Before; adım 2 soru "Kim kahvaltı yapacak?" → "kahvaltı yapmadan önce" → Before I have breakfast; adım 3 → "duş alırım" → Before I have breakfast, I take a shower.
+   Her adım bir Türkçe parça ekler ve hedef dildeki cümlenin o ana kadarki TAM hâlini verir; her adımın target'ı bir öncekini İÇERSİN. Adım sayısı 2-6.
+4. question: bu adıma geçiren Türkçe soru ("Neyi seviyorum?", "Nasıl?", "Ne zaman?", "Nereye?", "Kim?", "Neyle?"); ilk adımda "". trPiece: bu adımda eklenen Türkçe parça. trSoFar: Türkçe cümlenin bu adıma kadarki hâli. note: tek cümle Türkçe; bir Türkçe EK ya da yapı hedef dile çevriliyorsa bunu AÇIKÇA söyle ("'uyanmayı'daki -mayı ekini to ile veririz", "-la ekinde araç varsa with değil by", "saatlerde at kullanılır", "sometimes/often/always fiilden hemen önce gelir").
 5. alts: aynı adımın gerçekten doğru başka söyleyişleri (take/have a shower, like doing/like to do, around/about). Uydurma alternatif yazma.
-6. blocks: cümlenin öğrettiği yapı taşları. contrast alanında Türklerin KARIŞTIRDIĞI şeyi açıkla (ago/before, later/after, with/by, open/turn on gibi); karışıklık yoksa "".
+6. blocks: cümlenin öğrettiği yapı taşları — öğrenci bunları cümleye BAŞLAMADAN görecek, hoca da çeviriden önce anlatır. contrast alanında Türklerin KARIŞTIRDIĞI şeyi örnekle açıkla ("ago sadece 'önce' demek: 3 days ago; -madan önce için before", later/after, with/by, open/turn on gibi); karışıklık yoksa "". Gerekiyorsa kısa bir kural da buraya (am/pm, 12'lik saat).
 7. reorder: cümle bağlaçla başlıyorsa ve bağlaç ortaya da alınabiliyorsa o sıralamanın TAM hâli; yoksa "".
 8. SON 2 cümle, önceki cümlelerde öğretilen yapı taşlarını YENİDEN birleştirsin — yeni taş getirmesin.
 9. Seviye ${level}: kelimeler seviyeye uygun, cümle uzunluğu makul.

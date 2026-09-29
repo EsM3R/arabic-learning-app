@@ -56,7 +56,12 @@ interface Props {
   onBack: () => void;
 }
 
-type Phase = "home" | "loading" | "drill" | "blocks" | "done";
+/**
+ * "preview": cümleye başlamadan yapı taşları — videodaki hoca da "-madan
+ * önce = before, ago ile karıştırma" açıklamasını çeviriden ÖNCE yapar.
+ * "blocks": cümle bittikten sonra tam hâl + bağlacın öteki yeri (özet).
+ */
+type Phase = "home" | "loading" | "preview" | "drill" | "blocks" | "done";
 
 /** En fazla bu kadar set saklanır (dil başına). */
 const KEEP_SETS = 30;
@@ -159,7 +164,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     setRevealed(false);
     setScore({ ok: 0, total: 0 });
     setSavedBlocks(false);
-    setPhase("drill");
+    setPhase(s.sentences[0]?.blocks.length ? "preview" : "drill");
   };
 
   // ------------------------------------------------------------------ denetim
@@ -220,7 +225,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     if (si + 1 < set.sentences.length) {
       setSi(si + 1);
       setSti(0);
-      setPhase("drill");
+      setPhase(set.sentences[si + 1].blocks.length ? "preview" : "drill");
     } else {
       setPhase("done");
     }
@@ -357,6 +362,31 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     );
   }
 
+  if (phase === "preview") {
+    return (
+      <View style={styles.container}>
+        <Header title="Cümle Kurma" subtitle={`cümle ${si + 1} / ${set.sentences.length}`} onBack={onBack} />
+        <ScrollView contentContainerStyle={styles.body}>
+          <Text style={styles.trSentence}>{sentence.tr}</Text>
+          <Text style={styles.section}>Bu cümlede öğreneceklerin</Text>
+          {sentence.blocks.map((b, i) => (
+            <View key={i} style={styles.blockCard}>
+              <Text style={[styles.blockTarget, rtl && styles.rtl]}>
+                {b.target} <Text style={styles.blockTr}>= {b.tr}</Text>
+              </Text>
+              {!!b.note && <Text style={styles.blockNote}>{b.note}</Text>}
+              {!!b.contrast && <Text style={styles.contrast}>⚠️ {b.contrast}</Text>}
+              {b.alts.length > 0 && <Text style={styles.alts}>Ayrıca: {b.alts.join(" · ")}</Text>}
+            </View>
+          ))}
+          <TouchableOpacity style={styles.primary} onPress={() => setPhase("drill")}>
+            <Text style={styles.primaryText}>Kurmaya başla ›</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  }
+
   if (phase === "blocks") {
     return (
       <View style={styles.container}>
@@ -373,14 +403,9 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           ) : null}
 
           {sentence.blocks.map((b, i) => (
-            <View key={i} style={styles.blockCard}>
-              <Text style={[styles.blockTarget, rtl && styles.rtl]}>
-                {b.target} <Text style={styles.blockTr}>= {b.tr}</Text>
-              </Text>
-              {!!b.note && <Text style={styles.blockNote}>{b.note}</Text>}
-              {!!b.contrast && <Text style={styles.contrast}>⚠️ {b.contrast}</Text>}
-              {b.alts.length > 0 && <Text style={styles.alts}>Ayrıca: {b.alts.join(" · ")}</Text>}
-            </View>
+            <Text key={i} style={styles.recap}>
+              ✓ {b.target} = {b.tr}
+            </Text>
           ))}
 
           <TouchableOpacity style={styles.primary} onPress={nextSentence}>
@@ -412,7 +437,11 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
               <Text style={styles.stepHint}>Şimdi aynı cümleyi bağlacı ORTAYA alarak söyle.</Text>
             ) : (
               <>
-                <Text style={styles.stepHint}>Bu adımda ekle:</Text>
+                {step.question ? (
+                  <Text style={styles.question}>{step.question}</Text>
+                ) : (
+                  <Text style={styles.stepHint}>Bu adımda ekle:</Text>
+                )}
                 <Text style={styles.trPiece}>{step.trPiece}</Text>
                 <Text style={styles.trSoFar}>→ {step.trSoFar}</Text>
               </>
@@ -526,6 +555,8 @@ function makeStyles(colors: Palette) {
     stepCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 14, ...shadow },
     stepHint: { fontSize: 12, color: colors.inkFaint, fontWeight: "700" },
     trPiece: { fontSize: 20, fontWeight: "800", color: colors.accentDark, marginTop: 4 },
+    question: { fontSize: 15, fontWeight: "800", color: colors.gold },
+    recap: { fontSize: 14, color: colors.accentDark, marginTop: 6, fontWeight: "600" },
     trSoFar: { fontSize: 14, color: colors.inkSoft, marginTop: 6 },
     prev: { fontSize: 13, color: colors.inkFaint, marginTop: 10, fontStyle: "italic" },
     verdict: { borderRadius: radius.lg, padding: 16, gap: 6 },
