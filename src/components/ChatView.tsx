@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,11 +16,40 @@ import RichText from "./RichText";
 import { extractArabic, speakTarget } from "../speech";
 import { isSpoken, stripSpokenMark } from "../speechinput";
 import { useDictation } from "../useDictation";
+import { useRecorderDictation } from "../useRecorderDictation";
+import type { VoiceBackend } from "../neuralVoice";
+import { TEXT_SCALES } from "../storage";
 import { colors, shadow } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { ChatMessage, NavigationSuggestion } from "../types";
 import { containsTargetScript, isRtl } from "../scripts";
+
+/** Sesli derste öğrenci sustuktan sonra sıranın geçmesi için beklenen süre. */
+const SILENCE_MS = 2200;
+
+/**
+ * SESLİ DERS — sohbeti mesajlaşmadan konuşmaya çeviren kısım.
+ * Açıkken hoca cevabı cümle cümle seslenir (ekranı LessonScreen sürer),
+ * hoca susunca mikrofon kendi açılır, öğrenci susunca söylenen kendiliğinden
+ * gider. Kapalıyken eski düzen: basılı tut, yazı kutusuna düşsün, gönder.
+ */
+export interface ChatVoice {
+  on: boolean;
+  /** Bu cihazda sesli ders mümkün mü (ses modeli ya da ayrı alfabe). */
+  available: boolean;
+  onToggle: () => void;
+  /** Hoca şu an konuşuyor mu + hangi cümleyi. */
+  speaking: boolean;
+  nowSaying: string;
+  onStop: () => void;
+  /** Her artışında (hoca sustu) mikrofon kendiliğinden açılır. */
+  listenSignal: number;
+  /** Ses modeliyle tanıma; null → telefonun tanıması. */
+  stt: VoiceBackend | null;
+  /** 🔊 Dinle: mesajı hocanın sesiyle oku. */
+  speakMessage: (text: string) => void;
+}
 
 interface Props {
   messages: ChatMessage[];
@@ -35,6 +64,10 @@ interface Props {
   /** Üstaz'ın ekrana_git önerisi — zorlamaz, tıklanabilir bir şerit olarak çıkar. */
   suggestion?: NavigationSuggestion | null;
   onSuggestionPress?: () => void;
+  voice?: ChatVoice;
+  /** Yazı boyutu çarpanı (TEXT_SCALES içinden). */
+  textScale?: number;
+  onTextScale?: (scale: number) => void;
 }
 
 export default function ChatView({
@@ -46,9 +79,13 @@ export default function ChatView({
   placeholder,
   suggestion,
   onSuggestionPress,
+  voice,
+  textScale = 1,
+  onTextScale,
 }: Props) {
   const colors = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => makeStyles(colors, textScale), [colors, textScale]);
+  const voiceOn = !!voice?.on;
 
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -56,14 +93,59 @@ export default function ChatView({
   /** Mikrofondan gelen ve öğrencinin elle değiştirmediği metin. */
   const spokenDraft = useRef<string | null>(null);
 
-  // Mikrofon: söylenen doğrudan yazı kutusuna düşer — öğrenci göndermeden
-  // önce görebilir ve düzeltebilir (ses tanıma gürültülüdür).
-  const dictation = useDictation({
-    onResult: (text) => {
-      spokenDraft.current = text;
-      setDraft(text);
-    },
+  // Kancalar sonucu başlatıldıkları andaki kapanışla teslim edebilir:
+  // güncel değerler ref'ten okunur.
+  const voiceOnRef = useRef(voiceOn);
+  voiceOnRef.current = voiceOn;
+  const onSendRef = useRef(onSend);
+  onSendRef.current = onSend;
+
+  // Mikrofon. Sesli derste söylenen doğrudan gider (konuşmada kimse
+  // cümlesini göndermeden önce düzeltmez); yazılı düzende yazı kutusuna
+  // düşer — öğrenci göndermeden önce görebilir ve düzeltebilir.
+  const onHeard = (text: string) => {
+    const t = text.trim();
+    if (voiceOnRef.current) {
+      if (t) onSendRef.current(t, true);
+      return;
+    }
+    spokenDraft.current = text;
+    setDraft(text);
+  };
+  const phoneDictation = useDictation({
+    autoStopMs: voiceOn ? SILENCE_MS : undefined,
+    onResult: onHeard,
   });
+  const recorderDictation = useRecorderDictation({
+    backend: voiceOn && voice?.stt ? voice.stt : null,
+    silenceMs: SILENCE_MS,
+    onResult: onHeard,
+  });
+  const dictation = voiceOn && voice?.stt ? recorderDictation : phoneDictation;
+  const dictationRef = useRef(dictation);
+  dictationRef.current = dictation;
+
+  // Hoca sustu → sıra öğrencide: mikrofon kendi açılır.
+  const listenSignal = voice?.listenSignal ?? 0;
+  useEffect(() => {
+    if (listenSignal > 0 && voiceOnRef.current) dictationRef.current.start();
+  }, [listenSignal]);
+
+  /** Sesli derste mikrofon dokun-konuş: hoca konuşuyorsa sözünü keser. */
+  const tapMic = () => {
+    if (dictation.listening) {
+      dictation.stop();
+      return;
+    }
+    if (voice?.speaking) voice.onStop();
+    dictation.start();
+  };
+
+  const scaleIdx = TEXT_SCALES.indexOf(textScale);
+  const bumpScale = (dir: 1 | -1) => {
+    const i = Math.min(TEXT_SCALES.length - 1, Math.max(0, (scaleIdx < 0 ? 1 : scaleIdx) + dir));
+    onTextScale?.(TEXT_SCALES[i]);
+  };
 
   const send = () => {
     const text = draft.trim();
@@ -83,6 +165,47 @@ export default function ChatView({
       behavior="padding"
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
+      {(voice || onTextScale) && (
+        <View style={styles.toolbar}>
+          {voice && (
+            <TouchableOpacity
+              style={[styles.toolChip, voiceOn && styles.toolChipOn, !voice.available && styles.toolChipOff]}
+              onPress={voice.onToggle}
+              disabled={!voice.available}
+              accessibilityLabel="Sesli ders"
+            >
+              <Text style={[styles.toolText, voiceOn && styles.toolTextOn]}>
+                {!voice.available
+                  ? "🔇 Sesli ders için Ayarlar'dan ses modeli seç"
+                  : voiceOn
+                    ? "🔊 Sesli ders açık"
+                    : "🔇 Sesli ders kapalı"}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <View style={{ flex: 1 }} />
+          {onTextScale && (
+            <>
+              <TouchableOpacity
+                style={styles.sizeBtn}
+                onPress={() => bumpScale(-1)}
+                disabled={scaleIdx === 0}
+                accessibilityLabel="Yazıyı küçült"
+              >
+                <Text style={[styles.sizeText, scaleIdx === 0 && styles.sizeTextOff]}>A−</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.sizeBtn}
+                onPress={() => bumpScale(1)}
+                disabled={scaleIdx === TEXT_SCALES.length - 1}
+                accessibilityLabel="Yazıyı büyüt"
+              >
+                <Text style={[styles.sizeTextBig, scaleIdx === TEXT_SCALES.length - 1 && styles.sizeTextOff]}>A+</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      )}
       <FlatList
         ref={listRef}
         data={[
@@ -124,7 +247,7 @@ export default function ChatView({
                   containsTargetScript(item.content, pack.script) && (
                   <TouchableOpacity
                     style={styles.speakButton}
-                    onPress={() => speakTarget(item.content)}
+                    onPress={() => (voice ? voice.speakMessage(item.content) : speakTarget(item.content))}
                   >
                     <Text style={styles.speakText}>🔊 Dinle</Text>
                   </TouchableOpacity>
@@ -143,6 +266,16 @@ export default function ChatView({
           </View>
         )}
       />
+      {voice?.speaking && (
+        <View style={styles.speakingBar}>
+          <Text style={styles.speakingText} numberOfLines={2}>
+            🔊 {voice.nowSaying || `${pack.teacherName} konuşuyor…`}
+          </Text>
+          <TouchableOpacity style={styles.hushBtn} onPress={voice.onStop} accessibilityLabel="Sustur">
+            <Text style={styles.hushText}>Sustur</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {sending && (status || !live) && (
         <View style={styles.typing}>
           <View style={styles.avatarSmall}>
@@ -171,18 +304,21 @@ export default function ChatView({
         <View style={styles.micBanner}>
           <ActivityIndicator size="small" color={colors.gold} />
           <Text style={styles.micBannerText} numberOfLines={2}>
-            {dictation.partial || `Dinliyorum… bitince parmağını kaldır`}
+            {dictation.partial ||
+              (voiceOn ? "Dinliyorum… konuş, susunca kendi gider" : "Dinliyorum… bitince parmağını kaldır")}
           </Text>
         </View>
       )}
       <View style={styles.inputRow}>
         <TouchableOpacity
           style={[styles.micButton, dictation.listening && styles.micButtonOn]}
-          // Basılı tut - konuş - bırak: bitişe makine değil öğrenci karar verir.
-          onPressIn={() => dictation.start()}
-          onPressOut={() => dictation.stop()}
+          // Yazılı düzende basılı tut - konuş - bırak: bitişe öğrenci karar verir.
+          // Sesli derste dokun ve konuş: susunca sıra kendi geçer.
+          onPressIn={voiceOn ? undefined : () => dictation.start()}
+          onPressOut={voiceOn ? undefined : () => dictation.stop()}
+          onPress={voiceOn ? tapMic : undefined}
           disabled={sending}
-          accessibilityLabel="Basılı tutarak konuş"
+          accessibilityLabel={voiceOn ? "Dokun ve konuş" : "Basılı tutarak konuş"}
         >
           <Text style={styles.micText}>{dictation.listening ? "●" : "🎙️"}</Text>
         </TouchableOpacity>
@@ -216,8 +352,62 @@ export default function ChatView({
  * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
  * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
  */
-function makeStyles(colors: Palette) {
+function makeStyles(colors: Palette, k = 1) {
+  const fs = (n: number) => Math.round(n * k * 10) / 10;
   return StyleSheet.create({
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  toolChip: {
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexShrink: 1,
+  },
+  toolChipOn: { backgroundColor: colors.accentSoft, borderColor: "transparent" },
+  toolChipOff: { opacity: 0.7 },
+  toolText: { fontSize: 12, fontWeight: "700", color: colors.inkSoft },
+  toolTextOn: { color: colors.accentDark },
+  sizeBtn: {
+    width: 36,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sizeText: { fontSize: 12, fontWeight: "800", color: colors.ink },
+  sizeTextBig: { fontSize: 15, fontWeight: "800", color: colors.ink },
+  sizeTextOff: { opacity: 0.3 },
+  speakingBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: colors.deep,
+  },
+  speakingText: { flex: 1, color: colors.onDeep, fontSize: fs(14), lineHeight: fs(20) },
+  hushBtn: {
+    backgroundColor: colors.goldDeep,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  hushText: { color: colors.deep, fontSize: 12, fontWeight: "800" },
   micButton: {
     width: 44,
     height: 44,
@@ -272,7 +462,7 @@ function makeStyles(colors: Palette) {
   },
   avatarSmallText: { color: colors.goldDeep, fontSize: 11, fontWeight: "700" },
   bubble: {
-    maxWidth: "82%",
+    maxWidth: "84%",
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 11,
@@ -282,14 +472,18 @@ function makeStyles(colors: Palette) {
     borderBottomRightRadius: 6,
   },
   assistantBubble: {
+    // Hocanın mesajları uzun açıklamalar: dar balonda satırlar kırık kırık
+    // akıyordu. Hoca balonu neredeyse tam genişlik.
+    maxWidth: "90%",
+    flexShrink: 1,
     backgroundColor: colors.assistantBubble,
     borderTopLeftRadius: 6,
     borderWidth: 1,
     borderColor: colors.border,
     ...shadow,
   },
-  userText: { color: "#FFFFFF", fontSize: 15.5, lineHeight: 23 },
-  assistantText: { color: colors.ink, fontSize: 15.5, lineHeight: 24 },
+  userText: { color: "#FFFFFF", fontSize: fs(15.5), lineHeight: fs(23) },
+  assistantText: { color: colors.ink, fontSize: fs(15.5), lineHeight: fs(24) },
   actionsWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -365,7 +559,7 @@ function makeStyles(colors: Palette) {
     borderRadius: 23,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 15.5,
+    fontSize: fs(15.5),
     color: colors.ink,
     backgroundColor: colors.bg,
   },

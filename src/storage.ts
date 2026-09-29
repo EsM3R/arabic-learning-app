@@ -96,6 +96,38 @@ export async function saveReviewMode(mode: string): Promise<void> {
 }
 
 /**
+ * Ders sohbeti tercihleri — dil-bağımsız UI ayarı.
+ * voice: hoca cevabını sesli okusun + sustuktan sonra mikrofon kendi açılsın.
+ * textScale: yazı boyutu çarpanı.
+ */
+export interface ChatPrefs {
+  voice: boolean;
+  textScale: number;
+}
+export const TEXT_SCALES = [0.9, 1, 1.15, 1.3, 1.45];
+export const DEFAULT_CHAT_PREFS: ChatPrefs = { voice: true, textScale: 1 };
+
+export async function loadChatPrefs(): Promise<ChatPrefs> {
+  const raw = await AsyncStorage.getItem("chatPrefs.v1");
+  if (!raw) return DEFAULT_CHAT_PREFS;
+  try {
+    const p = JSON.parse(raw) as Partial<ChatPrefs>;
+    return {
+      voice: typeof p.voice === "boolean" ? p.voice : DEFAULT_CHAT_PREFS.voice,
+      textScale:
+        typeof p.textScale === "number" && TEXT_SCALES.includes(p.textScale)
+          ? p.textScale
+          : DEFAULT_CHAT_PREFS.textScale,
+    };
+  } catch {
+    return DEFAULT_CHAT_PREFS;
+  }
+}
+export async function saveChatPrefs(prefs: ChatPrefs): Promise<void> {
+  await AsyncStorage.setItem("chatPrefs.v1", JSON.stringify(prefs));
+}
+
+/**
  * CÜMLE KURMA: kalıp ilerlemesi ve kayıtlı setler (dil başına). Setler
  * saklanır ki aynı set tekrar tekrar çalışılabilsin — her açılışta yeniden
  * üretmek hem para hem tekrar fırsatı kaybı olurdu.

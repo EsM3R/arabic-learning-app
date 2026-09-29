@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
+import type { ChatVoice } from "../components/ChatView";
 import Header from "../components/Header";
 import { agenticChat } from "../claude";
 import { isBudgetError } from "../budget";
@@ -12,7 +13,12 @@ import {
   pruneQuality,
 } from "../lessonquality";
 import { getActivePack } from "../languages";
-import { extractArabic } from "../speech";
+import { createSpeechQueue, speakTarget } from "../speech";
+import type { SpeechQueue } from "../speech";
+import { takeSentences } from "../conversation";
+import { backendFor, createNeuralSpeechQueue } from "../neuralVoice";
+import { keyFor } from "../providers";
+import { cleanForSpeech, normalizeVoice } from "../voice";
 import { markSpoken } from "../speechinput";
 import { fluencyTrend } from "../fluency";
 import { progressDigest, readingPerformance } from "../progress";
@@ -41,7 +47,10 @@ import {
   loadNotes,
   loadReadings,
   loadVocab,
+  DEFAULT_CHAT_PREFS,
+  loadChatPrefs,
   saveChat,
+  saveChatPrefs,
   saveLessonQuality,
   touchLastActivity,
 } from "../storage";
@@ -49,7 +58,7 @@ import { colors } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { ChatMessage, CurriculumModule, NavigationSuggestion, Profile } from "../types";
-import { containsTargetScript } from "../scripts";
+import { containsTargetScript, extractScript } from "../scripts";
 
 interface Props {
   profile: Profile;
@@ -94,6 +103,106 @@ export default function LessonScreen({
   /** Akış tamponu: her delta'da setState yapmamak için ~80ms'de bir boşaltılır. */
   const liveBuf = useRef("");
   const liveFlush = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ------------------------------------------------------------ sesli ders
+  const [prefs, setPrefs] = useState(DEFAULT_CHAT_PREFS);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  useEffect(() => {
+    void loadChatPrefs().then(setPrefs);
+  }, []);
+  const updatePrefs = (next: Partial<typeof prefs>) => {
+    const merged = { ...prefsRef.current, ...next };
+    setPrefs(merged);
+    void saveChatPrefs(merged);
+  };
+  const voiceSettings = normalizeVoice(profile.voice);
+  const backend = useMemo(
+    () => backendFor(voiceSettings, { openai: keyFor(profile, "openai"), gemini: keyFor(profile, "gemini") }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [voiceSettings.provider, voiceSettings.voiceId, profile.apiKeys]
+  );
+  /**
+   * Telefon sesi yalnız ayrı alfabeli dillerde işe yarar: orada Türkçe
+   * açıklama atlanıp yalnız hedef dil okunur. Latin dillerde telefon sesi
+   * Türkçe açıklamayı İngilizce aksanla okur — sesli ders ancak ses
+   * modeliyle (iki dili de doğal okuyan) açılır.
+   */
+  const voiceAvailable = backend !== null || getActivePack().script !== "latin";
+  const voiceOn = prefs.voice && voiceAvailable;
+  const voiceOnRef = useRef(voiceOn);
+  voiceOnRef.current = voiceOn;
+  const [speaking, setSpeaking] = useState(false);
+  const [nowSaying, setNowSaying] = useState("");
+  const [listenSignal, setListenSignal] = useState(0);
+  const queue = useRef<SpeechQueue | null>(null);
+  const speechBuf = useRef("");
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      queue.current?.cancel();
+    };
+  }, []);
+
+  const stopSpeaking = () => {
+    queue.current?.cancel();
+    queue.current = null;
+    speechBuf.current = "";
+    setSpeaking(false);
+    setNowSaying("");
+  };
+
+  /** Yeni konuşma kuyruğu; autoListen → hoca susunca mikrofon açılır. */
+  const newQueue = (autoListen: boolean): SpeechQueue => {
+    stopSpeaking();
+    const onSentence = (s: string) => {
+      if (!alive.current) return;
+      setSpeaking(true);
+      setNowSaying(s);
+    };
+    const onIdle = () => {
+      if (!alive.current) return;
+      setSpeaking(false);
+      setNowSaying("");
+      if (autoListen && voiceOnRef.current) setListenSignal((n) => n + 1);
+    };
+    const q = backend
+      ? createNeuralSpeechQueue({ backend, onSentence, onIdle })
+      : createSpeechQueue({ onSentence, onIdle });
+    queue.current = q;
+    return q;
+  };
+
+  const pushSpeech = (q: SpeechQueue, text: string) => {
+    const clean = cleanForSpeech(text);
+    // Telefon sesi yalnız hedef dili okur: Türkçe cümle Arapça sesle
+    // okunursa anlaşılmaz bir gürültü olur, o cümle atlanır.
+    const spoken = backend ? clean : extractScript(clean, getActivePack().script);
+    if (spoken.trim()) q.push(spoken);
+  };
+
+  /** Akıştan tamamlanan cümleleri kuyruğa at. */
+  const feedSpeech = (q: SpeechQueue, delta: string) => {
+    speechBuf.current += delta;
+    const { sentences, rest } = takeSentences(speechBuf.current);
+    speechBuf.current = rest;
+    for (const s of sentences) pushSpeech(q, s);
+  };
+
+  /** 🔊 Dinle: tek mesajı baştan oku (mikrofon açılmaz). */
+  const speakMessage = (text: string) => {
+    if (!voiceAvailable) {
+      speakTarget(text);
+      return;
+    }
+    const q = newQueue(false);
+    const { sentences, rest } = takeSentences(text);
+    for (const s of sentences) pushSpeech(q, s);
+    if (rest.trim()) pushSpeech(q, rest);
+    q.finish();
+  };
 
   useEffect(() => {
     profileRef.current = profile;
@@ -239,6 +348,9 @@ export default function LessonScreen({
     liveBuf.current = "";
     setLive(null);
     void touchLastActivity();
+    // Sesli ders: yeni tur eski konuşmayı keser, cevap geldikçe seslenir.
+    const q = voiceOnRef.current ? newQueue(true) : null;
+    if (!q) stopSpeaking();
     const ctx: AgentContext = {
       profile: profileRef.current,
       profileChanged: false,
@@ -258,6 +370,7 @@ export default function LessonScreen({
             setStatus(null);
             liveBuf.current += delta;
             scheduleFlush();
+            if (q) feedSpeech(q, delta);
           },
           onTool: (name) => setStatus(toolLabel(name)),
           onRound: (round) => {
@@ -265,9 +378,27 @@ export default function LessonScreen({
             if (round > 0 && liveBuf.current && !liveBuf.current.endsWith("\n\n")) {
               liveBuf.current += "\n\n";
             }
+            // Araç turundan önceki yarım cümle beklemesin.
+            if (q && round > 0 && speechBuf.current.trim()) {
+              pushSpeech(q, speechBuf.current);
+              speechBuf.current = "";
+            }
           },
         },
       });
+      if (q) {
+        // Akış hiç gelmediyse (sağlayıcı akış desteklemiyor) cevabın tamamı.
+        const streamed = liveBuf.current.trim().length > 0;
+        if (streamed) {
+          if (speechBuf.current.trim()) pushSpeech(q, speechBuf.current);
+        } else {
+          const { sentences, rest } = takeSentences(reply.text);
+          for (const s of sentences) pushSpeech(q, s);
+          if (rest.trim()) pushSpeech(q, rest);
+        }
+        speechBuf.current = "";
+        q.finish();
+      }
       const updated: ChatMessage[] = [
         ...history,
         { role: "assistant", content: reply.text, actions: reply.actions },
@@ -284,6 +415,7 @@ export default function LessonScreen({
         isBudgetError(e) ? "Harcama tavanı doldu" : "Bağlantı hatası",
         e instanceof Error ? e.message : String(e)
       );
+      if (q) stopSpeaking();
       setMessages(history);
     } finally {
       // Araçlar profili zaten diske yazdı; burada UI durumunu senkronlıyoruz.
@@ -347,7 +479,8 @@ export default function LessonScreen({
     // Hoca yazıyla söyleneni ayırt edebilmeli: ses tanıma gürültülüdür,
     // kelime kelime yazım düzeltmesi yapılmamalı.
     const content = spoken ? markSpoken(text) : text;
-    const history: ChatMessage[] = [...messages, { role: "user", content }];
+    const history: ChatMessage[] = [...messagesRef.current, { role: "user", content }];
+    messagesRef.current = history;
     setMessages(history);
     void saveChat(chatId, history);
     void runTurn(history);
@@ -362,6 +495,21 @@ export default function LessonScreen({
   };
 
   const pack = getActivePack();
+
+  const chatVoice: ChatVoice = {
+    on: voiceOn,
+    available: voiceAvailable,
+    onToggle: () => {
+      if (voiceOn) stopSpeaking();
+      updatePrefs({ voice: !prefs.voice });
+    },
+    speaking,
+    nowSaying,
+    onStop: stopSpeaking,
+    listenSignal,
+    stt: voiceSettings.transcribe ? backend : null,
+    speakMessage,
+  };
 
   return (
     <View style={styles.container}>
@@ -398,6 +546,9 @@ export default function LessonScreen({
         onSuggestionPress={() => {
           if (suggestion) onNavigate(suggestion);
         }}
+        voice={chatVoice}
+        textScale={prefs.textScale}
+        onTextScale={(textScale) => updatePrefs({ textScale })}
       />
     </View>
   );

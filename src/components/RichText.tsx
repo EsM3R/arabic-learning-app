@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TextStyle, View } from "react-native";
-import { Block, classifyLine, InlineToken, splitInline, splitScript } from "../richtext";
+import { Block, classifyLine, InlineToken, isMostlyArabic, splitInline, splitScript } from "../richtext";
 import { arabicText } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
@@ -121,6 +121,7 @@ export default function RichText({ content, style, scaleScript = false }: Props)
     lastWasBlank = false;
 
     const content = renderInline(styles, block.text, baseSize, scaleScript, key);
+    const rtl = scaleScript && isMostlyArabic(block.text) ? styles.rtl : null;
 
     if (block.type === "heading") {
       nodes.push(
@@ -142,13 +143,13 @@ export default function RichText({ content, style, scaleScript = false }: Props)
     if (block.type === "quote") {
       nodes.push(
         <View key={key} style={styles.quote}>
-          <Text style={[style, styles.quoteText]}>{content}</Text>
+          <Text style={[style, styles.quoteText, rtl]}>{content}</Text>
         </View>
       );
       return;
     }
     nodes.push(
-      <Text key={key} style={style}>
+      <Text key={key} style={[style, rtl]}>
         {content}
       </Text>
     );
@@ -176,5 +177,6 @@ function makeStyles(colors: Palette) {
     marginVertical: 3,
   },
   quoteText: { fontStyle: "italic" },
+  rtl: { writingDirection: "rtl", textAlign: "right" },
   });
 }

@@ -84,3 +84,18 @@ export function splitScript(text: string): ScriptRun[] {
   }
   return out;
 }
+
+/**
+ * Satır ağırlıkla Arap harfli mi? Harflerin en az %60'ı Arapçaysa satır
+ * sağdan sola hizalanır — "Arapça cümle + kısa Türkçe not" satırı soldan
+ * başlayınca cümle ters yerde kırılıyor ve okuma yönü bozuluyordu.
+ */
+export function isMostlyArabic(text: string): boolean {
+  let ar = 0;
+  let other = 0;
+  for (const ch of text) {
+    if (ARABIC_RE.test(ch)) ar += 1;
+    else if (/\p{L}/u.test(ch)) other += 1;
+  }
+  return ar > 0 && ar / (ar + other) >= 0.6;
+}
