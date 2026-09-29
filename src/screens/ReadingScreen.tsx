@@ -1,23 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { generateReadingText } from "../claude";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import type { IconName } from "../components/Icon";
+import {
+  Button,
+  Chip,
+  Empty,
+  IconButton,
+  ListGroup,
+  PressableScale,
+  Screen,
+  SectionLabel,
+  Segmented,
+  Surface,
+  TargetText,
+  TeacherAvatar,
+  Txt,
+} from "../components/kit";
+import { ltrLine } from "../richtext";
 import { getActivePack } from "../languages";
 import { COMPLIANCE_WARN, LENGTH_SPECS, pruneReadings } from "../reading";
 import { newCard } from "../srs";
 import { SequenceHandle, speakSequence, speakTarget, stopSpeaking } from "../speech";
 import { recordStat } from "../statsStore";
 import { loadReadings, loadVocab, saveReadings, saveVocab, touchLastActivity } from "../storage";
-import { ARABIC_FONT, arabicText, colors, radius, shadow, shadowLift } from "../theme";
+import { arabicText, shadow } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { Profile, ReadingLength, ReadingText } from "../types";
@@ -210,12 +219,25 @@ export default function ReadingScreen({ profile, onBack }: Props) {
     );
   };
 
-  const badge = (r: ReadingText) =>
+  const badge = (r: ReadingText): { text: string; tone: "gold" | "accent" | "danger"; icon: IconName } =>
     r.coldStart
-      ? "🌱 Başlangıç metni"
+      ? { text: "Başlangıç metni", tone: "gold", icon: "sparkles" }
       : r.complianceRatio >= COMPLIANCE_WARN
-        ? "✅ Defterine göre örüldü"
-        : "🟡 Beklenenden çok yeni kelime";
+        ? { text: "Defterine göre örüldü", tone: "accent", icon: "check" }
+        : { text: "Beklenenden çok yeni kelime", tone: "danger", icon: "alert" };
+
+  const badgeView = (r: ReadingText) => {
+    const b = badge(r);
+    const fg = b.tone === "gold" ? colors.gold : b.tone === "accent" ? colors.accentDark : colors.danger;
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <Icon name={b.icon} size={13} color={fg} strokeWidth={2.4} />
+        <Txt variant="caption" color={fg} style={{ fontWeight: "700" }}>
+          {b.text}
+        </Txt>
+      </View>
+    );
+  };
 
   // ------------------------------------------------------------------ üretiliyor
   if (generating) {
@@ -223,12 +245,16 @@ export default function ReadingScreen({ profile, onBack }: Props) {
       <View style={styles.container}>
         <Header title="Okuma Salonu" subtitle="metin yazılıyor…" onBack={onBack} />
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingTitle}>{pack.teacherName} metnini yazıyor…</Text>
-          <Text style={styles.loadingText}>
+          <TeacherAvatar size={76} speaking />
+          <Txt variant="title3" center>
+            {pack.teacherName} metnini yazıyor…
+          </Txt>
+          <Txt variant="callout" color={colors.inkSoft} center>
             Kelime defterindeki kelimelerden, senin seviyende özgün bir metin örüyor.
-            {"\n"}Geçen süre: {elapsed} sn
-          </Text>
+          </Txt>
+          <Txt variant="caption" color={colors.inkFaint}>
+            Geçen süre: {elapsed} sn
+          </Txt>
         </View>
       </View>
     );
@@ -237,6 +263,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
   // ------------------------------------------------------------------ okuyucu
   if (view === "reader" && current) {
     const showWarn = !current.coldStart && current.complianceRatio < COMPLIANCE_WARN;
+    const rtl = isRtl(pack.script);
     return (
       <View style={styles.container}>
         <Header
@@ -247,216 +274,237 @@ export default function ReadingScreen({ profile, onBack }: Props) {
             setView("list");
           }}
         />
-        <ScrollView ref={readerScroll} contentContainerStyle={styles.body}>
+        <ScrollView ref={readerScroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           {error && (
-            <View style={styles.warnBand}>
-              <Text style={styles.warnText}>{error}</Text>
-            </View>
+            <Surface tone="sunken" style={{ marginBottom: 12 }}>
+              <Txt variant="callout" color={colors.danger}>
+                {error}
+              </Txt>
+            </Surface>
           )}
           {showWarn && (
-            <View style={styles.warnBand}>
-              <Text style={styles.warnText}>
-                ⚠️ Bu metinde beklenenden çok yeni kelime var.
-              </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  confirmGenerate({ avoidWords: current.unplannedUnknown, regenOf: current })
-                }
-              >
-                <Text style={styles.warnAction}>Yeniden üret ›</Text>
-              </TouchableOpacity>
-            </View>
+            <Surface tone="gold" style={{ marginBottom: 12, gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                <Icon name="alert" size={17} color={colors.gold} />
+                <Txt variant="callout" style={{ flex: 1 }}>
+                  Bu metinde beklenenden çok yeni kelime var.
+                </Txt>
+              </View>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="refresh"
+                label="Yeniden üret"
+                style={{ alignSelf: "flex-start" }}
+                onPress={() => confirmGenerate({ avoidWords: current.unplannedUnknown, regenOf: current })}
+              />
+            </Surface>
           )}
 
-          <Text style={[styles.title, isRtl(pack.script) && styles.rtl]}>{current.title}</Text>
-          <Text style={styles.badgeLine}>{badge(current)}</Text>
+          <Text style={[styles.title, rtl ? arabicText(30, true) : null, rtl && styles.rtl]}>{current.title}</Text>
+          <View style={{ marginTop: 6, marginBottom: 14 }}>{badgeView(current)}</View>
 
           <View style={styles.listenRow}>
-            <TouchableOpacity style={styles.listenButton} onPress={listen}>
-              <Text style={styles.listenText}>▶️ Baştan dinle</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.listenButton} onPress={stopListening}>
-              <Text style={styles.listenText}>⏹ Durdur</Text>
-            </TouchableOpacity>
+            <Button size="md" icon="play" label="Baştan dinle" onPress={listen} style={{ flex: 1 }} />
+            <IconButton icon="stop" label="Durdur" variant="outline" size={46} onPress={stopListening} />
           </View>
 
-          {current.sentences.map((s, i) => {
-            const open = revealed.has(i);
-            return (
-              <TouchableOpacity
-                key={i}
-                style={[styles.sentenceCard, activeIndex === i && styles.sentenceActive]}
-                // Dinlerken okunan cümleye kendiliğinden kaydırabilmek için
-                // her cümlenin dikey konumu ölçülür.
-                onLayout={(e) => {
-                  sentenceY.current[i] = e.nativeEvent.layout.y;
-                }}
-                activeOpacity={0.9}
-                onPress={() =>
-                  setRevealed((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(i)) next.delete(i);
-                    else next.add(i);
-                    return next;
-                  })
-                }
-              >
-                <Text style={[styles.sentenceTarget, isRtl(pack.script) && styles.rtlBig]}>
-                  {s.target}
-                </Text>
-                {open ? (
-                  <View style={styles.revealBlock}>
-                    {needsTranslit(pack.script) && !!s.translit && (
-                      <Text style={styles.sentenceTranslit}>{s.translit}</Text>
-                    )}
-                    <Text style={styles.sentenceTr}>🇹🇷 {s.tr}</Text>
+          <View style={{ gap: 10 }}>
+            {current.sentences.map((st, i) => {
+              const open = revealed.has(i);
+              const active = activeIndex === i;
+              return (
+                <Pressable
+                  key={i}
+                  style={[styles.sentenceCard, active && styles.sentenceActive]}
+                  // Dinlerken okunan cümleye kendiliğinden kaydırabilmek için
+                  // her cümlenin dikey konumu ölçülür.
+                  onLayout={(e) => {
+                    sentenceY.current[i] = e.nativeEvent.layout.y;
+                  }}
+                  onPress={() =>
+                    setRevealed((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(i)) next.delete(i);
+                      else next.add(i);
+                      return next;
+                    })
+                  }
+                >
+                  <Text style={[styles.sentenceTarget, rtl && styles.rtlBig]}>{st.target}</Text>
+                  {open ? (
+                    <View style={{ gap: 3, marginTop: 6 }}>
+                      {needsTranslit(pack.script) && !!st.translit && (
+                        <Txt variant="caption" color={colors.inkSoft} style={{ fontStyle: "italic" }}>
+                          {st.translit}
+                        </Txt>
+                      )}
+                      <Txt variant="callout">{st.tr}</Txt>
+                    </View>
+                  ) : (
+                    <Txt variant="caption" color={colors.inkFaint} style={{ marginTop: 4 }}>
+                      çeviri için dokun
+                    </Txt>
+                  )}
+                  <View style={styles.sentenceSpeakRow}>
+                    <IconButton
+                      icon="volume"
+                      label="Cümleyi dinle"
+                      variant="soft"
+                      size={32}
+                      onPress={() => {
+                        speakTarget(st.target);
+                        void recordStat("readSentence");
+                      }}
+                    />
+                    <IconButton icon="slow" label="Yavaş dinle" variant="soft" size={32} onPress={() => speakTarget(st.target, true)} />
                   </View>
-                ) : (
-                  <Text style={styles.revealHint}>çeviri için dokun</Text>
-                )}
-                <View style={styles.sentenceSpeakRow}>
-                  <TouchableOpacity
-                    hitSlop={8}
-                    onPress={() => {
-                      speakTarget(s.target);
-                      void recordStat("readSentence");
-                    }}
-                  >
-                    <Text style={styles.speakEmoji}>🔊</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity hitSlop={8} onPress={() => speakTarget(s.target, true)}>
-                    <Text style={styles.speakEmoji}>🐢</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                </Pressable>
+              );
+            })}
+          </View>
 
           {current.reviewCardIds.length > 0 && (
-            <View style={styles.sectionBox}>
-              <Text style={styles.sectionTitle}>🔁 Bu metinde tekrar ettiklerin</Text>
-              <Text style={styles.sectionMeta}>
-                {current.usedReviewWords.join(" · ") ||
-                  `${current.reviewCardIds.length} kelime`}
-              </Text>
-            </View>
+            <Surface tone="soft" style={{ marginTop: 18, gap: 6 }}>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                <Icon name="repeat" size={16} color={colors.accentDark} />
+                <Txt variant="headline" color={colors.accentDark} style={{ fontSize: 14 }}>
+                  Bu metinde tekrar ettiklerin
+                </Txt>
+              </View>
+              <Txt variant="callout" style={rtl ? styles.rtl : undefined}>
+                {current.usedReviewWords.join(" · ") || `${current.reviewCardIds.length} kelime`}
+              </Txt>
+            </Surface>
           )}
 
           {current.newWords.length > 0 && (
-            <View style={styles.sectionBox}>
-              <Text style={styles.sectionTitle}>✨ Yeni kelimeler</Text>
-              {current.newWords.map((w, i) => {
-                const inDeck = addedWords.has(w.word);
-                return (
-                  <View key={i} style={styles.newWordRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.newWordTarget, isRtl(pack.script) && styles.rtl]}>
-                        {w.word}
-                      </Text>
-                      <Text style={styles.newWordMeta}>
-                        {needsTranslit(pack.script) && w.translit ? `${w.translit} — ` : ""}
-                        {w.tr}
-                      </Text>
-                      <Text style={styles.newWordHint}>💡 {w.hint}</Text>
+            <View style={{ marginTop: 22 }}>
+              <SectionLabel title="Yeni kelimeler" />
+              <ListGroup>
+                {current.newWords.map((w, i) => {
+                  const inDeck = addedWords.has(w.word);
+                  return (
+                    <View key={i} style={styles.newWordRow}>
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <TargetText size={rtl ? 22 : 17} align="left">
+                          {w.word}
+                        </TargetText>
+                        <Txt variant="callout" color={colors.inkSoft}>
+                          {needsTranslit(pack.script) && w.translit ? `${w.translit} — ` : ""}
+                          {w.tr}
+                        </Txt>
+                        <View style={{ flexDirection: "row", gap: 6 }}>
+                          <Icon name="bulb" size={14} color={colors.gold} />
+                          <Txt variant="caption" color={colors.inkSoft} style={{ flex: 1 }}>
+                            {ltrLine(w.hint)}
+                          </Txt>
+                        </View>
+                      </View>
+                      <Button
+                        variant={inDeck ? "ghost" : "secondary"}
+                        size="sm"
+                        icon={inDeck ? "check" : "bookmark"}
+                        label={inDeck ? "Defterde" : "Deftere ekle"}
+                        disabled={inDeck}
+                        onPress={() => void addWordToDeck(i)}
+                      />
                     </View>
-                    <TouchableOpacity
-                      style={[styles.addButton, inDeck && styles.addButtonDone]}
-                      disabled={inDeck}
-                      onPress={() => void addWordToDeck(i)}
-                    >
-                      <Text style={[styles.addButtonText, inDeck && styles.addButtonTextDone]}>
-                        {inDeck ? "✓ Defterde" : "📇 Deftere ekle"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </ListGroup>
             </View>
           )}
 
           {current.questions.length > 0 && (
-            <View style={styles.sectionBox}>
-              <Text style={styles.sectionTitle}>🧠 Anlama soruları</Text>
-              {current.questions.map((q, qi) => {
-                const sel = quizSel[qi];
-                return (
-                  <View key={qi} style={styles.questionBlock}>
-                    <Text style={styles.questionText}>
-                      {qi + 1}. {q.q}
-                    </Text>
-                    {q.choices.map((c, ci) => {
-                      const chosen = sel === ci;
-                      const isCorrect = ci === q.answer;
-                      const showState = sel !== undefined && (chosen || isCorrect);
-                      return (
-                        <TouchableOpacity
-                          key={ci}
-                          style={[
-                            styles.choice,
-                            showState && isCorrect && styles.choiceCorrect,
-                            showState && chosen && !isCorrect && styles.choiceWrong,
-                          ]}
-                          disabled={sel !== undefined}
-                          onPress={() => answerQuestion(qi, ci)}
-                        >
-                          <Text
+            <View style={{ marginTop: 22 }}>
+              <SectionLabel title="Anlama soruları" />
+              <View style={{ gap: 12 }}>
+                {current.questions.map((q, qi) => {
+                  const sel = quizSel[qi];
+                  return (
+                    <Surface key={qi} style={{ gap: 8 }}>
+                      <Txt variant="bodyStrong">
+                        {qi + 1}. {q.q}
+                      </Txt>
+                      {q.choices.map((ch, ci) => {
+                        const chosen = sel === ci;
+                        const isCorrect = ci === q.answer;
+                        const showState = sel !== undefined && (chosen || isCorrect);
+                        const tone = showState ? (isCorrect ? "ok" : chosen ? "bad" : null) : null;
+                        return (
+                          <PressableScale
+                            key={ci}
                             style={[
-                              styles.choiceText,
-                              showState && isCorrect && styles.choiceTextCorrect,
+                              styles.choice,
+                              tone === "ok" && { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+                              tone === "bad" && { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
                             ]}
+                            disabled={sel !== undefined}
+                            onPress={() => answerQuestion(qi, ci)}
+                            accessibilityLabel={tone === "ok" ? `doğru: ${ch}` : tone === "bad" ? `yanlış: ${ch}` : ch}
                           >
-                            {showState ? (isCorrect ? "✓ " : chosen ? "✗ " : "") : ""}
-                            {c}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                );
-              })}
+                            {tone && (
+                              <Icon
+                                name={tone === "ok" ? "check" : "close"}
+                                size={16}
+                                color={tone === "ok" ? colors.accentDark : colors.danger}
+                                strokeWidth={2.6}
+                              />
+                            )}
+                            <Txt
+                              variant="callout"
+                              color={tone === "ok" ? colors.accentDark : tone === "bad" ? colors.danger : colors.ink}
+                              style={{ flex: 1, fontWeight: tone ? "700" : "600" }}
+                            >
+                              {ch}
+                            </Txt>
+                          </PressableScale>
+                        );
+                      })}
+                    </Surface>
+                  );
+                })}
+              </View>
             </View>
           )}
 
-          <View style={styles.sectionBox}>
-            <Text style={styles.sectionTitle}>✍️ Şimdi sen</Text>
-            <Text style={styles.productionInstruction}>{current.productionTask.instruction}</Text>
-            <TextInput
-              style={[styles.productionInput, isRtl(pack.script) && styles.rtl]}
-              value={production}
-              onChangeText={setProduction}
-              onEndEditing={() => {
-                // Yazım bittiğinde sayılır — ilk harfte değil (dürüst sayaç).
-                if (production.trim().length > 0) void recordStat("produced");
-              }}
-              placeholder="Cevabını buraya yaz…"
-              placeholderTextColor={colors.inkFaint}
-              multiline
-            />
-            <TouchableOpacity onPress={() => setShowExample((v) => !v)}>
-              <Text style={styles.exampleToggle}>
-                {showExample ? "Örneği gizle" : "Örneği gör"}
-              </Text>
-            </TouchableOpacity>
-            {showExample && (
-              <Text style={[styles.exampleText, isRtl(pack.script) && styles.rtl]}>
-                {current.productionTask.example}
-              </Text>
-            )}
+          <View style={{ marginTop: 22 }}>
+            <SectionLabel title="Şimdi sen" />
+            <Surface style={{ gap: 10 }}>
+              <Txt variant="callout">{current.productionTask.instruction}</Txt>
+              <TextInput
+                style={[styles.productionInput, rtl && styles.rtl]}
+                value={production}
+                onChangeText={setProduction}
+                onEndEditing={() => {
+                  // Yazım bittiğinde sayılır — ilk harfte değil (dürüst sayaç).
+                  if (production.trim().length > 0) void recordStat("produced");
+                }}
+                placeholder="Cevabını buraya yaz…"
+                placeholderTextColor={colors.inkFaint}
+                multiline
+              />
+              <PressableScale onPress={() => setShowExample((v) => !v)} accessibilityLabel="Örnek" haptic={false}>
+                <Txt variant="caption" color={colors.accentDark} style={{ fontWeight: "800" }}>
+                  {showExample ? "Örneği gizle" : "Örneği gör"}
+                </Txt>
+              </PressableScale>
+              {showExample && (
+                <TargetText size={rtl ? 20 : 16} align={rtl ? "right" : "left"}>
+                  {current.productionTask.example}
+                </TargetText>
+              )}
+            </Surface>
           </View>
 
-          <TouchableOpacity
-            style={[styles.finishButton, !allAnswered && styles.finishDisabled]}
+          <Button
+            style={{ marginTop: 20 }}
+            icon={allAnswered ? "award" : undefined}
+            label={current.finishedAt ? "Yeniden bitir" : allAnswered ? "Okumayı bitir" : "Önce soruları cevapla"}
             disabled={!allAnswered}
             onPress={() => void finishReading()}
-          >
-            <Text style={styles.finishText}>
-              {current.finishedAt
-                ? "🏁 Yeniden bitir"
-                : allAnswered
-                  ? "🏁 Okumayı bitir"
-                  : "Önce soruları cevapla"}
-            </Text>
-          </TouchableOpacity>
+          />
         </ScrollView>
       </View>
     );
@@ -466,85 +514,71 @@ export default function ReadingScreen({ profile, onBack }: Props) {
   if (view === "create") {
     const scenarioChips = pack.scenarios
       .split(",")
-      .map((s) => s.trim())
+      .map((x) => x.trim())
       .filter(Boolean)
       .slice(0, 6);
     return (
-      <View style={styles.container}>
-        <Header title="Yeni Metin" subtitle="konu ve uzunluk seç" onBack={() => setView("list")} />
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {error && (
-            <View style={styles.warnBand}>
-              <Text style={styles.warnText}>{error}</Text>
-            </View>
+      <Screen
+        header={<Header title="Yeni Metin" subtitle="konu ve uzunluk seç" onBack={() => setView("list")} />}
+        footer={
+          <View style={{ gap: 8 }}>
+            <Button icon="sparkles" label="Metni hazırla" onPress={() => confirmGenerate()} />
+            <Txt variant="caption" color={colors.inkFaint} center>
+              Üretim bir API isteği harcar; okuması, dinlemesi ve soruları sonsuza dek bedava.
+            </Txt>
+          </View>
+        }
+      >
+        {error && (
+          <Surface tone="sunken" style={{ marginBottom: 12 }}>
+            <Txt variant="callout" color={colors.danger}>
+              {error}
+            </Txt>
+          </Surface>
+        )}
+        <SectionLabel title="Konu" />
+        <View style={styles.chipsWrap}>
+          {nextReadingModule && (
+            <Chip
+              icon="layers"
+              label={`Müfredattan: ${nextReadingModule.title}`}
+              selected={moduleId === nextReadingModule.id}
+              onPress={() => {
+                setModuleId(moduleId === nextReadingModule.id ? undefined : nextReadingModule.id);
+                setTopic("");
+              }}
+            />
           )}
-          <Text style={styles.formLabel}>Konu</Text>
-          <View style={styles.chipsWrap}>
-            {nextReadingModule && (
-              <TouchableOpacity
-                style={[styles.chip, moduleId === nextReadingModule.id && styles.chipActive]}
-                onPress={() => {
-                  setModuleId(moduleId === nextReadingModule.id ? undefined : nextReadingModule.id);
-                  setTopic("");
-                }}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    moduleId === nextReadingModule.id && styles.chipTextActive,
-                  ]}
-                >
-                  📚 Müfredattan: {nextReadingModule.title}
-                </Text>
-              </TouchableOpacity>
-            )}
-            {scenarioChips.map((s) => (
-              <TouchableOpacity
-                key={s}
-                style={[styles.chip, topic === s && styles.chipActive]}
-                onPress={() => {
-                  setTopic(topic === s ? "" : s);
-                  setModuleId(undefined);
-                }}
-              >
-                <Text style={[styles.chipText, topic === s && styles.chipTextActive]}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TextInput
-            style={styles.topicInput}
-            value={topic}
-            onChangeText={(t) => {
-              setTopic(t);
-              if (t) setModuleId(undefined);
-            }}
-            placeholder="…ya da kendi konunu yaz (boş bırakırsan hoca seçer)"
-            placeholderTextColor={colors.inkFaint}
-          />
+          {scenarioChips.map((x) => (
+            <Chip
+              key={x}
+              label={x}
+              selected={topic === x}
+              onPress={() => {
+                setTopic(topic === x ? "" : x);
+                setModuleId(undefined);
+              }}
+            />
+          ))}
+        </View>
+        <TextInput
+          style={styles.topicInput}
+          value={topic}
+          onChangeText={(t) => {
+            setTopic(t);
+            if (t) setModuleId(undefined);
+          }}
+          placeholder="…ya da kendi konunu yaz (boş bırakırsan hoca seçer)"
+          placeholderTextColor={colors.inkFaint}
+        />
 
-          <Text style={styles.formLabel}>Uzunluk</Text>
-          <View style={styles.chipsWrap}>
-            {(Object.keys(LENGTH_SPECS) as ReadingLength[]).map((l) => (
-              <TouchableOpacity
-                key={l}
-                style={[styles.chip, length === l && styles.chipActive]}
-                onPress={() => setLength(l)}
-              >
-                <Text style={[styles.chipText, length === l && styles.chipTextActive]}>
-                  {LENGTH_SPECS[l].label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <TouchableOpacity style={styles.primaryButton} onPress={() => confirmGenerate()}>
-            <Text style={styles.primaryButtonText}>✨ Metni hazırla</Text>
-          </TouchableOpacity>
-          <Text style={styles.costNote}>
-            Üretim bir API isteği harcar; okuması, dinlemesi ve soruları sonsuza dek bedava.
-          </Text>
-        </ScrollView>
-      </View>
+        <SectionLabel title="Uzunluk" style={{ marginTop: 22 }} />
+        <Segmented<ReadingLength>
+          options={(Object.keys(LENGTH_SPECS) as ReadingLength[]).map((l) => ({ key: l, label: LENGTH_SPECS[l].label }))}
+          value={length}
+          onChange={setLength}
+        />
+      </Screen>
     );
   }
 
@@ -555,267 +589,107 @@ export default function ReadingScreen({ profile, onBack }: Props) {
         title="Okuma Salonu"
         subtitle={`${library.length} metin`}
         onBack={onBack}
-        right={
-          <TouchableOpacity style={styles.newButton} onPress={() => setView("create")}>
-            <Text style={styles.newButtonText}>＋ Yeni</Text>
-          </TouchableOpacity>
-        }
+        right={<Button size="sm" icon="plus" label="Yeni" onPress={() => setView("create")} />}
       />
       {library.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyEmoji}>📖</Text>
-          <Text style={styles.emptyTitle}>Sana özel okuma metinleri</Text>
-          <Text style={styles.emptyText}>
-            {pack.teacherName}, kelime defterindeki kelimelerden — %98'i senin bildiğin,
-            %2'si tam kıvamında yeni — özgün metinler yazar. Okur, dinler, soruları çözersin;
-            tekrarı gelen kelimeler metnin içinde kendiliğinden tekrar edilir.
-          </Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => setView("create")}>
-            <Text style={styles.primaryButtonText}>İlk metnini hazırlat</Text>
-          </TouchableOpacity>
-        </View>
+        <Empty
+          icon="bookOpen"
+          title="Sana özel okuma metinleri"
+          text={`${pack.teacherName}, kelime defterindeki kelimelerden — %98'i senin bildiğin, %2'si tam kıvamında yeni — özgün metinler yazar. Okur, dinler, soruları çözersin; tekrarı gelen kelimeler metnin içinde kendiliğinden tekrar edilir.`}
+          action={<Button icon="sparkles" label="İlk metnini hazırlat" onPress={() => setView("create")} style={{ marginTop: 10 }} />}
+        />
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
-          {library.map((r) => (
-            <TouchableOpacity
-              key={r.id}
-              style={styles.libCard}
-              activeOpacity={0.85}
-              onPress={() => openReader(r)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.libTitleTr}>{r.titleTr}</Text>
-                <Text style={[styles.libTitle, isRtl(pack.script) && styles.rtl]}>{r.title}</Text>
-                <Text style={styles.libMeta}>
-                  {LENGTH_SPECS[r.length].label} · {r.level} · {r.createdAt.slice(0, 10)}
-                </Text>
-                <Text style={styles.libBadge}>{badge(r)}</Text>
-              </View>
-              <Text style={styles.libRight}>
-                {r.finishedAt ? `✅ ${r.quizCorrect}/${r.quizTotal}` : "›"}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <View style={{ gap: 12 }}>
+            {library.map((r) => (
+              <PressableScale key={r.id} onPress={() => openReader(r)} accessibilityLabel={r.titleTr}>
+                <Surface style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Txt variant="title3">{r.titleTr}</Txt>
+                    <TargetText size={isRtl(pack.script) ? 19 : 15} align="left" color={colors.inkSoft}>
+                      {r.title}
+                    </TargetText>
+                    <Txt variant="caption" color={colors.inkFaint}>
+                      {LENGTH_SPECS[r.length].label} · {r.level} · {r.createdAt.slice(0, 10)}
+                    </Txt>
+                    {badgeView(r)}
+                  </View>
+                  {r.finishedAt ? (
+                    <View style={{ alignItems: "center", gap: 2 }}>
+                      <Icon name="award" size={20} color={colors.gold} />
+                      <Txt variant="caption" color={colors.gold} style={{ fontWeight: "800" }}>
+                        {`${r.quizCorrect}/${r.quizTotal}`}
+                      </Txt>
+                    </View>
+                  ) : (
+                    <Icon name="chevronRight" size={20} color={colors.inkFaint} />
+                  )}
+                </Surface>
+              </PressableScale>
+            ))}
+          </View>
         </ScrollView>
       )}
     </View>
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 28 },
-  body: { padding: 16, paddingBottom: 40 },
-  loadingTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
-  loadingText: { fontSize: 13, color: colors.inkSoft, textAlign: "center", lineHeight: 20 },
-  // writingDirection Android'de etkisizdir; yön BiDi ile içerikten çıkar.
-  // Arapça fontu ve letterSpacing:0 burada verilir (bitişik yazı kopmasın).
-  rtl: { textAlign: "right", fontFamily: ARABIC_FONT, letterSpacing: 0 },
-  // 26/44 oranı (1.69) harekeleri kırpıyordu; arabicText 2.25 kuralını uygular.
-  rtlBig: { ...arabicText(26), textAlign: "right" },
-  warnBand: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: radius.md,
-    padding: 12,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  warnText: { flex: 1, color: colors.ink, fontSize: 13, lineHeight: 19 },
-  warnAction: { color: colors.gold, fontWeight: "800", fontSize: 13 },
-  title: { fontSize: 24, fontWeight: "800", color: colors.ink, marginBottom: 4 },
-  badgeLine: { fontSize: 12, color: colors.inkSoft, marginBottom: 12 },
-  listenRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
-  listenButton: {
-    flex: 1,
-    backgroundColor: colors.accentSoft,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  listenText: { color: colors.accent, fontSize: 14, fontWeight: "700" },
-  sentenceCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    marginBottom: 10,
-    ...shadow,
-  },
-  sentenceActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  sentenceTarget: { fontSize: 17, color: colors.ink, lineHeight: 27 },
-  revealBlock: { marginTop: 8, gap: 3 },
-  sentenceTranslit: { fontSize: 13.5, color: colors.accent, fontWeight: "600" },
-  sentenceTr: { fontSize: 13.5, color: colors.inkSoft, lineHeight: 19 },
-  revealHint: { fontSize: 11, color: colors.inkFaint, marginTop: 6 },
-  sentenceSpeakRow: {
-    flexDirection: "row",
-    gap: 14,
-    marginTop: 8,
-    justifyContent: "flex-end",
-  },
-  speakEmoji: { fontSize: 17 },
-  sectionBox: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    ...shadow,
-  },
-  sectionTitle: { fontSize: 15, fontWeight: "800", color: colors.ink, marginBottom: 8 },
-  sectionMeta: { fontSize: 13.5, color: colors.inkSoft, lineHeight: 21 },
-  newWordRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  newWordTarget: { fontSize: 19, color: colors.ink },
-  newWordMeta: { fontSize: 13, color: colors.inkSoft, marginTop: 2 },
-  newWordHint: { fontSize: 12, color: colors.gold, marginTop: 3, lineHeight: 17 },
-  addButton: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  addButtonDone: { backgroundColor: colors.bg },
-  addButtonText: { color: colors.accent, fontSize: 12, fontWeight: "800" },
-  addButtonTextDone: { color: colors.inkFaint },
-  questionBlock: { marginBottom: 12 },
-  questionText: { fontSize: 14.5, fontWeight: "700", color: colors.ink, marginBottom: 8 },
-  choice: {
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 6,
-  },
-  choiceCorrect: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  choiceWrong: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
-  choiceText: { fontSize: 13.5, color: colors.ink, lineHeight: 19 },
-  choiceTextCorrect: { fontWeight: "700", color: colors.accentDark },
-  productionInstruction: { fontSize: 13.5, color: colors.ink, lineHeight: 20, marginBottom: 10 },
-  productionInput: {
-    minHeight: 70,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 12,
-    fontSize: 15,
-    color: colors.ink,
-    backgroundColor: colors.bg,
-    textAlignVertical: "top",
-  },
-  exampleToggle: { color: colors.accent, fontWeight: "700", fontSize: 13, marginTop: 10 },
-  exampleText: {
-    marginTop: 8,
-    fontSize: 15,
-    color: colors.inkSoft,
-    backgroundColor: colors.bg,
-    borderRadius: 10,
-    padding: 10,
-    lineHeight: 24,
-  },
-  finishButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 10,
-    ...shadowLift,
-  },
-  finishDisabled: { opacity: 0.4 },
-  finishText: { color: "#FFFFFF", fontSize: 15.5, fontWeight: "800" },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: colors.inkSoft,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 8,
-    marginTop: 6,
-  },
-  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
-  chip: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-  },
-  chipActive: { backgroundColor: colors.deep, borderColor: colors.deep },
-  chipText: { fontSize: 13, color: colors.ink, fontWeight: "600" },
-  chipTextActive: { color: colors.onDeep },
-  topicInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 12,
-    fontSize: 14.5,
-    color: colors.ink,
-    backgroundColor: colors.card,
-    marginBottom: 14,
-  },
-  primaryButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
-    paddingHorizontal: 30,
-    alignItems: "center",
-    marginTop: 8,
-    ...shadowLift,
-  },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 15.5, fontWeight: "800" },
-  costNote: {
-    fontSize: 12,
-    color: colors.inkFaint,
-    textAlign: "center",
-    marginTop: 10,
-    lineHeight: 17,
-  },
-  newButton: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  newButtonText: { color: colors.gold, fontWeight: "800", fontSize: 12 },
-  emptyEmoji: { fontSize: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: "800", color: colors.ink },
-  emptyText: { fontSize: 13.5, color: colors.inkSoft, textAlign: "center", lineHeight: 20 },
-  libCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    marginBottom: 10,
-    ...shadow,
-  },
-  libTitleTr: { fontSize: 15.5, fontWeight: "800", color: colors.ink },
-  libTitle: { fontSize: 15, color: colors.inkSoft, marginTop: 2 },
-  libMeta: { fontSize: 11.5, color: colors.inkFaint, marginTop: 4 },
-  libBadge: { fontSize: 11.5, color: colors.inkSoft, marginTop: 3 },
-  libRight: { fontSize: 15, color: colors.inkFaint, fontWeight: "700" },
-});
+    container: { flex: 1, backgroundColor: colors.bg },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 28 },
+    body: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 40 },
+    title: { fontFamily: "Fraunces", fontWeight: "600", fontSize: 26, lineHeight: 32, color: colors.ink },
+    rtl: { writingDirection: "rtl", textAlign: "right" },
+    rtlBig: { writingDirection: "rtl", textAlign: "right", ...arabicText(24) },
+    listenRow: { flexDirection: "row", gap: 10, alignItems: "center", marginBottom: 16 },
+    sentenceCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      ...shadow,
+    },
+    sentenceActive: { borderColor: colors.goldDeep, backgroundColor: colors.goldSoft },
+    sentenceTarget: { fontFamily: "Manrope", fontWeight: "700", fontSize: 18, lineHeight: 26, color: colors.ink },
+    sentenceSpeakRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+    newWordRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+    choice: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: colors.bg,
+    },
+    productionInput: {
+      minHeight: 90,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      padding: 14,
+      fontFamily: "Manrope",
+      fontSize: 16,
+      color: colors.ink,
+      backgroundColor: colors.bg,
+      textAlignVertical: "top",
+    },
+    chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    topicInput: {
+      marginTop: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      fontFamily: "Manrope",
+      fontSize: 15,
+      color: colors.ink,
+      backgroundColor: colors.card,
+    },
+  });
 }

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import { Bar, Empty, Ring, StarPattern, Surface, TeacherAvatar, Txt } from "../components/kit";
 import { averageQuality, lessonFindings } from "../lessonquality";
 import type { LessonQuality, QualityFinding } from "../lessonquality";
 import { loadLessonQuality } from "../storage";
 import { getActivePack } from "../languages";
-import { colors, radius, shadow, shadowLift } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { Profile } from "../types";
@@ -59,131 +60,133 @@ export default function LevelScreen({ profile, onBack }: Props) {
     ? lessonFindings(quality, a?.speakingLevel ?? "A0")
     : [];
 
+  const levelCard = (track: "konusma" | "okuma", value: string, st: { d: number; t: number }) => (
+    <Surface raised style={{ flex: 1, alignItems: "center", gap: 6, paddingVertical: 20 }}>
+      <Ring progress={st.t ? st.d / st.t : 0} size={74} stroke={6} label={value} />
+      <Txt variant="headline" style={{ fontSize: 15 }}>
+        {pack.tracks[track].short}
+      </Txt>
+      <Txt variant="caption" color={colors.inkSoft}>
+        {st.d}/{st.t} modül
+      </Txt>
+    </Surface>
+  );
+
+  const markFor = (lvl: QualityFinding["level"]) =>
+    lvl === "iyi"
+      ? { icon: "check" as const, color: colors.accentDark }
+      : lvl === "dikkat"
+        ? { icon: "alert" as const, color: colors.gold }
+        : { icon: "close" as const, color: colors.danger };
+
   return (
     <View style={styles.container}>
       <Header
         title="Seviye Raporu"
-        subtitle={`${pack.flag} ${pack.label} · ${pack.teacherName}'ın değerlendirmesi`}
+        subtitle={`${pack.label} · ${pack.teacherName}'ın değerlendirmesi`}
         onBack={onBack}
       />
       {!a ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyEmoji}>📋</Text>
-          <Text style={styles.emptyTitle}>Henüz değerlendirme yok</Text>
-          <Text style={styles.emptyText}>
-            Sıfırdan başlıyorsun. {pack.teacherName} seni derslerde tanıdıkça seviyeni
-            kendisi günceller; raporun burada oluşacak.
-          </Text>
-        </View>
+        <Empty
+          icon="chart"
+          title="Henüz değerlendirme yok"
+          text={`Sıfırdan başlıyorsun. ${pack.teacherName} seni derslerde tanıdıkça seviyeni kendisi günceller; raporun burada oluşacak.`}
+        />
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.levelRow}>
-            <View style={styles.levelCard}>
-              <Text style={styles.levelIcon}>{pack.tracks.konusma.icon}</Text>
-              <Text style={styles.levelValue}>{a.speakingLevel}</Text>
-              <Text style={styles.levelLabel}>{pack.tracks.konusma.short}</Text>
-              <Text style={styles.levelSub}>
-                {konusma.d}/{konusma.t} modül
-              </Text>
-            </View>
-            <View style={styles.levelCard}>
-              <Text style={styles.levelIcon}>{pack.tracks.okuma.icon}</Text>
-              <Text style={styles.levelValue}>{a.readingLevel}</Text>
-              <Text style={styles.levelLabel}>{pack.tracks.okuma.short}</Text>
-              <Text style={styles.levelSub}>
-                {okuma.d}/{okuma.t} modül
-              </Text>
-            </View>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            {levelCard("konusma", a.speakingLevel, konusma)}
+            {levelCard("okuma", a.readingLevel, okuma)}
           </View>
 
           {a.summary ? (
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>{pack.teacherName} ne diyor</Text>
-              <Text style={styles.summaryText}>{a.summary}</Text>
+              <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.08} />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <TeacherAvatar size={36} />
+                <Txt variant="overline" color={colors.goldDeep}>
+                  {`${pack.teacherName.toLocaleUpperCase("tr-TR")} NE DİYOR`}
+                </Txt>
+              </View>
+              <Txt variant="title3" color={colors.onDeep} style={{ marginTop: 12, fontWeight: "500" }}>
+                {a.summary}
+              </Txt>
             </View>
           ) : null}
 
           {a.strengths?.length > 0 && (
-            <View style={styles.listCard}>
-              <Text style={[styles.listTitle, { color: colors.accentDark }]}>
+            <Surface style={{ gap: 10 }}>
+              <Txt variant="headline" color={colors.accentDark} style={{ fontSize: 15 }}>
                 Güçlü yönlerin
-              </Text>
-              {a.strengths.map((s, i) => (
+              </Txt>
+              {a.strengths.map((x, i) => (
                 <View key={i} style={styles.listRow}>
-                  <Text style={[styles.listMark, { color: colors.accent }]}>✓</Text>
-                  <Text style={styles.listText}>{s}</Text>
+                  <Icon name="check" size={17} color={colors.accentDark} strokeWidth={2.6} />
+                  <Txt variant="callout" style={{ flex: 1 }}>
+                    {x}
+                  </Txt>
                 </View>
               ))}
-            </View>
+            </Surface>
           )}
 
           {a.weaknesses?.length > 0 && (
-            <View style={styles.listCard}>
-              <Text style={[styles.listTitle, { color: colors.gold }]}>
+            <Surface style={{ gap: 10 }}>
+              <Txt variant="headline" color={colors.gold} style={{ fontSize: 15 }}>
                 Üzerinde çalışılacaklar
-              </Text>
+              </Txt>
               {a.weaknesses.map((w, i) => (
                 <View key={i} style={styles.listRow}>
-                  <Text style={[styles.listMark, { color: colors.gold }]}>→</Text>
-                  <Text style={styles.listText}>{w}</Text>
+                  <Icon name="arrowRight" size={17} color={colors.gold} strokeWidth={2.4} />
+                  <Txt variant="callout" style={{ flex: 1 }}>
+                    {w}
+                  </Txt>
                 </View>
               ))}
-              <Text style={styles.listNote}>
+              <Txt variant="caption" color={colors.inkFaint}>
                 {pack.teacherName} bunları derslere doğal biçimde serpiştiriyor; düzeldikçe
                 listeden düşüyorlar.
-              </Text>
-            </View>
+              </Txt>
+            </Surface>
           )}
 
           {findings.length > 0 && (
-            <View style={styles.listCard}>
-              <Text style={[styles.listTitle, { color: colors.ink }]}>
+            <Surface style={{ gap: 10 }}>
+              <Txt variant="headline" style={{ fontSize: 15 }}>
                 {pack.teacherName} nasıl ders veriyor
-              </Text>
-              {findings.map((f) => (
-                <View key={f.key} style={styles.listRow}>
-                  <Text
-                    style={[
-                      styles.listMark,
-                      {
-                        color:
-                          f.level === "sorun"
-                            ? colors.danger
-                            : f.level === "dikkat"
-                              ? colors.gold
-                              : colors.accent,
-                      },
-                    ]}
-                  >
-                    {f.level === "iyi" ? "✓" : f.level === "dikkat" ? "!" : "✗"}
-                  </Text>
-                  <Text style={styles.listText}>{f.text}</Text>
-                </View>
-              ))}
-              <Text style={styles.listNote}>
+              </Txt>
+              {findings.map((f) => {
+                const mk = markFor(f.level);
+                return (
+                  <View key={f.key} style={styles.listRow}>
+                    <Icon name={mk.icon} size={17} color={mk.color} strokeWidth={2.4} />
+                    <Txt variant="callout" style={{ flex: 1 }}>
+                      {f.text}
+                    </Txt>
+                  </View>
+                );
+              })}
+              <Txt variant="caption" color={colors.inkFaint}>
                 Son {"\u00A0"}derslerin ortalaması; cihazda hesaplanır, hiçbir yere
                 gönderilmez. Latin alfabeli dillerde Türkçe/hedef dil ayrımı tahminîdir,
                 sayılar YAKLAŞIKTIR. {pack.teacherName} bu ölçümü her derste görüp
                 kendini düzeltir.
-              </Text>
-            </View>
+              </Txt>
+            </Surface>
           )}
 
           {total > 0 && (
-            <View style={styles.progressCard}>
-              <Text style={styles.progressLabel}>Müfredat ilerlemesi</Text>
-              <Text style={styles.progressValue}>
-                {done}/{total} modül
-              </Text>
-              <View style={styles.track}>
-                <View
-                  style={[
-                    styles.fill,
-                    { width: `${Math.max((done / total) * 100, 2)}%` },
-                  ]}
-                />
+            <Surface style={{ gap: 10 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Txt variant="callout" color={colors.inkSoft}>
+                  Müfredat ilerlemesi
+                </Txt>
+                <Txt variant="headline" style={{ fontSize: 15 }}>
+                  {done}/{total} modül
+                </Txt>
               </View>
-            </View>
+              <Bar progress={done / total} height={8} />
+            </Surface>
           )}
         </ScrollView>
       )}
@@ -191,75 +194,11 @@ export default function LevelScreen({ profile, onBack }: Props) {
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  body: { padding: 18, paddingBottom: 40 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
-  emptyEmoji: { fontSize: 46 },
-  emptyTitle: { fontSize: 19, fontWeight: "800", color: colors.ink },
-  emptyText: { fontSize: 14, color: colors.inkSoft, textAlign: "center", lineHeight: 21 },
-  levelRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
-  levelCard: {
-    flex: 1,
-    backgroundColor: colors.deep,
-    borderRadius: radius.lg,
-    padding: 16,
-    alignItems: "center",
-    ...shadowLift,
-  },
-  levelIcon: { fontSize: 22, marginBottom: 4 },
-  levelValue: { fontSize: 30, fontWeight: "800", color: colors.goldDeep },
-  levelLabel: { fontSize: 13, fontWeight: "700", color: colors.onDeep, marginTop: 2 },
-  levelSub: { fontSize: 11, color: colors.onDeepSoft, marginTop: 3 },
-  summaryCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.goldDeep,
-    padding: 16,
-    marginBottom: 14,
-    ...shadow,
-  },
-  summaryTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: colors.gold,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginBottom: 7,
-  },
-  summaryText: { fontSize: 15, color: colors.ink, lineHeight: 23 },
-  listCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginBottom: 14,
-    ...shadow,
-  },
-  listTitle: { fontSize: 13, fontWeight: "800", marginBottom: 10 },
-  listRow: { flexDirection: "row", gap: 9, marginBottom: 7, alignItems: "flex-start" },
-  listMark: { fontSize: 14, fontWeight: "800", marginTop: 1 },
-  listText: { flex: 1, fontSize: 14.5, color: colors.ink, lineHeight: 21 },
-  listNote: { fontSize: 12, color: colors.inkSoft, lineHeight: 18, marginTop: 6 },
-  progressCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    ...shadow,
-  },
-  progressLabel: { fontSize: 12, color: colors.inkSoft },
-  progressValue: { fontSize: 20, fontWeight: "800", color: colors.ink, marginVertical: 5 },
-  track: { height: 8, borderRadius: 4, backgroundColor: colors.bg, overflow: "hidden" },
-  fill: { height: "100%", borderRadius: 4, backgroundColor: colors.accent },
-});
+    container: { flex: 1, backgroundColor: colors.bg },
+    body: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 40, gap: 14 },
+    summaryCard: { backgroundColor: colors.deep, borderRadius: 26, padding: 20, overflow: "hidden" },
+    listRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  });
 }

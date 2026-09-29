@@ -1,14 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { AgentContext, TEACHER_TOOLS } from "../agent";
 import Header from "../components/Header";
+import { Button, IconTile, Screen, StarPattern, Surface, TeacherAvatar, Txt } from "../components/kit";
 import RichText from "../components/RichText";
 import { agenticChat, generateCurriculum } from "../claude";
 import { getActivePack } from "../languages";
@@ -31,7 +25,6 @@ import {
   loadRepairSeen,
   loadVocab,
 } from "../storage";
-import { colors, radius, shadow, shadowLift } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { Assessment, Curriculum, Profile } from "../types";
@@ -154,6 +147,18 @@ export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
       ? a.speakingLevel !== before.speakingLevel || a.readingLevel !== before.readingLevel
       : false;
 
+  const levelBox = (label: string, from: string, to: string) => (
+    <View style={styles.levelCard}>
+      <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.08} />
+      <Txt variant="caption" color={colors.onDeepSoft}>
+        {label}
+      </Txt>
+      <Txt variant="title2" color={colors.goldDeep}>
+        {`${from}${to !== from ? ` → ${to}` : ""}`}
+      </Txt>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <Header
@@ -164,120 +169,81 @@ export default function LevelUpScreen({ profile, onComplete, onBack }: Props) {
 
       {stage === "judging" || stage === "building" ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.busyTitle}>
-            {stage === "judging"
-              ? `${pack.teacherName} verilerine bakıyor…`
-              : "Yeni müfredatın hazırlanıyor…"}
-          </Text>
-          <Text style={styles.busySub}>
+          <TeacherAvatar size={80} speaking />
+          <Txt variant="title3" center>
+            {stage === "judging" ? `${pack.teacherName} verilerine bakıyor…` : "Yeni müfredatın hazırlanıyor…"}
+          </Txt>
+          <Txt variant="callout" color={colors.inkSoft} center>
             {stage === "judging"
               ? "Kelime hatırlama performansın, açık hataların ve bitirdiğin modüller inceleniyor."
               : "Bir üst seviye için 12-16 modül tasarlanıyor."}
-          </Text>
+          </Txt>
+          <ActivityIndicator color={colors.accent} />
         </View>
       ) : stage === "error" ? (
         <View style={styles.center}>
-          <Text style={styles.errEmoji}>😕</Text>
-          <Text style={styles.busyTitle}>İşlem tamamlanamadı</Text>
-          <Text style={styles.errText} selectable>
+          <IconTile icon="alert" tone="danger" size={56} />
+          <Txt variant="title3" center>
+            İşlem tamamlanamadı
+          </Txt>
+          <Txt variant="callout" color={colors.inkSoft} center selectable>
             {error}
-          </Text>
-          <TouchableOpacity style={styles.primary} onPress={() => void buildNext()}>
-            <Text style={styles.primaryText}>Tekrar dene</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondary} onPress={onBack}>
-            <Text style={styles.secondaryText}>Panele dön</Text>
-          </TouchableOpacity>
+          </Txt>
+          <View style={{ alignSelf: "stretch", gap: 10, marginTop: 8 }}>
+            <Button icon="refresh" label="Tekrar dene" onPress={() => void buildNext()} />
+            <Button variant="secondary" size="md" label="Panele dön" onPress={onBack} />
+          </View>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
+        <Screen
+          footer={
+            <View style={{ gap: 10 }}>
+              <Button icon="layers" label="Yeni müfredatı hazırla" onPress={() => void buildNext()} />
+              <Button variant="ghost" size="md" label="Şimdi değil" onPress={onBack} />
+            </View>
+          }
+        >
           {a && before && (
-            <View style={styles.levelRow}>
-              <View style={styles.levelCard}>
-                <Text style={styles.levelLabel}>{pack.tracks.konusma.short}</Text>
-                <Text style={styles.levelValue}>
-                  {before.speakingLevel}
-                  {a.speakingLevel !== before.speakingLevel ? ` → ${a.speakingLevel}` : ""}
-                </Text>
-              </View>
-              <View style={styles.levelCard}>
-                <Text style={styles.levelLabel}>{pack.tracks.okuma.short}</Text>
-                <Text style={styles.levelValue}>
-                  {before.readingLevel}
-                  {a.readingLevel !== before.readingLevel ? ` → ${a.readingLevel}` : ""}
-                </Text>
-              </View>
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 14 }}>
+              {levelBox(pack.tracks.konusma.short, before.speakingLevel, a.speakingLevel)}
+              {levelBox(pack.tracks.okuma.short, before.readingLevel, a.readingLevel)}
             </View>
           )}
 
-          <View style={styles.verdictCard}>
+          <Surface style={{ marginBottom: 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <TeacherAvatar size={32} ring={false} />
+              <Txt variant="headline" style={{ fontSize: 15 }}>
+                {pack.teacherName}'ın kararı
+              </Txt>
+            </View>
             <RichText content={verdict} style={styles.verdictText} scaleScript={isRtl(pack.script)} />
-          </View>
+          </Surface>
 
-          <Text style={styles.note}>
+          <Txt variant="caption" color={colors.inkSoft}>
             {rose
               ? "Yeni seviyene göre müfredatın baştan kurulacak; kelime defterin, hata defterin ve hoca hafızan aynen kalır."
               : "Seviyen aynı kalsa da yeni müfredat, eksik kalan yerlere odaklanacak şekilde kurulacak."}
-          </Text>
-
-          <TouchableOpacity style={styles.primary} onPress={() => void buildNext()} activeOpacity={0.85}>
-            <Text style={styles.primaryText}>Yeni müfredatı hazırla</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondary} onPress={onBack}>
-            <Text style={styles.secondaryText}>Şimdi değil</Text>
-          </TouchableOpacity>
-        </ScrollView>
+          </Txt>
+        </Screen>
       )}
     </View>
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
-  busyTitle: { fontSize: 17, fontWeight: "800", color: colors.ink, marginTop: 4 },
-  busySub: { fontSize: 13, color: colors.inkSoft, textAlign: "center", lineHeight: 19 },
-  errEmoji: { fontSize: 40 },
-  errText: { fontSize: 13, color: colors.inkSoft, textAlign: "center", lineHeight: 19 },
-  body: { padding: 18, paddingBottom: 40 },
-  levelRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
-  levelCard: {
-    flex: 1,
-    backgroundColor: colors.deep,
-    borderRadius: radius.lg,
-    padding: 14,
-    alignItems: "center",
-    ...shadow,
-  },
-  levelLabel: { fontSize: 12, color: colors.onDeepSoft, fontWeight: "700" },
-  levelValue: { fontSize: 21, fontWeight: "800", color: colors.goldDeep, marginTop: 3 },
-  verdictCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginBottom: 14,
-    ...shadow,
-  },
-  verdictText: { fontSize: 15, color: colors.ink, lineHeight: 23 },
-  note: { fontSize: 12.5, color: colors.inkSoft, lineHeight: 19, marginBottom: 18 },
-  primary: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
-    alignItems: "center",
-    ...shadowLift,
-  },
-  primaryText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
-  secondary: { paddingVertical: 12, alignItems: "center" },
-  secondaryText: { color: colors.accent, fontSize: 14, fontWeight: "700" },
-});
+    container: { flex: 1, backgroundColor: colors.bg },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
+    levelCard: {
+      flex: 1,
+      backgroundColor: colors.deep,
+      borderRadius: 20,
+      padding: 16,
+      alignItems: "center",
+      gap: 4,
+      overflow: "hidden",
+    },
+    verdictText: { fontFamily: "Manrope", fontWeight: "500", fontSize: 15.5, color: colors.ink, lineHeight: 24 },
+  });
 }

@@ -49,8 +49,8 @@ test("kartın ÜÇ parçası da görünür: hata, düzeltme, gerekçe", async ()
   // Biri eksik kalırsa kart öğretmez; sadece "bir şeyi yanlış yaptın" der.
   await saveMistakes([mistake()]);
   await open();
-  await waitFor(() => expect(screen.getByText(/✗ الكتابُ/)).toBeTruthy());
-  expect(screen.getByText(/✓ الكتابَ/)).toBeTruthy();
+  await waitFor(() => expect(screen.getByText(/الكتابُ/)).toBeTruthy());
+  expect(screen.getByText(/الكتابَ/)).toBeTruthy();
   expect(screen.getByText(/Mef'ûl mansûbtur/)).toBeTruthy();
   expect(screen.getByText("i'râb")).toBeTruthy();
 });
@@ -70,7 +70,7 @@ test("ÇÖZÜLMÜŞ kayıt silinmez, işaretlenir", async () => {
   await saveMistakes([mistake({ resolved: true })]);
   await open();
   await waitFor(() => expect(screen.getByText(/ÇÖZÜLDÜ/)).toBeTruthy());
-  expect(screen.getByText(/✗ الكتابُ/)).toBeTruthy();
+  expect(screen.getByText(/الكتابُ/)).toBeTruthy();
 });
 
 test("başlıktaki sayaç kayıt sayısını söyler", async () => {

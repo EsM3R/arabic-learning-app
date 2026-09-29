@@ -217,11 +217,11 @@ test("dinleme her cümleyi SAYAR ve sonunda takip biter", async () => {
 test("cevap KİLİTLENİR — deneme yanılmayla skor şişirilemez", async () => {
   await openReader(text());
   fireEvent.press(screen.getByText(/Küçük/)); // yanlış
-  await waitFor(() => expect(screen.getByText(/✗ Küçük/)).toBeTruthy());
-  expect(screen.getByText(/✓ Büyük/)).toBeTruthy(); // doğrusu da gösterilir
+  await waitFor(() => expect(screen.getByLabelText(/yanlış: Küçük/)).toBeTruthy());
+  expect(screen.getByLabelText(/doğru: Büyük/)).toBeTruthy(); // doğrusu da gösterilir
 
-  fireEvent.press(screen.getByText(/✓ Büyük/)); // ikinci deneme yok sayılmalı
-  await waitFor(() => expect(screen.getByText(/✗ Küçük/)).toBeTruthy());
+  fireEvent.press(screen.getByLabelText(/doğru: Büyük/)); // ikinci deneme yok sayılmalı
+  await waitFor(() => expect(screen.getByLabelText(/yanlış: Küçük/)).toBeTruthy());
 
   // Asıl ölçü ekrandaki işaret değil DİSKE YAZILAN skor: düzeltilebilen bir
   // cevap, tüm anlama ölçümünü değersiz kılardı.
@@ -258,7 +258,7 @@ test("bitirme SKORU diske yazar ve kütüphanede görünür", async () => {
   expect((await loadStatsSummary()).total.readingFinished).toBe(1);
 
   pressAlert(/Kütüphaneye dön/);
-  await waitFor(() => expect(screen.getByText("✅ 1/1")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("1/1")).toBeTruthy());
 });
 
 // --- deftere ekleme ---------------------------------------------------------

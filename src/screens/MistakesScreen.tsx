@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { FlatList, View } from "react-native";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import { Empty, Surface, Txt } from "../components/kit";
+import { ltrLine } from "../richtext";
 import { loadMistakes } from "../storage";
-import { colors, radius, shadow } from "../theme";
-import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { MistakeEntry } from "../types";
 
@@ -11,10 +12,9 @@ interface Props {
   onBack: () => void;
 }
 
+/** HATA DEFTERİ — hocanın kaydettiği hatalar; en yenisi üstte. */
 export default function MistakesScreen({ onBack }: Props) {
-  const colors = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-
+  const c = useTheme();
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -27,82 +27,59 @@ export default function MistakesScreen({ onBack }: Props) {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Hata Defteri" subtitle={`${mistakes.length} kayıt`} onBack={onBack} />
 
       {loaded && mistakes.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyEmoji}>📒</Text>
-          <Text style={styles.emptyTitle}>Defter tertemiz</Text>
-          <Text style={styles.emptyText}>
-            Derslerde anlamlı bir hata yaptığında hocan buraya kendisi kaydedecek ve sonraki
-            derslerde üzerinden geçecek.
-          </Text>
-        </View>
+        <Empty
+          icon="note"
+          title="Defter tertemiz"
+          text="Derslerde anlamlı bir hata yaptığında hocan buraya kendisi kaydedecek ve sonraki derslerde üzerinden geçecek."
+        />
       ) : (
         <FlatList
           data={mistakes}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 6, paddingBottom: 32, gap: 12 }}
           renderItem={({ item }) => (
-            <View style={[styles.card, item.resolved && styles.cardResolved]}>
-              <View style={styles.topicRow}>
-                <Text style={styles.topic}>{item.topic}</Text>
-                {item.resolved && <Text style={styles.resolvedBadge}>✓ ÇÖZÜLDÜ</Text>}
+            <Surface style={[{ gap: 8 }, item.resolved && { opacity: 0.6 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Txt variant="overline" color={c.gold} style={{ flex: 1 }} numberOfLines={1}>
+                  {item.topic}
+                </Txt>
+                {(item.timesSeen ?? 1) >= 3 && !item.resolved && (
+                  <Txt variant="caption" color={c.danger} style={{ fontWeight: "800" }}>
+                    {item.timesSeen}×
+                  </Txt>
+                )}
+                {item.resolved && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Icon name="check" size={13} color={c.accentDark} strokeWidth={2.8} />
+                    <Txt variant="overline" color={c.accentDark} style={{ fontSize: 10 }}>
+                      ÇÖZÜLDÜ
+                    </Txt>
+                  </View>
+                )}
               </View>
-              <Text style={styles.mistake}>✗ {item.mistake}</Text>
-              <Text style={styles.correction}>✓ {item.correction}</Text>
-              <Text style={styles.explanation}>{item.explanation}</Text>
-            </View>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
+                <Icon name="close" size={16} color={c.danger} strokeWidth={2.6} />
+                <Txt variant="body" color={c.danger} style={{ flex: 1 }}>
+                  {item.mistake}
+                </Txt>
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
+                <Icon name="check" size={16} color={c.accentDark} strokeWidth={2.6} />
+                <Txt variant="bodyStrong" color={c.accentDark} style={{ flex: 1 }}>
+                  {item.correction}
+                </Txt>
+              </View>
+              <Txt variant="callout" color={c.inkSoft}>
+                {ltrLine(item.explanation)}
+              </Txt>
+            </Surface>
           )}
         />
       )}
     </View>
   );
-}
-
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
-function makeStyles(colors: Palette) {
-  return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: { fontSize: 20, fontWeight: "700", color: colors.ink },
-  emptyText: { fontSize: 14, color: colors.inkSoft, textAlign: "center", lineHeight: 21 },
-  list: { padding: 16 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.danger,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 15,
-    marginBottom: 11,
-    ...shadow,
-  },
-  cardResolved: { opacity: 0.65, borderLeftColor: colors.accent },
-  topicRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-    gap: 8,
-  },
-  topic: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.gold,
-    textTransform: "uppercase",
-    flex: 1,
-  },
-  resolvedBadge: { fontSize: 10, fontWeight: "800", color: colors.accent },
-  mistake: { fontSize: 15, color: colors.danger, marginBottom: 4 },
-  correction: { fontSize: 15, color: colors.accent, fontWeight: "600", marginBottom: 6 },
-  explanation: { fontSize: 13, color: colors.inkSoft, lineHeight: 19 },
-});
 }

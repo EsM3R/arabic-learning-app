@@ -1,14 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Header from "../components/Header";
-import { ProgressBar } from "../components/ui";
+import Icon from "../components/Icon";
+import {
+  Badge,
+  Bar,
+  Button,
+  Chip,
+  Empty,
+  IconButton,
+  PressableScale,
+  Segmented,
+  Surface,
+  Txt,
+  Wave,
+} from "../components/kit";
+import { ltrLine } from "../richtext";
 import { feedback } from "../feedback";
 import { getActivePack } from "../languages";
 import { speakTarget } from "../speech";
@@ -19,7 +26,7 @@ import { recordStat, recordStats } from "../statsStore";
 import type { StatEvent } from "../stats";
 import { loadReviewMode, loadVocab, saveReviewMode, saveVocab, touchLastActivity } from "../storage";
 import { matchProduction, ProductionMatch } from "../textnorm";
-import { colors, radius, shadow, shadowLift, targetText } from "../theme";
+import { targetText } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { ReviewGrade, VocabCard } from "../types";
@@ -193,6 +200,27 @@ export default function ReviewScreen({ onBack }: Props) {
   const wrongAnswered = phase === "sonuc" && matchKind === "none";
   const showProduction = direction === "uretim" && mode === "yaz";
 
+  const total = doneCount + queue.length;
+  const speakBtns = (
+    <View style={styles.listenRow}>
+      <Chip icon="volume" label="Dinle" onPress={() => current && speakTarget(current.arabic)} />
+      <Chip icon="slow" label="Yavaş" onPress={() => current && speakTarget(current.arabic, true)} />
+    </View>
+  );
+  const micHint = dictation.listening ? (
+    <View style={styles.listeningRow}>
+      <Wave active color={colors.accent} />
+      <Txt variant="callout" color={colors.inkSoft} style={{ fontStyle: "italic", flexShrink: 1 }}>
+        {dictation.partial || "Dinliyorum…"}
+      </Txt>
+    </View>
+  ) : null;
+  const micError = dictation.error ? (
+    <Txt variant="caption" color={colors.danger} center>
+      {dictation.error}
+    </Txt>
+  ) : null;
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
       <Header
@@ -200,110 +228,109 @@ export default function ReviewScreen({ onBack }: Props) {
         subtitle={`${allCards.length} kelime · bugün ${queue.length} tekrar`}
         onBack={onBack}
         right={
-          <View style={styles.modeToggle}>
-            {(["yaz", "soyle"] as ReviewMode[]).map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.modeChip, mode === m && styles.modeChipActive]}
-                onPress={() => toggleMode(m)}
-              >
-                <Text style={[styles.modeChipText, mode === m && styles.modeChipTextActive]}>
-                  {m === "yaz" ? "✍️ Yaz" : "🗣️ Söyle"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Segmented<ReviewMode>
+            options={[
+              { key: "yaz", label: "Yaz" },
+              { key: "soyle", label: "Söyle" },
+            ]}
+            value={mode}
+            onChange={toggleMode}
+          />
         }
       />
 
       {!loaded ? null : !current ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyEmoji}>{allCards.length === 0 ? "📇" : "🎉"}</Text>
-          <Text style={styles.emptyTitle}>
-            {allCards.length === 0 ? "Defter henüz boş" : "Bugünlük bitti!"}
-          </Text>
-          <Text style={styles.emptyText}>
-            {allCards.length === 0
+        <Empty
+          icon={allCards.length === 0 ? "book" : "award"}
+          title={allCards.length === 0 ? "Defter henüz boş" : "Bugünlük bitti!"}
+          text={
+            allCards.length === 0
               ? `${pack.teacherName} ile ders yaptıkça bilmediğin kelimeleri buraya kendisi ekleyecek.`
               : doneCount > 0
                 ? `${doneCount} kelime tekrar ettin. Yarın yenileri seni bekliyor.`
-                : "Şu an tekrarı gelen kelime yok. Yarın tekrar bak."}
-          </Text>
-        </View>
+                : "Şu an tekrarı gelen kelime yok. Yarın tekrar bak."
+          }
+        />
       ) : (
-        <View style={styles.cardArea}>
+        <ScrollView contentContainerStyle={styles.cardArea} keyboardShouldPersistTaps="handled">
           {/* Oturum ilerlemesi: kaç kart kaldığı görünmüyordu, bitiş belirsizdi. */}
           <View style={styles.sessionRow}>
-            <ProgressBar progress={doneCount / Math.max(doneCount + queue.length, 1)} />
-            <Text style={styles.sessionText}>
-              {doneCount} / {doneCount + queue.length}
-            </Text>
+            <Bar progress={doneCount / Math.max(total, 1)} style={{ flex: 1 }} />
+            <Txt variant="caption" color={colors.inkSoft} style={{ fontWeight: "800" }}>
+              {doneCount} / {total}
+            </Txt>
           </View>
-          <View style={styles.card}>
+
+          <Surface raised style={styles.card}>
             {direction === "tanima" ? (
               // ------------------------- TANIMA (yeni kart ilk görüş)
               <>
-                <Text style={styles.newBadge}>🌱 Yeni kelime — önce tanı</Text>
-                <Text style={[styles.targetWord, targetText(40, pack.script)]}>{current.arabic}</Text>
+                <View style={styles.newBadge}>
+                  <Icon name="sparkles" size={13} color={colors.gold} />
+                  <Txt variant="caption" color={colors.gold} style={{ fontWeight: "800" }}>
+                    Yeni kelime — önce tanı
+                  </Txt>
+                </View>
+                <Text style={[styles.targetWord, targetText(42, pack.script)]}>{current.arabic}</Text>
                 <View style={styles.listenRow}>
-                  <TouchableOpacity
-                    style={styles.listenChip}
-                    onPress={() => speakTarget(current.arabic)}
-                  >
-                    <Text style={styles.listenChipText}>🔊 Dinle</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.listenChip}
-                    onPress={() => speakTarget(current.arabic, true)}
-                  >
-                    <Text style={styles.listenChipText}>🐢 Yavaş</Text>
-                  </TouchableOpacity>
+                  <Chip icon="volume" label="Dinle" onPress={() => speakTarget(current.arabic)} />
+                  <Chip icon="slow" label="Yavaş" onPress={() => speakTarget(current.arabic, true)} />
                   {/* Yeni kelimenin doğal alıştırması "dinle ve tekrarla"dır.
                       Kelime görünür olduğu için bu hatırlama değil TELAFFUZ
                       denemesidir: sayaçlara işler ama kartı notlamaz. */}
-                  <TouchableOpacity
-                    style={[styles.listenChip, dictation.listening && styles.listeningButton]}
+                  <IconButton
+                    icon={dictation.listening ? "stop" : "mic"}
+                    label="Basılı tut"
+                    variant={dictation.listening ? "deep" : "soft"}
+                    size={36}
                     onPressIn={() => dictation.start()}
                     onPressOut={() => dictation.stop()}
-                  >
-                    <Text
-                      style={[
-                        styles.listenChipText,
-                        dictation.listening && styles.listenChipTextOn,
-                      ]}
-                    >
-                      {dictation.listening ? "● Dinliyorum" : "🎙️ Basılı tut"}
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 </View>
-                {dictation.listening && (
-                  <Text style={styles.listeningText}>{dictation.partial || "Dinliyorum…"}</Text>
-                )}
-                {dictation.error && <Text style={styles.micErrorText}>{dictation.error}</Text>}
+                {micHint}
+                {micError}
                 {speech && !dictation.listening && (
                   <>
-                    <Text style={styles.speechVerdict}>{speech.message}</Text>
-                    <Text style={styles.speechNote}>{RECOGNITION_NOTE}</Text>
+                    <Txt variant="bodyStrong" color={speech.verdict === "dogru" ? colors.accentDark : colors.gold} center>
+                      {speech.message}
+                    </Txt>
+                    <Txt variant="caption" color={colors.inkFaint} center>
+                      {RECOGNITION_NOTE}
+                    </Txt>
                   </>
                 )}
                 {revealed ? (
-                  <>
-                    <Text style={styles.translit}>{current.transliteration}</Text>
-                    <Text style={styles.turkish}>{current.turkish}</Text>
-                    {current.note ? <Text style={styles.note}>{current.note}</Text> : null}
-                  </>
+                  <View style={{ alignItems: "center", gap: 4 }}>
+                    {!!current.transliteration && (
+                      <Txt variant="callout" color={colors.inkSoft} style={{ fontStyle: "italic" }}>
+                        {current.transliteration}
+                      </Txt>
+                    )}
+                    <Txt variant="title2" center>
+                      {current.turkish}
+                    </Txt>
+                    {current.note ? (
+                      <Txt variant="caption" color={colors.inkSoft} center>
+                        {ltrLine(current.note)}
+                      </Txt>
+                    ) : null}
+                  </View>
                 ) : (
-                  <Text style={styles.prompt}>Anlamını hatırlıyor musun?</Text>
+                  <Txt variant="callout" color={colors.inkSoft} center>
+                    Anlamını hatırlıyor musun?
+                  </Txt>
                 )}
               </>
             ) : phase === "sor" ? (
               // ------------------------- ÜRETİM — SORU
               <>
-                <Text style={styles.hintLabel}>Hedef dilde nasıl söylersin?</Text>
-                <Text style={styles.turkishBig}>{current.turkish}</Text>
-                <Text style={styles.trackTag}>
-                  {pack.tracks[current.track].icon} {pack.tracks[current.track].short}
-                </Text>
+                <Txt variant="overline" color={colors.inkSoft}>
+                  HEDEF DİLDE NASIL SÖYLERSİN?
+                </Txt>
+                <Txt variant="display" center>
+                  {current.turkish}
+                </Txt>
+                <Badge text={pack.tracks[current.track].short} tone="gold" />
                 {showProduction ? (
                   <>
                     <TextInput
@@ -324,350 +351,214 @@ export default function ReviewScreen({ onBack }: Props) {
                       autoFocus
                     />
                     {needsTranslit(pack.script) && (
-                      <Text style={styles.translitNote}>
-                        {pack.label} klavyen yoksa Latin okunuşuyla yazabilirsin — yazabilir
-                        ya da söyleyebilirsin, ikisi de sayılır.
-                      </Text>
+                      <Txt variant="caption" color={colors.inkFaint} center>
+                        {pack.label} klavyen yoksa Latin okunuşuyla yazabilirsin — yazabilir ya da
+                        söyleyebilirsin, ikisi de sayılır.
+                      </Txt>
                     )}
                   </>
                 ) : (
-                  <Text style={styles.prompt}>
+                  <Txt variant="callout" color={colors.inkSoft} center>
                     Mikrofonu BASILI TUT, hedef dilde söyle, sonra bırak.
-                  </Text>
+                  </Txt>
                 )}
-                {/* Mikrofon durumu artık kipten bağımsız: "yaz" modunda da
-                    söyleyebilirsin. Eskiden mikrofon yalnız "söyle" kipinde
-                    vardı ve öğrenci ekranda mikrofon bulamıyordu. */}
-                {dictation.listening && (
-                  <Text style={styles.listeningText}>
-                    {dictation.partial || "Dinliyorum…"}
-                  </Text>
-                )}
-                {dictation.error && <Text style={styles.micErrorText}>{dictation.error}</Text>}
+                {micHint}
+                {micError}
               </>
             ) : (
               // ------------------------- ÜRETİM — SONUÇ
               <>
                 {matchKind !== "none" ? (
-                  <Text style={styles.correctBanner}>
-                    ✅ Doğru!
-                    {matchKind === "translit" ? " (okunuşuyla yazdın)" : ""}
-                  </Text>
+                  <View style={[styles.banner, { backgroundColor: colors.accentSoft }]}>
+                    <Icon name="check" size={16} color={colors.accentDark} strokeWidth={2.8} />
+                    <Txt variant="bodyStrong" color={colors.accentDark}>
+                      {`Doğru!${matchKind === "translit" ? " (okunuşuyla yazdın)" : ""}`}
+                    </Txt>
+                  </View>
                 ) : mode === "yaz" && answer.trim() ? (
-                  <Text style={styles.wrongBanner}>Doğrusu:</Text>
+                  <View style={[styles.banner, { backgroundColor: colors.dangerSoft }]}>
+                    <Txt variant="bodyStrong" color={colors.danger}>
+                      Doğrusu:
+                    </Txt>
+                  </View>
                 ) : null}
-                <Text style={[styles.targetWord, targetText(40, pack.script)]}>{current.arabic}</Text>
-                <Text style={styles.translit}>{current.transliteration}</Text>
-                <View style={styles.listenRow}>
-                  <TouchableOpacity
-                    style={styles.listenChip}
-                    onPress={() => speakTarget(current.arabic)}
-                  >
-                    <Text style={styles.listenChipText}>🔊 Dinle</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.listenChip}
-                    onPress={() => speakTarget(current.arabic, true)}
-                  >
-                    <Text style={styles.listenChipText}>🐢 Yavaş</Text>
-                  </TouchableOpacity>
-                </View>
-                {current.note ? <Text style={styles.note}>{current.note}</Text> : null}
+                <Text style={[styles.targetWord, targetText(42, pack.script)]}>{current.arabic}</Text>
+                {!!current.transliteration && (
+                  <Txt variant="callout" color={colors.inkSoft} style={{ fontStyle: "italic" }}>
+                    {current.transliteration}
+                  </Txt>
+                )}
+                {speakBtns}
+                {current.note ? (
+                  <Txt variant="caption" color={colors.inkSoft} center>
+                    {ltrLine(current.note)}
+                  </Txt>
+                ) : null}
                 {speech && speech.verdict !== "dogru" && (
-                  <Text style={styles.speechVerdict}>{speech.message}</Text>
+                  <Txt variant="callout" color={colors.gold} center>
+                    {speech.message}
+                  </Txt>
                 )}
                 {matchKind === "none" && !speech && answer.trim().length > 0 && (
-                  <Text style={styles.yourAnswer}>Senin cevabın: {answer.trim()}</Text>
+                  <Txt variant="caption" color={colors.inkSoft}>
+                    Senin cevabın: {answer.trim()}
+                  </Txt>
                 )}
               </>
             )}
-          </View>
+          </Surface>
 
-          {/* ---------------- alt butonlar ---------------- */}
-          {direction === "tanima" ? (
-            !revealed ? (
-              <TouchableOpacity style={styles.revealButton} onPress={() => setRevealed(true)}>
-                <Text style={styles.revealText}>Cevabı Göster</Text>
-              </TouchableOpacity>
-            ) : (
-              <GradeRow onGrade={(g) => void grade(g)} />
-            )
-          ) : phase === "sor" ? (
-            showProduction ? (
-              <View style={styles.actionCol}>
-                <View style={styles.answerRow}>
-                  <TouchableOpacity
-                    style={[styles.revealButton, styles.grow, !answer.trim() && styles.disabled]}
-                    disabled={!answer.trim()}
-                    onPress={() => void checkAnswer()}
-                  >
-                    <Text style={styles.revealText}>Kontrol Et</Text>
-                  </TouchableOpacity>
-                  {/* Yaz kipinde de söyleyebilmeli: mikrofon artık burada da var. */}
-                  <TouchableOpacity
-                    style={[styles.micSquare, dictation.listening && styles.listeningButton]}
+          {/* ---------------- alt düğmeler ---------------- */}
+          <View style={styles.actionCol}>
+            {direction === "tanima" ? (
+              !revealed ? (
+                <Button icon="eye" label="Cevabı Göster" onPress={() => setRevealed(true)} />
+              ) : (
+                <GradeRow onGrade={(g) => void grade(g)} />
+              )
+            ) : phase === "sor" ? (
+              showProduction ? (
+                <>
+                  <View style={styles.answerRow}>
+                    <Button label="Kontrol Et" disabled={!answer.trim()} onPress={() => void checkAnswer()} style={{ flex: 1 }} />
+                    {/* Yaz kipinde de söyleyebilmeli: mikrofon burada da var. */}
+                    <IconButton
+                      icon={dictation.listening ? "stop" : "mic"}
+                      label="Basılı tutarak söyle"
+                      variant={dictation.listening ? "deep" : "outline"}
+                      size={54}
+                      onPressIn={() => dictation.start()}
+                      onPressOut={() => dictation.stop()}
+                    />
+                  </View>
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    label="Bilmiyorum"
+                    onPress={() => {
+                      setMatchKind("none");
+                      setPhase("sonuc");
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <PressableScale
                     onPressIn={() => dictation.start()}
                     onPressOut={() => dictation.stop()}
-                    accessibilityLabel="Basılı tutarak söyle"
+                    accessibilityLabel="Basılı tut ve söyle"
+                    style={[styles.holdMic, dictation.listening && { backgroundColor: colors.danger }]}
                   >
-                    <Text style={styles.micSquareText}>{dictation.listening ? "●" : "🎙️"}</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity
-                  style={styles.secondaryButton}
-                  onPress={() => {
-                    setMatchKind("none");
-                    setPhase("sonuc");
-                  }}
-                >
-                  <Text style={styles.secondaryText}>Bilmiyorum</Text>
-                </TouchableOpacity>
-              </View>
+                    <Icon name={dictation.listening ? "stop" : "mic"} size={22} color="#FFFFFF" />
+                    <Txt variant="button" color="#FFFFFF">
+                      {dictation.listening ? "Dinliyorum — bırakınca biter" : "Basılı tut ve söyle"}
+                    </Txt>
+                  </PressableScale>
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    label="Cevabı göster"
+                    onPress={() => {
+                      setMatchKind("none");
+                      setPhase("sonuc");
+                    }}
+                  />
+                </>
+              )
+            ) : matchKind !== "none" ? (
+              <>
+                {preGrade && (
+                  <View style={styles.answerRow}>
+                    <Button variant="secondary" size="md" label="Zorlandım" onPress={() => void adjustGrade(1)} style={{ flex: 1 }} />
+                    <Button variant="secondary" size="md" label="Çok kolaydı" onPress={() => void adjustGrade(3)} style={{ flex: 1 }} />
+                  </View>
+                )}
+                <Button icon="arrowRight" label="Sıradaki" onPress={advanceCorrect} />
+              </>
             ) : (
-              <View style={styles.actionCol}>
-                <TouchableOpacity
-                  style={[styles.revealButton, dictation.listening && styles.listeningButton]}
-                  onPressIn={() => dictation.start()}
-                  onPressOut={() => dictation.stop()}
-                >
-                  <Text style={styles.revealText}>
-                    {dictation.listening ? "● Dinliyorum — bırakınca biter" : "🎙️ Basılı tut ve söyle"}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.secondaryButton}
-                  onPress={() => {
-                    setMatchKind("none");
-                    setPhase("sonuc");
-                  }}
-                >
-                  <Text style={styles.secondaryText}>Cevabı göster</Text>
-                </TouchableOpacity>
-              </View>
-            )
-          ) : matchKind !== "none" ? (
-            <View style={styles.actionCol}>
-              {preGrade && (
-                <View style={styles.adjustRow}>
-                  <TouchableOpacity
-                    style={styles.adjustChip}
-                    onPress={() => void adjustGrade(1)}
-                  >
-                    <Text style={styles.adjustText}>😮‍💨 Zorlandım</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.adjustChip}
-                    onPress={() => void adjustGrade(3)}
-                  >
-                    <Text style={styles.adjustText}>😎 Çok kolaydı</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              <TouchableOpacity style={styles.revealButton} onPress={advanceCorrect}>
-                <Text style={styles.revealText}>Sıradaki →</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <GradeRow onGrade={(g) => void grade(g)} />
-          )}
-          {wrongAnswered && mode === "yaz" && (
-            <Text style={styles.honestyNote}>
-              Yazımın farklı ama aslında biliyordun mu? Dürüstçe seç — takvimi bu kurar.
-            </Text>
-          )}
-        </View>
+              <GradeRow onGrade={(g) => void grade(g)} />
+            )}
+            {wrongAnswered && mode === "yaz" && (
+              <Txt variant="caption" color={colors.inkSoft} center>
+                Yazımın farklı ama aslında biliyordun mu? Dürüstçe seç — takvimi bu kurar.
+              </Txt>
+            )}
+          </View>
+        </ScrollView>
       )}
     </KeyboardAvoidingView>
   );
 }
 
 function GradeRow({ onGrade }: { onGrade: (g: ReviewGrade) => void }) {
-  const colors = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-
+  const c = useTheme();
+  const items: { g: ReviewGrade; label: string; bg: string; fg: string }[] = [
+    { g: 0, label: "Bilemedim", bg: c.dangerSoft, fg: c.danger },
+    { g: 1, label: "Zor", bg: c.goldSoft, fg: c.gold },
+    { g: 2, label: "Bildim", bg: c.accentSoft, fg: c.accentDark },
+    { g: 3, label: "Çok Kolay", bg: c.accent, fg: "#FFFFFF" },
+  ];
   return (
-    <View style={styles.gradeRow}>
-      <TouchableOpacity
-        style={[styles.gradeButton, { backgroundColor: "#F3D9D0" }]}
-        onPress={() => onGrade(0)}
-      >
-        <Text style={[styles.gradeText, { color: colors.danger }]}>Bilemedim</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.gradeButton, { backgroundColor: colors.goldSoft }]}
-        onPress={() => onGrade(1)}
-      >
-        <Text style={[styles.gradeText, { color: colors.gold }]}>Zor</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.gradeButton, { backgroundColor: colors.accentSoft }]}
-        onPress={() => onGrade(2)}
-      >
-        <Text style={[styles.gradeText, { color: colors.accent }]}>Bildim</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.gradeButton, { backgroundColor: colors.accent }]}
-        onPress={() => onGrade(3)}
-      >
-        <Text style={[styles.gradeText, { color: "#FFFFFF" }]}>Çok Kolay</Text>
-      </TouchableOpacity>
+    <View style={{ flexDirection: "row", gap: 8 }}>
+      {items.map((it) => (
+        <PressableScale
+          key={it.g}
+          onPress={() => onGrade(it.g)}
+          accessibilityLabel={it.label}
+          style={{ flex: 1, height: 54, borderRadius: 16, backgroundColor: it.bg, alignItems: "center", justifyContent: "center" }}
+        >
+          <Txt variant="callout" color={it.fg} style={{ fontWeight: "800" }} numberOfLines={1} adjustsFontSizeToFit>
+            {it.label}
+          </Txt>
+        </PressableScale>
+      ))}
     </View>
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: { fontSize: 20, fontWeight: "700", color: colors.ink },
-  emptyText: { fontSize: 14, color: colors.inkSoft, textAlign: "center", lineHeight: 21 },
-  cardArea: { flex: 1, padding: 20, justifyContent: "center" },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 28,
-    alignItems: "center",
-    marginBottom: 20,
-    minHeight: 280,
-    justifyContent: "center",
-    ...shadowLift,
-  },
-  modeToggle: { flexDirection: "row", gap: 4 },
-  modeChip: {
-    backgroundColor: colors.bg,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modeChipActive: { backgroundColor: colors.deep, borderColor: colors.deep },
-  modeChipText: { fontSize: 11, fontWeight: "800", color: colors.inkSoft },
-  modeChipTextActive: { color: colors.onDeep },
-  newBadge: { fontSize: 12, color: colors.gold, fontWeight: "700", marginBottom: 10 },
-  // Yazı tipi/satır yüksekliği artık alfabeye göre (targetText); burada
-  // yalnız alfabeden bağımsız olanlar kalır.
-  targetWord: { color: colors.ink, textAlign: "center", marginBottom: 12 },
-  listenRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
-  listenChip: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  listenChipText: { color: colors.accent, fontSize: 13, fontWeight: "700" },
-  prompt: { fontSize: 14, color: colors.inkSoft, marginTop: 8 },
-  hintLabel: { fontSize: 12.5, color: colors.inkSoft, marginBottom: 8 },
-  translit: { fontSize: 18, color: colors.accent, fontWeight: "600", marginBottom: 8 },
-  turkish: { fontSize: 22, color: colors.ink, fontWeight: "700", marginBottom: 8 },
-  turkishBig: {
-    fontSize: 27,
-    color: colors.ink,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  note: { fontSize: 13, color: colors.inkSoft, textAlign: "center", lineHeight: 19 },
-  trackTag: { fontSize: 12, color: colors.inkSoft, marginBottom: 14 },
-  answerInput: {
-    alignSelf: "stretch",
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 18,
-    color: colors.ink,
-    backgroundColor: colors.bg,
-    textAlign: "center",
-    marginTop: 6,
-  },
-  speechNote: { fontSize: 11, lineHeight: 16, color: colors.inkFaint, marginTop: 6 },
-  translitNote: { fontSize: 11, color: colors.inkFaint, marginTop: 8, textAlign: "center" },
-  correctBanner: { fontSize: 16, fontWeight: "800", color: colors.accentDark, marginBottom: 10 },
-  wrongBanner: { fontSize: 14, fontWeight: "800", color: colors.danger, marginBottom: 10 },
-  yourAnswer: { fontSize: 12.5, color: colors.inkFaint, marginTop: 10 },
-  sessionRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
-  answerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  grow: { flex: 1 },
-  micSquare: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.md,
-    backgroundColor: colors.goldSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  micSquareText: { fontSize: 22 },
-  listenChipTextOn: { color: "#FFFFFF" },
-  sessionText: { fontSize: 11.5, fontWeight: "800", color: colors.inkFaint, minWidth: 44, textAlign: "right" },
-  listeningText: {
-    fontSize: 14,
-    color: colors.gold,
-    fontWeight: "700",
-    marginTop: 10,
-    textAlign: "center",
-  },
-  micErrorText: { fontSize: 12.5, color: colors.danger, marginTop: 10, lineHeight: 18 },
-  listeningButton: { backgroundColor: colors.danger },
-  speechVerdict: {
-    fontSize: 13,
-    color: colors.inkSoft,
-    marginTop: 12,
-    lineHeight: 19,
-    textAlign: "center",
-  },
-  revealButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 17,
-    alignItems: "center",
-    ...shadow,
-  },
-  revealText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  disabled: { opacity: 0.4 },
-  actionCol: { gap: 10 },
-  secondaryButton: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  secondaryText: { color: colors.ink, fontSize: 14, fontWeight: "600" },
-  adjustRow: { flexDirection: "row", gap: 10, justifyContent: "center" },
-  adjustChip: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  adjustText: { fontSize: 12.5, fontWeight: "700", color: colors.inkSoft },
-  gradeRow: { flexDirection: "row", gap: 8 },
-  gradeButton: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: 15,
-    alignItems: "center",
-    ...shadow,
-  },
-  gradeText: { fontSize: 13, fontWeight: "700" },
-  honestyNote: {
-    fontSize: 11.5,
-    color: colors.inkFaint,
-    textAlign: "center",
-    marginTop: 10,
-    lineHeight: 16,
-  },
-});
+    container: { flex: 1, backgroundColor: colors.bg },
+    cardArea: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 28, gap: 18 },
+    sessionRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    card: { alignItems: "center", gap: 14, paddingVertical: 28, minHeight: 300, justifyContent: "center" },
+    newBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.goldSoft,
+      borderRadius: 14,
+      paddingHorizontal: 11,
+      paddingVertical: 5,
+    },
+    targetWord: { color: colors.ink, textAlign: "center" },
+    listenRow: { flexDirection: "row", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "center" },
+    listeningRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    banner: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7 },
+    answerInput: {
+      alignSelf: "stretch",
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+      borderRadius: 16,
+      backgroundColor: colors.bg,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontFamily: "Manrope",
+      fontWeight: "600",
+      fontSize: 18,
+      color: colors.ink,
+      textAlign: "center",
+    },
+    actionCol: { gap: 10 },
+    answerRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+    holdMic: {
+      height: 58,
+      borderRadius: 18,
+      backgroundColor: colors.accent,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+    },
+  });
 }
