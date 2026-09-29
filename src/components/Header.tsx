@@ -1,8 +1,7 @@
-import React, { useMemo } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { colors } from "../theme";
-import type { Palette } from "../theme";
+import React from "react";
+import { View } from "react-native";
 import { useTheme } from "../useTheme";
+import { IconButton, Txt, useInsets } from "./kit";
 
 interface Props {
   title: string;
@@ -10,68 +9,56 @@ interface Props {
   onBack?: () => void;
   /** Sağ tarafa düğme vb. */
   right?: React.ReactNode;
-}
-
-/** Tüm iç ekranlarda ortak, sakin başlık çubuğu. */
-export default function Header({ title, subtitle, onBack, right }: Props) {
-  const colors = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-
-  return (
-    <View style={styles.container}>
-      {onBack ? (
-        <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={10}>
-          <Text style={styles.backChevron}>‹</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.backSpacer} />
-      )}
-      <View style={styles.center}>
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.right}>{right}</View>
-    </View>
-  );
+  /** deep: koyu sahne ekranları (Konuşma Odası). */
+  tone?: "light" | "deep";
+  /** Geri yerine kapat (×) — tam ekran akışlarda. */
+  closeIcon?: boolean;
 }
 
 /**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
+ * İç ekranların ortak üst çubuğu. Güvenli alanı kendi ölçer (eski sürüm
+ * 58 px'i elle yazıyordu), geri düğmesi 44 px dokunma alanlı bir ikon.
  */
-function makeStyles(colors: Palette) {
-  return StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingTop: 58,
-    paddingBottom: 12,
-    paddingHorizontal: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 10,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.bg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backChevron: { fontSize: 24, color: colors.accent, fontWeight: "700", marginTop: -3 },
-  backSpacer: { width: 4 },
-  center: { flex: 1 },
-  title: { fontSize: 17, fontWeight: "800", color: colors.ink, letterSpacing: -0.2 },
-  subtitle: { fontSize: 12, color: colors.inkSoft, marginTop: 2 },
-  right: { flexDirection: "row", alignItems: "center" },
-});
+export default function Header({ title, subtitle, onBack, right, tone = "light", closeIcon }: Props) {
+  const c = useTheme();
+  const insets = useInsets();
+  const deep = tone === "deep";
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingTop: insets.top + 8,
+        paddingBottom: 10,
+        paddingLeft: 8,
+        paddingRight: 14,
+        gap: 6,
+        backgroundColor: deep ? c.deep : c.bg,
+      }}
+    >
+      {onBack ? (
+        <IconButton
+          icon={closeIcon ? "close" : "chevronLeft"}
+          label={closeIcon ? "Kapat" : "Geri"}
+          onPress={onBack}
+          variant="plain"
+          color={deep ? c.onDeep : c.ink}
+          iconSize={23}
+        />
+      ) : (
+        <View style={{ width: 12 }} />
+      )}
+      <View style={{ flex: 1, gap: 1 }}>
+        <Txt variant="headline" color={deep ? c.onDeep : c.ink} numberOfLines={1}>
+          {title}
+        </Txt>
+        {subtitle ? (
+          <Txt variant="caption" color={deep ? c.onDeepSoft : c.inkSoft} numberOfLines={1}>
+            {subtitle}
+          </Txt>
+        ) : null}
+      </View>
+      {right ? <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>{right}</View> : null}
+    </View>
+  );
 }

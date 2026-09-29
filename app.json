@@ -57,13 +57,65 @@
                     "style": "normal"
                   }
                 ]
+              },
+              {
+                "fontFamily": "Fraunces",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Fraunces-Medium.ttf",
+                    "weight": 500,
+                    "style": "normal"
+                  },
+                  {
+                    "path": "./assets/fonts/Fraunces-SemiBold.ttf",
+                    "weight": 600,
+                    "style": "normal"
+                  }
+                ]
+              },
+              {
+                "fontFamily": "Manrope",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/Manrope-Regular.ttf",
+                    "weight": 400,
+                    "style": "normal"
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope-Medium.ttf",
+                    "weight": 500,
+                    "style": "normal"
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope-SemiBold.ttf",
+                    "weight": 600,
+                    "style": "normal"
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope-Bold.ttf",
+                    "weight": 700,
+                    "style": "normal"
+                  },
+                  {
+                    "path": "./assets/fonts/Manrope-ExtraBold.ttf",
+                    "weight": 800,
+                    "style": "normal"
+                  }
+                ]
               }
             ]
           },
           "ios": {
             "fonts": [
               "./assets/fonts/NotoNaskhArabic-Regular.ttf",
-              "./assets/fonts/NotoNaskhArabic-SemiBold.ttf"
+              "./assets/fonts/NotoNaskhArabic-SemiBold.ttf",
+              "./assets/fonts/Fraunces-Medium.ttf",
+              "./assets/fonts/Fraunces-SemiBold.ttf",
+              "./assets/fonts/Manrope-Regular.ttf",
+              "./assets/fonts/Manrope-Medium.ttf",
+              "./assets/fonts/Manrope-SemiBold.ttf",
+              "./assets/fonts/Manrope-Bold.ttf",
+              "./assets/fonts/Manrope-ExtraBold.ttf"
             ]
           }
         }
