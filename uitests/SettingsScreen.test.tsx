@@ -302,7 +302,7 @@ test("Gemini anahtarı yokken ses modeli için NE OLACAĞI söylenir, sınama ka
   // Sessizce telefon sesine düşmek, kullanıcıyı "neden hâlâ robot" diye
   // bırakırdı. (Gemini sesi varsayılan; seçmeye gerek yok.)
   await open();
-  expect(screen.getByText(/Gemini anahtarı gerekir/)).toBeTruthy();
+  expect(screen.getByText(/aistudio\.google\.com/)).toBeTruthy();
   expect(screen.getByText(/Anahtar girilene kadar telefon sesi/)).toBeTruthy();
   const tryBtn = screen.getByText(/Sesi dene/);
   fireEvent.press(tryBtn); // devre dışı: hiçbir şey olmamalı
@@ -338,4 +338,15 @@ test("sağlayıcı değişince ses listesi ve varsayılan ses DEĞİŞİR", asyn
 test("DeepSeek anahtarı yokken oda beyninin ne olacağı söylenir", async () => {
   await open();
   expect(screen.getByText(/DeepSeek anahtarı yok — oda şimdilik/)).toBeTruthy();
+});
+
+test("ses anahtarı SES BÖLÜMÜNDEN girilir — sohbet sağlayıcısı değişmeden kaydedilir", async () => {
+  // Eskiden "yukarıdan Gemini'yi seç, yapıştır, geri al" deniyordu; kullanıcı bulamadı.
+  await open();
+  fireEvent.changeText(screen.getByLabelText("Gemini ses anahtarı"), "AIza-test");
+  expect(screen.getByText(/hocanın sesi hazır/)).toBeTruthy();
+  fireEvent.press(screen.getByText("Kaydet"));
+  await waitFor(() => expect(saved).toHaveLength(1));
+  expect(saved[0].apiKeys?.gemini).toBe("AIza-test");
+  expect(saved[0].provider).toBe("anthropic");
 });

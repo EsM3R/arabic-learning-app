@@ -499,10 +499,30 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
           </View>
           {voice.provider !== "device" && (
             <>
-              {!voiceReady &&
-                warn(
-                  `Ses modeli için ${voiceProviderLabel} anahtarı gerekir (sohbet için başka sağlayıcı kullanmaya devam edebilirsin; anahtar yalnız ses için). Yukarıdan ${voiceProviderLabel}'ı seçip anahtarı yapıştır, sonra sağlayıcını geri değiştir. Anahtar girilene kadar telefon sesi kullanılır.`
-                )}
+              {/* Ses anahtarı BURADA girilir. Eskiden "yukarıdan Gemini'yi seç,
+                  anahtarı yapıştır, sağlayıcını geri al" deniyordu — kimse
+                  bulamıyordu. Anahtar yalnız ses için; beyin değişmez. */}
+              <Txt variant="caption" color={colors.inkSoft} style={{ marginTop: 12, marginBottom: 6 }}>
+                {voiceProviderLabel} ses anahtarı
+              </Txt>
+              <TextInput
+                style={styles.input}
+                value={keys[voice.provider] ?? ""}
+                onChangeText={(v) => setKeys({ ...keys, [voice.provider]: v })}
+                placeholder={voice.provider === "gemini" ? "Gemini anahtarını yapıştır (AIza…)" : "OpenAI anahtarını yapıştır (sk-…)"}
+                placeholderTextColor={colors.inkFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+                accessibilityLabel={`${voiceProviderLabel} ses anahtarı`}
+              />
+              <Txt variant="caption" color={voiceReady ? colors.accentDark : colors.inkSoft} style={styles.hint}>
+                {voiceReady
+                  ? "Anahtar var — hocanın sesi hazır. Aşağıdan sesi dene, sonra Kaydet."
+                  : voice.provider === "gemini"
+                    ? "Ücretsiz anahtar: aistudio.google.com → Get API key → Create API key. Kopyala, buraya yapıştır. Sohbet sağlayıcın (DeepSeek vb.) değişmez; bu anahtar yalnız ses için. Anahtar girilene kadar telefon sesi kullanılır."
+                    : "Anahtar: platform.openai.com → API keys. Yalnız ses için kullanılır; sohbet sağlayıcın değişmez. Anahtar girilene kadar telefon sesi kullanılır."}
+              </Txt>
               <View style={styles.chips}>
                 {voicesFor(voice.provider).map((v) => (
                   <Chip key={v.id} label={`${v.label} · ${v.note}`} selected={voice.voiceId === v.id} onPress={() => setVoice({ ...voice, voiceId: v.id })} />
