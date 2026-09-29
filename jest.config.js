@@ -9,6 +9,8 @@
 module.exports = {
   preset: "jest-expo",
   setupFiles: ["<rootDir>/jest.setup.js"],
+  // Paylaşımlı CI makineleri yavaş: bir süitin ilk çizimi 5 sn'yi aşabiliyor.
+  testTimeout: 30000,
   // .tsx ekran testleri, .ts ise cihaz modülü gerektiren mantık testleri
   // (agent araç döngüsü gibi) — ikisi de jest ortamına muhtaç.
   testMatch: ["<rootDir>/uitests/**/*.test.tsx", "<rootDir>/uitests/**/*.test.ts"],
