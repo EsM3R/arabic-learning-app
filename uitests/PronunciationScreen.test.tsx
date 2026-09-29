@@ -162,9 +162,9 @@ test("cevap KİLİTLENİR ve ayırt etme sayaçları artar", async () => {
   await waitFor(() => expect(screen.getByText("قَلْب")).toBeTruthy());
 
   fireEvent.press(screen.getByText("قَلْب")); // playIndex 0, round 0 → doğru
-  await waitFor(() => expect(screen.getByText(/✅ Doğru!/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Doğru!/)).toBeTruthy());
   fireEvent.press(screen.getByText("كَلْب")); // ikinci deneme yok sayılmalı
-  expect(screen.getByText(/✅ Doğru!/)).toBeTruthy();
+  expect(screen.getByText(/Doğru!/)).toBeTruthy();
 
   await flushStats();
   const stats = await loadStatsSummary();
@@ -177,7 +177,7 @@ test("YANLIŞ seçimde çalınan kelime söylenir ve doğru sayılmaz", async ()
   await open();
   await waitFor(() => expect(screen.getByText("كَلْب")).toBeTruthy());
   fireEvent.press(screen.getByText("كَلْب")); // yanlış taraf
-  await waitFor(() => expect(screen.getByText(/❌ Çalınan: قَلْب/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Çalınan: قَلْب/)).toBeTruthy());
 
   await flushStats();
   const stats = await loadStatsSummary();
@@ -192,14 +192,14 @@ test("TEKRAR turunda cevap tarafı ÇEVRİLİR — ezberle geçilemez", async ()
   await open();
   await waitFor(() => expect(screen.getByText("قَلْب")).toBeTruthy());
   fireEvent.press(screen.getByText("قَلْب"));
-  await waitFor(() => expect(screen.getByText(/✅ Doğru!/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Doğru!/)).toBeTruthy());
   fireEvent.press(screen.getByText(/Sonraki ›/));
   await waitFor(() => expect(screen.getByText(/Kulak turunu tekrarla/)).toBeTruthy());
   fireEvent.press(screen.getByText(/Kulak turunu tekrarla/));
 
   await waitFor(() => expect(screen.getByText(/kulak turu 1 \/ 1/)).toBeTruthy());
   fireEvent.press(screen.getByText("قَلْب")); // geçen turun doğrusu
-  await waitFor(() => expect(screen.getByText(/❌ Çalınan: كَلْب/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Çalınan: كَلْب/)).toBeTruthy());
 });
 
 test("kulak turu özeti skoru verir ama SUÇLAMAZ", async () => {

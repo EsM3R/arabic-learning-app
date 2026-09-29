@@ -170,8 +170,8 @@ test("üçüncü turdan SONRA not sorulur — döngü sonsuza gitmez", async () 
 test("döngü KAPATILINCA tek turda nota geçilir", async () => {
   await saveReadings([reading()]);
   await open();
-  await waitFor(() => expect(screen.getByText(/🔁 3x/)).toBeTruthy());
-  fireEvent.press(screen.getByText(/🔁 3x/)); // döngüyü kapat
+  await waitFor(() => expect(screen.getByLabelText("3x")).toBeTruthy());
+  fireEvent.press(screen.getByLabelText("3x")); // döngüyü kapat
   await waitFor(() => expect(screen.queryByText(/tur 1\/3/)).toBeNull());
 
   await runOnePass();

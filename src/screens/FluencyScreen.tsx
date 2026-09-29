@@ -22,7 +22,7 @@ import {
   View,
 } from "react-native";
 import Header from "../components/Header";
-import { Card, ProgressBar, SectionHeader } from "../components/ui";
+import { Button, ListGroup, ListRow, Ring, SectionLabel, StarPattern, Surface, Txt, Wave } from "../components/kit";
 import { feedback } from "../feedback";
 import {
   afterRound,
@@ -240,33 +240,39 @@ export default function FluencyScreen({
   return (
     <View style={styles.flex}>
       <Header title="Akıcılık Odası" subtitle="4 · 3 · 2" onBack={onBack} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {stage === "konu" && (
           <>
-            <Card>
-              <Text style={styles.explain}>
-                Aynı şeyi <Text style={styles.bold}>üç kez</Text> anlatacaksın:
-                önce {mmss(plan[0])}, sonra {mmss(plan[1])}, sonra {mmss(plan[2])}.
-                İçerik aynı kalınca beyin "ne söyleyeceğim"le uğraşmayı bırakır,
-                süre baskısı da duraksamaları eritir.
-              </Text>
-              <Text style={styles.rule}>
-                Tek kural: <Text style={styles.bold}>durma</Text>. Hata yapmak
-                serbest, düzeltmeye çalışmak yasak.
-              </Text>
-            </Card>
+            <Surface tone="deep" style={{ overflow: "hidden", gap: 10 }}>
+              <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.08} />
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {plan.map((p, i) => (
+                  <View key={i} style={styles.planChip}>
+                    <Txt variant="headline" color={colors.goldDeep} style={{ fontSize: 15 }}>
+                      {mmss(p)}
+                    </Txt>
+                  </View>
+                ))}
+              </View>
+              <Txt variant="callout" color={colors.onDeep}>
+                Aynı şeyi <Txt variant="callout" color={colors.goldDeep} style={{ fontWeight: "800" }}>üç kez</Txt>{" "}
+                anlatacaksın: önce {mmss(plan[0])}, sonra {mmss(plan[1])}, sonra {mmss(plan[2])}. İçerik aynı
+                kalınca beyin "ne söyleyeceğim"le uğraşmayı bırakır, süre baskısı da duraksamaları eritir.
+              </Txt>
+              <Txt variant="callout" color={colors.onDeepSoft}>
+                Tek kural: <Txt variant="callout" color={colors.onDeep} style={{ fontWeight: "800" }}>durma</Txt>. Hata
+                yapmak serbest, düzeltmeye çalışmak yasak.
+              </Txt>
+            </Surface>
 
-            <SectionHeader title="Ne anlatacaksın?" hint="Bildiğin bir şey olsun" />
-            {topics.map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={styles.topic}
-                onPress={() => startPrep(t)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.topicText}>{t}</Text>
-              </TouchableOpacity>
-            ))}
+            <View>
+              <SectionLabel title="Ne anlatacaksın?" />
+              <ListGroup>
+                {topics.map((t) => (
+                  <ListRow key={t} icon="message" title={t} onPress={() => startPrep(t)} />
+                ))}
+              </ListGroup>
+            </View>
             <View style={styles.customRow}>
               <TextInput
                 style={styles.input}
@@ -275,114 +281,123 @@ export default function FluencyScreen({
                 placeholder="Ya da kendi konunu yaz…"
                 placeholderTextColor={colors.inkFaint}
               />
-              <TouchableOpacity
-                style={[styles.go, !custom.trim() && styles.goOff]}
-                disabled={!custom.trim()}
-                onPress={() => startPrep(custom.trim())}
-              >
-                <Text style={styles.goText}>Başla</Text>
-              </TouchableOpacity>
+              <Button size="md" label="Başla" disabled={!custom.trim()} onPress={() => startPrep(custom.trim())} />
             </View>
           </>
         )}
 
         {stage === "hazirlik" && (
-          <Card>
-            <Text style={styles.stageLabel}>HAZIRLIK</Text>
-            <Text style={styles.timer}>{mmss(left)}</Text>
-            <Text style={styles.topicBig}>{topic}</Text>
-            <Text style={styles.explain}>
-              Not alma, sadece düşün: nereden başlayacaksın, hangi üç şeyi
-              söyleyeceksin? Cümle kurmaya çalışma — sıralamayı kur.
-            </Text>
-            <TouchableOpacity style={styles.primary} onPress={() => startRound(0)}>
-              <Text style={styles.primaryText}>Hazırım, başlayalım</Text>
-            </TouchableOpacity>
-          </Card>
+          <Surface raised style={styles.stageCard}>
+            <Txt variant="overline" color={colors.inkSoft}>
+              HAZIRLIK
+            </Txt>
+            <Txt style={styles.timer}>{mmss(left)}</Txt>
+            <Txt variant="title3" center style={styles.topicBig}>
+              {topic}
+            </Txt>
+            <Txt variant="callout" color={colors.inkSoft} center>
+              Not alma, sadece düşün: nereden başlayacaksın, hangi üç şeyi söyleyeceksin? Cümle kurmaya
+              çalışma — sıralamayı kur.
+            </Txt>
+            <Button icon="mic" label="Hazırım, başlayalım" onPress={() => startRound(0)} style={{ alignSelf: "stretch", marginTop: 8 }} />
+          </Surface>
         )}
 
         {stage === "tur" && (
-          <Card>
-            <Text style={styles.stageLabel}>
+          <Surface raised style={styles.stageCard}>
+            <Txt variant="overline" color={colors.inkSoft}>
               {index + 1}. TUR · {mmss(plan[index])}
-            </Text>
-            <Text style={[styles.timer, left <= 10 && styles.timerWarn]}>{mmss(left)}</Text>
-            <ProgressBar progress={1 - left / Math.max(1, plan[index])} />
-            <Text style={styles.topicBig}>{topic}</Text>
-            <View style={styles.liveBox}>
-              <Text style={styles.liveCount}>{liveWords}</Text>
-              <Text style={styles.liveLabel}>kelime duyuldu</Text>
+            </Txt>
+            <View style={{ alignItems: "center", justifyContent: "center", marginVertical: 6 }}>
+              <Ring
+                progress={1 - left / Math.max(1, plan[index])}
+                size={190}
+                stroke={10}
+                color={left <= 10 ? colors.danger : colors.accent}
+              />
+              <View style={StyleSheet.absoluteFill as object}>
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                  <Txt style={[styles.timer, left <= 10 && { color: colors.danger }]}>{mmss(left)}</Txt>
+                </View>
+              </View>
             </View>
-            {!!dictation.error && <Text style={styles.error}>{dictation.error}</Text>}
-            <Text style={styles.hint}>
-              {dictation.listening ? "● Dinliyorum — konuşmaya devam et" : "Mikrofon kapalı"}
-            </Text>
-            <TouchableOpacity style={styles.secondary} onPress={() => finishRound(index)}>
-              <Text style={styles.secondaryText}>Turu erken bitir</Text>
-            </TouchableOpacity>
-          </Card>
+            <Txt variant="title3" center style={styles.topicBig}>
+              {topic}
+            </Txt>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Wave active={dictation.listening} color={colors.accent} />
+              <Txt variant="stat" color={colors.accentDark}>
+                {liveWords}
+              </Txt>
+              <Txt variant="caption" color={colors.inkSoft}>
+                kelime duyuldu
+              </Txt>
+            </View>
+            {!!dictation.error && (
+              <Txt variant="caption" color={colors.danger} center>
+                {dictation.error}
+              </Txt>
+            )}
+            <Txt variant="caption" color={colors.inkSoft} center>
+              {dictation.listening ? "Dinliyorum — konuşmaya devam et" : "Mikrofon kapalı"}
+            </Txt>
+            <Button variant="secondary" size="md" label="Turu erken bitir" onPress={() => finishRound(index)} style={{ alignSelf: "stretch" }} />
+          </Surface>
         )}
 
         {stage === "arada" && index + 1 < plan.length && (
-          <Card>
-            <Text style={styles.stageLabel}>TUR BİTTİ</Text>
-            <Text style={styles.bigNumber}>{rounds[rounds.length - 1]?.wpm ?? 0}</Text>
-            <Text style={styles.liveLabel}>kelime / dakika</Text>
-            <Text style={styles.explain}>
-              Şimdi <Text style={styles.bold}>aynı şeyi</Text> tekrar anlat — ama
-              bu sefer {mmss(plan[index + 1])} içinde. Yeni şey ekleme, aynı
-              hikâyeyi daha hızlı akıt.
-            </Text>
-            <TouchableOpacity
-              style={styles.primary}
+          <Surface raised style={styles.stageCard}>
+            <Txt variant="overline" color={colors.inkSoft}>
+              TUR BİTTİ
+            </Txt>
+            <Txt style={styles.bigNumber}>{rounds[rounds.length - 1]?.wpm ?? 0}</Txt>
+            <Txt variant="caption" color={colors.inkSoft}>
+              kelime / dakika
+            </Txt>
+            <Txt variant="callout" color={colors.inkSoft} center>
+              Şimdi <Txt variant="callout" style={{ fontWeight: "800" }}>aynı şeyi</Txt> tekrar anlat — ama bu sefer{" "}
+              {mmss(plan[index + 1])} içinde. Yeni şey ekleme, aynı hikâyeyi daha hızlı akıt.
+            </Txt>
+            <Button
+              icon="arrowRight"
+              label={`${index + 2}. tura başla (${mmss(plan[index + 1])})`}
               onPress={() => startRound(afterRound(index, plan.length).next ?? index)}
-            >
-              <Text style={styles.primaryText}>
-                {index + 2}. tura başla ({mmss(plan[index + 1])})
-              </Text>
-            </TouchableOpacity>
-          </Card>
+              style={{ alignSelf: "stretch", marginTop: 8 }}
+            />
+          </Surface>
         )}
 
         {stage === "sonuc" && (
           <>
-            <Card>
-              <SectionHeader title="Sonuç" />
+            <Surface raised style={{ gap: 12 }}>
+              <SectionLabel title="Sonuç" style={{ marginBottom: 0 }} />
               {rounds.map((r, i) => (
                 <View key={i} style={styles.barRow}>
-                  <Text style={styles.barLabel}>{mmss(r.seconds)}</Text>
+                  <Txt variant="caption" color={colors.inkSoft} style={styles.barLabel}>
+                    {mmss(r.seconds)}
+                  </Txt>
                   <View style={styles.barTrack}>
-                    <View
-                      style={[
-                        styles.barFill,
-                        { width: `${Math.round((r.wpm / maxWpm) * 100)}%` },
-                      ]}
-                    />
+                    <View style={[styles.barFill, { width: `${Math.round((r.wpm / maxWpm) * 100)}%` }]} />
                   </View>
-                  <Text style={styles.barValue}>{r.wpm}</Text>
+                  <Txt variant="headline" style={styles.barValue}>
+                    {r.wpm}
+                  </Txt>
                 </View>
               ))}
-              <Text style={styles.unitNote}>kelime / dakika</Text>
-              <Text style={[styles.verdict, !outcome.measured && styles.verdictMuted]}>
+              <Txt variant="caption" color={colors.inkFaint} style={{ textAlign: "right" }}>
+                kelime / dakika
+              </Txt>
+              <Txt variant="body" color={outcome.measured ? colors.ink : colors.inkSoft}>
                 {outcome.message}
-              </Text>
-              <Text style={styles.caveat}>
-                Sayılar telefonun ses tanımasının DUYDUĞU kelimelerdir; kelime
-                yutabilir. Üç turda da aynı yönde yanıldığı için turlar arası
-                karşılaştırma yine de anlamlıdır — mutlak hız değil, kendi
+              </Txt>
+              <Txt variant="caption" color={colors.inkFaint}>
+                Sayılar telefonun ses tanımasının DUYDUĞU kelimelerdir; kelime yutabilir. Üç turda da aynı
+                yönde yanıldığı için turlar arası karşılaştırma yine de anlamlıdır — mutlak hız değil, kendi
                 kendine göre hızlanma ölçülüyor.
-              </Text>
-            </Card>
-            <TouchableOpacity
-              style={[styles.primary, saved && styles.goOff]}
-              disabled={saved}
-              onPress={() => void save()}
-            >
-              <Text style={styles.primaryText}>{saved ? "Kaydedildi ✓" : "Kaydet"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondary} onPress={() => setStage("konu")}>
-              <Text style={styles.secondaryText}>Yeni konu</Text>
-            </TouchableOpacity>
+              </Txt>
+            </Surface>
+            <Button icon={saved ? "check" : undefined} label={saved ? "Kaydedildi" : "Kaydet"} disabled={saved} onPress={() => void save()} />
+            <Button variant="secondary" size="md" label="Yeni konu" onPress={() => setStage("konu")} />
           </>
         )}
       </ScrollView>
@@ -393,111 +408,42 @@ export default function FluencyScreen({
 function makeStyles(c: Palette) {
   return StyleSheet.create({
     flex: { flex: 1, backgroundColor: c.bg },
-    scroll: { padding: 16, paddingBottom: 48, gap: 12 },
-    explain: { fontSize: 15, lineHeight: 22, color: c.inkSoft },
-    rule: { fontSize: 15, lineHeight: 22, color: c.ink, marginTop: 8 },
-    bold: { fontWeight: "800", color: c.ink },
-    topic: {
-      backgroundColor: c.card,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: 14,
-      ...shadow,
+    scroll: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 48, gap: 16 },
+    planChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: "rgba(255,255,255,0.08)",
     },
-    topicText: { fontSize: 15, color: c.ink },
     customRow: { flexDirection: "row", gap: 8, alignItems: "center" },
     input: {
       flex: 1,
       backgroundColor: c.card,
-      borderRadius: radius.md,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: c.border,
-      paddingHorizontal: 12,
-      paddingVertical: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
       color: c.ink,
+      fontFamily: "Manrope",
       fontSize: 15,
     },
-    go: {
-      backgroundColor: c.accent,
-      borderRadius: radius.md,
-      paddingHorizontal: 18,
-      paddingVertical: 13,
-    },
-    goOff: { opacity: 0.45 },
-    goText: { color: "#fff", fontWeight: "800" },
-    stageLabel: {
-      fontSize: 11,
-      fontWeight: "800",
-      letterSpacing: 1,
-      color: c.inkFaint,
-      textAlign: "center",
-    },
+    stageCard: { alignItems: "center", gap: 10, paddingVertical: 24 },
     timer: {
-      fontSize: 56,
-      fontWeight: "800",
+      fontFamily: "Fraunces",
+      fontWeight: "600",
+      fontSize: 52,
+      lineHeight: 60,
       color: c.ink,
       textAlign: "center",
-      marginVertical: 4,
       fontVariant: ["tabular-nums"],
     },
-    timerWarn: { color: c.danger },
-    topicBig: {
-      fontSize: 17,
-      fontWeight: "700",
-      color: c.ink,
-      textAlign: "center",
-      marginVertical: 10,
-      writingDirection: isRtl(getActivePack().script) ? "rtl" : "ltr",
-    },
-    liveBox: { alignItems: "center", marginTop: 12 },
-    liveCount: { fontSize: 40, fontWeight: "800", color: c.accent },
-    liveLabel: { fontSize: 13, color: c.inkSoft, textAlign: "center" },
-    bigNumber: { fontSize: 52, fontWeight: "800", color: c.accent, textAlign: "center" },
-    hint: { fontSize: 13, color: c.inkSoft, textAlign: "center", marginTop: 10 },
-    error: { fontSize: 13, color: c.danger, textAlign: "center", marginTop: 10 },
-    primary: {
-      backgroundColor: c.accent,
-      borderRadius: radius.md,
-      paddingVertical: 15,
-      alignItems: "center",
-      marginTop: 14,
-    },
-    primaryText: { color: "#fff", fontWeight: "800", fontSize: 15 },
-    secondary: {
-      borderRadius: radius.md,
-      paddingVertical: 13,
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: c.border,
-      marginTop: 8,
-    },
-    secondaryText: { color: c.inkSoft, fontWeight: "700" },
-    barRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8 },
-    barLabel: {
-      width: 44,
-      fontSize: 13,
-      color: c.inkSoft,
-      fontVariant: ["tabular-nums"],
-    },
-    barTrack: {
-      flex: 1,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: c.bgAlt,
-      overflow: "hidden",
-    },
+    topicBig: { writingDirection: isRtl(getActivePack().script) ? "rtl" : "ltr" },
+    bigNumber: { fontFamily: "Fraunces", fontWeight: "600", fontSize: 56, lineHeight: 64, color: c.accent, textAlign: "center" },
+    barRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    barLabel: { width: 44, fontVariant: ["tabular-nums"] },
+    barTrack: { flex: 1, height: 22, borderRadius: 11, backgroundColor: c.bgAlt, overflow: "hidden" },
     barFill: { height: "100%", backgroundColor: c.accent, borderRadius: 11 },
-    barValue: {
-      width: 38,
-      textAlign: "right",
-      fontWeight: "800",
-      color: c.ink,
-      fontVariant: ["tabular-nums"],
-    },
-    unitNote: { fontSize: 12, color: c.inkFaint, textAlign: "right", marginTop: 4 },
-    verdict: { fontSize: 15, lineHeight: 22, color: c.ink, marginTop: 14 },
-    verdictMuted: { color: c.inkSoft },
-    caveat: { fontSize: 12, lineHeight: 18, color: c.inkFaint, marginTop: 12 },
+    barValue: { width: 40, textAlign: "right", fontVariant: ["tabular-nums"] },
   });
 }

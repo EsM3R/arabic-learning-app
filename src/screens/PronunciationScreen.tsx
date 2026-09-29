@@ -17,6 +17,9 @@ import {
 } from "react-native";
 import { generatePronunciationSet } from "../claude";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import { Button, Chip, Empty, PressableScale, Surface, TeacherAvatar, Txt, Wave } from "../components/kit";
+import { ltrLine } from "../richtext";
 import { effectivePlayIndex, pickVoiceVariant } from "../hvpt";
 import { getActivePack } from "../languages";
 import { strugglingCards } from "../srs";
@@ -25,7 +28,7 @@ import { judgeSpeech, RECOGNITION_NOTE, SpeechAttempt } from "../speechinput";
 import { useDictation } from "../useDictation";
 import { recordStat } from "../statsStore";
 import { loadPronunciationSet, loadVocab, savePronunciationSet, touchLastActivity } from "../storage";
-import { colors, radius, shadow, shadowLift, targetText } from "../theme";
+import { targetText } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { Profile, PronunciationSet } from "../types";
@@ -220,6 +223,19 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
     ]);
   };
 
+  const pk = getActivePack();
+  const tip = (title: string, text: string, icon: "bulb" | "headphones") => (
+    <Surface tone="gold" style={{ gap: 6 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Icon name={icon} size={16} color={colors.gold} />
+        <Txt variant="headline" color={colors.gold} style={{ fontSize: 14 }}>
+          {title}
+        </Txt>
+      </View>
+      <Txt variant="callout">{ltrLine(text)}</Txt>
+    </Surface>
+  );
+
   return (
     <View style={styles.container}>
       <Header
@@ -227,214 +243,208 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
         subtitle={
           set
             ? phase === "ayirt"
-              ? `🎧 kulak turu ${pairIndex + 1} / ${pairs.length}`
+              ? `kulak turu ${pairIndex + 1} / ${pairs.length}`
               : phase === "ozet"
                 ? "kulak turu bitti"
-                : `🎙️ kayıt turu ${index + 1} / ${set.items.length}`
+                : `kayıt turu ${index + 1} / ${set.items.length}`
             : "hazırlanıyor…"
         }
         onBack={onBack}
-        right={
-          <TouchableOpacity onPress={newSet} style={styles.newSetButton} disabled={loading}>
-            <Text style={styles.newSetText}>✨ Yeni Set</Text>
-          </TouchableOpacity>
-        }
+        right={<Button size="sm" variant="secondary" icon="sparkles" label="Yeni Set" onPress={newSet} disabled={loading} />}
       />
 
       {error && !loading ? (
-        <View style={styles.loading}>
-          <Text style={styles.errEmoji}>😕</Text>
-          <Text style={styles.errTitle}>Telaffuz seti hazırlanamadı</Text>
-          <Text style={styles.errText} selectable>
-            {error}
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => void generate()}>
-            <Text style={styles.retryText}>Tekrar dene</Text>
-          </TouchableOpacity>
-        </View>
+        <Empty
+          icon="alert"
+          title="Telaffuz seti hazırlanamadı"
+          text={error}
+          action={<Button icon="refresh" label="Tekrar dene" onPress={() => void generate()} style={{ marginTop: 10, alignSelf: "stretch" }} />}
+        />
       ) : loading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>
-            {getActivePack().teacherName} telaffuz setini hazırlıyor…
-          </Text>
+        <View style={styles.center}>
+          <TeacherAvatar size={76} speaking />
+          <Txt variant="callout" color={colors.inkSoft} center>
+            {pk.teacherName} telaffuz setini hazırlıyor…
+          </Txt>
         </View>
       ) : !set || !item ? (
-        <View style={styles.loading}>
-          <Text style={styles.errEmoji}>🎙️</Text>
-          <Text style={styles.errTitle}>Telaffuz setin hazır değil</Text>
-          <Text style={styles.errText}>
-            {getActivePack().teacherName} senin seviyene ve kelime defterine göre bir
-            alıştırma seti hazırlasın mı? Bu bir API isteği harcar (yaklaşık birkaç lira).
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => void generate()}>
-            <Text style={styles.retryText}>Set hazırla</Text>
-          </TouchableOpacity>
-        </View>
+        <Empty
+          icon="wave"
+          title="Telaffuz setin hazır değil"
+          text={`${pk.teacherName} senin seviyene ve kelime defterine göre bir alıştırma seti hazırlasın mı? Bu bir API isteği harcar (yaklaşık birkaç lira).`}
+          action={<Button icon="sparkles" label="Set hazırla" onPress={() => void generate()} style={{ marginTop: 10, alignSelf: "stretch" }} />}
+        />
       ) : phase === "ayirt" && pair ? (
-        <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.tipBox}>
-            <Text style={styles.tipTitle}>🎧 {pair.focus}</Text>
-            <Text style={styles.tipText}>
-              Dinle ve hangi kelimenin çalındığını seç. Bir sesi duyup ayırt edemeyen onu
-              üretemez — önce kulak.
-            </Text>
-          </View>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Surface tone="soft" style={{ gap: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Icon name="ear" size={17} color={colors.accentDark} />
+              <Txt variant="headline" color={colors.accentDark} style={{ fontSize: 15 }}>
+                {pair.focus}
+              </Txt>
+            </View>
+            <Txt variant="callout">
+              Dinle ve hangi kelimenin çalındığını seç. Bir sesi duyup ayırt edemeyen onu üretemez — önce kulak.
+            </Txt>
+          </Surface>
 
-          <TouchableOpacity style={styles.recordButton} onPress={playPair}>
-            <Text style={styles.recordText}>🔊 Dinle</Text>
-          </TouchableOpacity>
+          <PressableScale onPress={playPair} accessibilityLabel="Dinle" style={styles.bigListen}>
+            <Icon name="volume" size={30} color={colors.onGold} />
+          </PressableScale>
 
           <View style={styles.pairRow}>
             {([0, 1] as const).map((side) => {
-              const s = side === 0 ? pair.a : pair.b;
+              const sd = side === 0 ? pair.a : pair.b;
               const isAnswer = side === playSide;
               const chosen = picked === side;
               const show = picked !== null;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={side}
                   style={[
                     styles.pairCard,
-                    show && isAnswer && styles.pairCorrect,
-                    show && chosen && !isAnswer && styles.pairWrong,
+                    show && isAnswer && { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+                    show && chosen && !isAnswer && { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
                   ]}
                   disabled={picked !== null}
                   onPress={() => pickSide(side)}
+                  accessibilityLabel={sd.word}
                 >
-                  <Text style={styles.pairWord}>{s.word}</Text>
-                  <Text style={styles.pairTranslit}>{s.translit}</Text>
-                </TouchableOpacity>
+                  <Text style={[styles.pairWord, targetText(34, pk.script)]}>{sd.word}</Text>
+                  <Txt variant="caption" color={colors.inkSoft}>
+                    {sd.translit}
+                  </Txt>
+                </PressableScale>
               );
             })}
           </View>
 
           {picked !== null && (
             <>
-              <Text style={picked === playSide ? styles.pairResultOk : styles.pairResultNo}>
-                {picked === playSide
-                  ? "✅ Doğru!"
-                  : `❌ Çalınan: ${(playSide === 0 ? pair.a : pair.b).word}`}
-              </Text>
-              <View style={styles.tipBox}>
-                <Text style={styles.tipTitle}>💡 İpucu</Text>
-                <Text style={styles.tipText}>{pair.tip}</Text>
+              <View style={[styles.result, { backgroundColor: picked === playSide ? colors.accentSoft : colors.dangerSoft }]}>
+                <Icon
+                  name={picked === playSide ? "check" : "close"}
+                  size={18}
+                  color={picked === playSide ? colors.accentDark : colors.danger}
+                  strokeWidth={2.6}
+                />
+                <Txt variant="bodyStrong" color={picked === playSide ? colors.accentDark : colors.danger}>
+                  {picked === playSide ? "Doğru!" : `Çalınan: ${(playSide === 0 ? pair.a : pair.b).word}`}
+                </Txt>
               </View>
-              <TouchableOpacity style={styles.recordButton} onPress={nextPair}>
-                <Text style={styles.recordText}>Sonraki ›</Text>
-              </TouchableOpacity>
+              {tip("İpucu", pair.tip, "bulb")}
+              <Button icon="arrowRight" label="Sonraki ›" onPress={nextPair} />
             </>
           )}
         </ScrollView>
       ) : phase === "ozet" ? (
-        <View style={styles.loading}>
-          <Text style={styles.errEmoji}>🎧</Text>
-          <Text style={styles.errTitle}>Kulak turu bitti</Text>
-          <Text style={styles.errText}>
-            {score} / {pairs.length} doğru ayırt ettin.
-            {score < pairs.length ? " Karıştırdıkların normal — kulak tekrarla eğitilir." : " Harika kulak!"}
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => setPhase("kayit")}>
-            <Text style={styles.retryText}>🎙️ Kayıt turuna geç</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.playbackButton} onPress={restartEarTraining}>
-            <Text style={styles.playbackText}>↺ Kulak turunu tekrarla</Text>
-          </TouchableOpacity>
-        </View>
+        <Empty
+          icon="headphones"
+          title="Kulak turu bitti"
+          text={`${score} / ${pairs.length} doğru ayırt ettin.${score < pairs.length ? " Karıştırdıkların normal — kulak tekrarla eğitilir." : " Harika kulak!"}`}
+          action={
+            <View style={{ alignSelf: "stretch", gap: 10, marginTop: 10 }}>
+              <Button icon="mic" label="Kayıt turuna geç" onPress={() => setPhase("kayit")} />
+              <Button variant="secondary" size="md" icon="replay" label="Kulak turunu tekrarla" onPress={restartEarTraining} />
+            </View>
+          }
+        />
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.card}>
-            <Text style={[styles.targetWord, targetText(42, getActivePack().script)]}>{item.arabic}</Text>
-            <Text style={styles.translit}>{item.transliteration}</Text>
-            <Text style={styles.turkish}>{item.turkish}</Text>
-          </View>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Surface raised style={styles.card}>
+            <Text style={[styles.targetWord, targetText(44, pk.script)]}>{item.arabic}</Text>
+            {!!item.transliteration && (
+              <Txt variant="callout" color={colors.inkSoft} style={{ fontStyle: "italic" }}>
+                {item.transliteration}
+              </Txt>
+            )}
+            <Txt variant="title3">{item.turkish}</Txt>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+              <Chip icon="volume" label="Dinle" onPress={() => speakTarget(item.arabic)} />
+              <Chip icon="slow" label="Yavaş" onPress={() => speakTarget(item.arabic, true)} />
+            </View>
+          </Surface>
 
-          <View style={styles.tipBox}>
-            <Text style={styles.tipTitle}>💡 Telaffuz ipucu</Text>
-            <Text style={styles.tipText}>{item.tip}</Text>
-          </View>
-
-          <View style={styles.listenRow}>
-            <TouchableOpacity
-              style={styles.listenButton}
-              onPress={() => speakTarget(item.arabic)}
-            >
-              <Text style={styles.listenText}>🔊 Dinle</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.listenButton}
-              onPress={() => speakTarget(item.arabic, true)}
-            >
-              <Text style={styles.listenText}>🐢 Yavaş</Text>
-            </TouchableOpacity>
-          </View>
+          {tip("Telaffuz ipucu", item.tip, "bulb")}
 
           {/* Denetimli deneme: söylediğin yazıya çevrilip hedefle karşılaştırılır. */}
-          <TouchableOpacity
-            style={[styles.recordButton, dictation.listening && styles.recording]}
+          <PressableScale
             onPressIn={startCheck}
             onPressOut={() => dictation.stop()}
+            accessibilityLabel="Basılı tut ve söyle"
+            style={[styles.holdMic, dictation.listening && { backgroundColor: colors.danger }]}
           >
-            <Text style={styles.recordText}>
-              {dictation.listening
-                ? "● Dinliyorum — bırakınca biter"
-                : "🎙️ Basılı tut ve söyle"}
-            </Text>
-          </TouchableOpacity>
+            {dictation.listening ? <Wave active color="#FFFFFF" /> : <Icon name="mic" size={22} color="#FFFFFF" />}
+            <Txt variant="button" color="#FFFFFF">
+              {dictation.listening ? "Dinliyorum — bırakınca biter" : "Basılı tut ve söyle"}
+            </Txt>
+          </PressableScale>
           {dictation.listening && (
-            <Text style={styles.listeningText}>{dictation.partial || "Dinliyorum…"}</Text>
+            <Txt variant="callout" color={colors.inkSoft} center style={{ fontStyle: "italic" }}>
+              {dictation.partial || "Dinliyorum…"}
+            </Txt>
           )}
-          {dictation.error && <Text style={styles.micErrorText}>{dictation.error}</Text>}
+          {dictation.error && (
+            <Txt variant="caption" color={colors.danger} center>
+              {dictation.error}
+            </Txt>
+          )}
           {attempt && !dictation.listening && (
             <View
               style={[
                 styles.verdictBox,
-                attempt.verdict === "dogru"
-                  ? styles.verdictOk
-                  : attempt.verdict === "yakin"
-                    ? styles.verdictNear
-                    : styles.verdictFar,
+                {
+                  backgroundColor:
+                    attempt.verdict === "dogru" ? colors.accentSoft : attempt.verdict === "yakin" ? colors.goldSoft : colors.dangerSoft,
+                },
               ]}
             >
-              <Text style={styles.verdictText}>{attempt.message}</Text>
-              <Text style={styles.verdictHint}>{RECOGNITION_NOTE}</Text>
-              {!!getActivePack().asrNote && (
-                <Text style={styles.verdictHint}>{getActivePack().asrNote}</Text>
+              <Txt variant="bodyStrong">
+                {attempt.message}
+              </Txt>
+              <Txt variant="caption" color={colors.inkSoft}>
+                {RECOGNITION_NOTE}
+              </Txt>
+              {!!pk.asrNote && (
+                <Txt variant="caption" color={colors.inkSoft}>
+                  {pk.asrNote}
+                </Txt>
               )}
             </View>
           )}
 
           {/* Kendi sesini duymak ayrı bir egzersiz: kayıt yolu duruyor. */}
-          <TouchableOpacity
-            style={[styles.playbackButton, recorder.isRecording && styles.recording]}
-            onPress={() => void toggleRecord()}
-          >
-            <Text style={styles.playbackText}>
-              {recorder.isRecording ? "⏹ Kaydı Durdur" : "🎧 Kendini kaydet ve dinle"}
-            </Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Button
+              variant={recorder.isRecording ? "danger" : "secondary"}
+              size="md"
+              icon={recorder.isRecording ? "stop" : "headphones"}
+              label={recorder.isRecording ? "Kaydı Durdur" : "Kendini kaydet"}
+              onPress={() => void toggleRecord()}
+              style={{ flex: 1 }}
+            />
+            {recordingUri && !recorder.isRecording && (
+              <Button variant="secondary" size="md" icon="play" label="Kaydımı dinle" onPress={playRecording} style={{ flex: 1 }} />
+            )}
+          </View>
 
-          {recordingUri && !recorder.isRecording && (
-            <TouchableOpacity style={styles.playbackButton} onPress={playRecording}>
-              <Text style={styles.playbackText}>▶️ Kaydımı Dinle ve Karşılaştır</Text>
-            </TouchableOpacity>
-          )}
-
-          <View style={styles.navRow}>
-            <TouchableOpacity
-              style={[styles.navButton, index === 0 && styles.navDisabled]}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Button
+              variant="ghost"
+              size="md"
+              label="‹ Önceki"
               onPress={() => goTo(index - 1)}
               disabled={index === 0}
-            >
-              <Text style={styles.navText}>‹ Önceki</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.navButton, index >= set!.items.length - 1 && styles.navDisabled]}
+              style={{ flex: 1 }}
+            />
+            <Button
+              variant="ghost"
+              size="md"
+              label="Sonraki ›"
               onPress={() => goTo(index + 1)}
               disabled={index >= set!.items.length - 1}
-            >
-              <Text style={styles.navText}>Sonraki ›</Text>
-            </TouchableOpacity>
+              style={{ flex: 1 }}
+            />
           </View>
         </ScrollView>
       )}
@@ -442,158 +452,46 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  newSetButton: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  newSetText: { color: colors.gold, fontWeight: "700", fontSize: 12 },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14 },
-  loadingText: { color: colors.inkSoft, fontSize: 14 },
-  errEmoji: { fontSize: 38 },
-  errTitle: { fontSize: 18, fontWeight: "800", color: colors.ink },
-  errText: {
-    fontSize: 13,
-    color: colors.inkSoft,
-    textAlign: "center",
-    lineHeight: 19,
-    paddingHorizontal: 28,
-  },
-  retryButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 14,
-    paddingHorizontal: 36,
-    marginTop: 6,
-    ...shadow,
-  },
-  retryText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
-  body: { padding: 20, paddingBottom: 40 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 28,
-    alignItems: "center",
-    marginBottom: 14,
-    ...shadowLift,
-  },
-  targetWord: { color: colors.ink, textAlign: "center", marginBottom: 12 },
-  translit: { fontSize: 18, color: colors.accent, fontWeight: "600", marginBottom: 6 },
-  turkish: { fontSize: 16, color: colors.inkSoft },
-  tipBox: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-  },
-  tipTitle: { fontSize: 13, fontWeight: "700", color: colors.gold, marginBottom: 4 },
-  tipText: { fontSize: 13, color: colors.ink, lineHeight: 20 },
-  listenRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
-  listenButton: {
-    flex: 1,
-    backgroundColor: colors.accentSoft,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  listenText: { color: colors.accent, fontSize: 15, fontWeight: "700" },
-  recordButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 17,
-    alignItems: "center",
-    marginBottom: 10,
-    ...shadow,
-  },
-  recording: { backgroundColor: colors.danger },
-  recordText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  playbackButton: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  playbackText: { color: colors.accent, fontSize: 15, fontWeight: "700" },
-  listeningText: {
-    fontSize: 14,
-    color: colors.gold,
-    fontWeight: "700",
-    textAlign: "center",
-    marginTop: 10,
-  },
-  micErrorText: {
-    fontSize: 12.5,
-    color: colors.danger,
-    textAlign: "center",
-    marginTop: 10,
-    lineHeight: 18,
-  },
-  verdictBox: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 13,
-    marginTop: 12,
-  },
-  verdictOk: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  verdictNear: { backgroundColor: colors.goldSoft, borderColor: colors.goldDeep },
-  verdictFar: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
-  verdictText: { fontSize: 14, color: colors.ink, fontWeight: "700", lineHeight: 20 },
-  verdictHint: { fontSize: 11.5, color: colors.inkSoft, marginTop: 7, lineHeight: 17 },
-  navRow: { flexDirection: "row", gap: 10, marginTop: 8 },
-  navButton: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  navDisabled: { opacity: 0.4 },
-  navText: { color: colors.ink, fontSize: 14, fontWeight: "600" },
-  pairRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
-  pairCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingVertical: 24,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    ...shadow,
-  },
-  pairCorrect: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  pairWrong: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
-  pairWord: { fontSize: 28, color: colors.ink, textAlign: "center", marginBottom: 8 },
-  pairTranslit: { fontSize: 14, color: colors.accent, fontWeight: "600" },
-  pairResultOk: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: colors.accentDark,
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  pairResultNo: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: colors.danger,
-    textAlign: "center",
-    marginBottom: 10,
-  },
-});
+    container: { flex: 1, backgroundColor: colors.bg },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, padding: 28 },
+    body: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 40, gap: 16 },
+    bigListen: {
+      alignSelf: "center",
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      backgroundColor: colors.goldDeep,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 8,
+      borderColor: colors.goldSoft,
+    },
+    pairRow: { flexDirection: "row", gap: 12 },
+    pairCard: {
+      flex: 1,
+      alignItems: "center",
+      gap: 4,
+      paddingVertical: 20,
+      borderRadius: 22,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    pairWord: { color: colors.ink, textAlign: "center" },
+    result: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
+    card: { alignItems: "center", gap: 8, paddingVertical: 26 },
+    targetWord: { color: colors.ink, textAlign: "center" },
+    holdMic: {
+      height: 60,
+      borderRadius: 20,
+      backgroundColor: colors.accent,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+    },
+    verdictBox: { borderRadius: 18, padding: 14, gap: 6 },
+  });
 }

@@ -6,8 +6,10 @@ import {
   useAudioRecorder,
 } from "expo-audio";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import { Button, Chip, Empty, PressableScale, Surface, Txt, Wave } from "../components/kit";
 import { getActivePack } from "../languages";
 import {
   buildShadowQueue,
@@ -27,7 +29,7 @@ import {
   touchLastActivity,
 } from "../storage";
 import { normalizeTarget } from "../textnorm";
-import { arabicText, colors, radius, shadow, shadowLift } from "../theme";
+import { arabicText } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { isRtl, needsTranslit } from "../scripts";
@@ -199,152 +201,152 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
     <View style={styles.container}>
       <Header
         title="Gölgeleme"
-        subtitle={
-          queue.length > 0 ? `${Math.min(index + 1, queue.length)} / ${queue.length}` : "shadowing"
-        }
+        subtitle={queue.length > 0 ? `${Math.min(index + 1, queue.length)} / ${queue.length}` : "shadowing"}
         onBack={onBack}
         right={
-          <TouchableOpacity
-            style={[styles.loopChip, loopMode && styles.loopChipActive]}
+          <Chip
+            icon="repeat"
+            label="3x"
+            selected={loopMode}
             onPress={() => {
               setLoopMode(!loopMode);
               setPass(1);
             }}
-          >
-            <Text style={[styles.loopChipText, loopMode && styles.loopChipTextActive]}>
-              🔁 3x
-            </Text>
-          </TouchableOpacity>
+          />
         }
       />
 
       {!loaded ? null : queue.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyEmoji}>🗣️</Text>
-          <Text style={styles.emptyTitle}>Gölgelenecek cümle yok</Text>
-          <Text style={styles.emptyText}>
-            Gölgeleme, okuduğun metinlerin ve telaffuz setinin cümleleriyle çalışır.
-            Önce bir okuma metni ya da telaffuz seti hazırlat; cümleler buraya birikir.
-          </Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={onOpenReading}>
-            <Text style={styles.primaryText}>📖 Okuma Salonu'na git</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={onOpenPronunciation}>
-            <Text style={styles.secondaryText}>🎙️ Telaffuz Stüdyosu'na git</Text>
-          </TouchableOpacity>
-        </View>
+        <Empty
+          icon="headphones"
+          title="Gölgelenecek cümle yok"
+          text="Gölgeleme, okuduğun metinlerin ve telaffuz setinin cümleleriyle çalışır. Önce bir okuma metni ya da telaffuz seti hazırlat; cümleler buraya birikir."
+          action={
+            <View style={{ alignSelf: "stretch", gap: 10, marginTop: 10 }}>
+              <Button icon="bookOpen" label="Okuma Salonu'na git" onPress={onOpenReading} />
+              <Button variant="secondary" size="md" icon="wave" label="Telaffuz Stüdyosu'na git" onPress={onOpenPronunciation} />
+            </View>
+          }
+        />
       ) : index >= queue.length ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyEmoji}>🎉</Text>
-          <Text style={styles.emptyTitle}>Oturum bitti</Text>
-          <Text style={styles.emptyText}>{queue.length} cümle gölgeledin — kulağın ve ağzın bugün çalıştı.</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={restart}>
-            <Text style={styles.primaryText}>↺ Baştan</Text>
-          </TouchableOpacity>
-        </View>
+        <Empty
+          icon="award"
+          title="Oturum bitti"
+          text={`${queue.length} cümle gölgeledin — kulağın ve ağzın bugün çalıştı.`}
+          action={<Button icon="replay" label="Baştan" onPress={restart} style={{ marginTop: 10, alignSelf: "stretch" }} />}
+        />
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.card}>
-            <Text style={styles.sourceBadge}>
-              {item.source === "okuma" ? "📖 Okumadan" : "🎙️ Telaffuz setinden"}
-              {loopMode ? `  ·  tur ${pass}/3` : ""}
-            </Text>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Surface raised style={styles.card}>
+            <View style={styles.sourceBadge}>
+              <Icon name={item.source === "okuma" ? "bookOpen" : "wave"} size={13} color={colors.gold} />
+              <Txt variant="caption" color={colors.gold} style={{ fontWeight: "800" }}>
+                {item.source === "okuma" ? "Okumadan" : "Telaffuz setinden"}
+                {loopMode ? `  ·  tur ${pass}/3` : ""}
+              </Txt>
+            </View>
             <Text
               style={[
                 styles.itemText,
                 item.source === "telaffuz" && styles.itemTextBig,
                 // Arapça stili EN SONA gelmeli: dizide sonraki kazanır, yoksa
                 // itemTextBig'in dar lineHeight'ı harekeleri kırpar.
-                isRtl(pack.script) &&
-                  (item.source === "telaffuz" ? styles.rtlBig : styles.rtl),
+                isRtl(pack.script) && (item.source === "telaffuz" ? styles.rtlBig : styles.rtl),
               ]}
             >
               {item.text}
             </Text>
             {!!item.translit && needsTranslit(pack.script) && (
-              <Text style={styles.translit}>{item.translit}</Text>
+              <Txt variant="callout" color={colors.inkSoft} style={{ fontStyle: "italic" }} center>
+                {item.translit}
+              </Txt>
             )}
-            {!!item.turkish && <Text style={styles.turkish}>{item.turkish}</Text>}
-          </View>
+            {!!item.turkish && (
+              <Txt variant="callout" center>
+                {item.turkish}
+              </Txt>
+            )}
+          </Surface>
 
           {step === "hazir" && (
-            <>
-              <View style={styles.tipBox}>
-                <Text style={styles.tipText}>
-                  Nasıl çalışır: cümle çalarken sen de ÜSTÜNE konuş — bitmesini bekleme,
-                  gölgesi gibi takip et. {loopMode ? "Her turda hız biraz artar." : ""}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.listenButton}
-                onPress={() => speakTargetWith(item.text, { rate })}
-              >
-                <Text style={styles.listenText}>🔊 Önce dinle</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.recordButton} onPress={() => void startShadow()}>
-                <Text style={styles.recordText}>🎙️ Üstüne Konuş</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.plainButton} onPress={() => void startPlainRecord()}>
-                <Text style={styles.plainText}>🎤 Sadece kaydet (sessiz)</Text>
-              </TouchableOpacity>
-            </>
+            <View style={styles.actions}>
+              <Surface tone="soft" style={{ flexDirection: "row", gap: 10 }}>
+                <Icon name="info" size={17} color={colors.accentDark} />
+                <Txt variant="callout" style={{ flex: 1 }}>
+                  Nasıl çalışır: cümle çalarken sen de ÜSTÜNE konuş — bitmesini bekleme, gölgesi gibi
+                  takip et. {loopMode ? "Her turda hız biraz artar." : ""}
+                </Txt>
+              </Surface>
+              <Button variant="secondary" icon="volume" label="Önce dinle" onPress={() => speakTargetWith(item.text, { rate })} />
+              <Button icon="mic" label="Üstüne Konuş" onPress={() => void startShadow()} />
+              <Button variant="ghost" size="md" label="Sadece kaydet (sessiz)" onPress={() => void startPlainRecord()} />
+            </View>
           )}
 
           {step === "kaydediliyor" && (
-            <>
-              <TouchableOpacity
-                style={[styles.recordButton, styles.recording]}
-                onPress={() => void finishRecording()}
-              >
-                <Text style={styles.recordText}>⏹ Durdur</Text>
-              </TouchableOpacity>
-              <Text style={styles.recHint}>konuşmaya devam et…</Text>
-            </>
+            <View style={styles.actions}>
+              <PressableScale onPress={() => void finishRecording()} accessibilityLabel="Durdur" style={styles.recording}>
+                <Wave active color="#FFFFFF" />
+                <Txt variant="button" color="#FFFFFF">
+                  Durdur
+                </Txt>
+              </PressableScale>
+              <Txt variant="caption" color={colors.inkSoft} center>
+                konuşmaya devam et…
+              </Txt>
+            </View>
           )}
 
           {step === "dinle" && (
-            <>
-              <TouchableOpacity style={styles.listenButton} onPress={playRecording}>
-                <Text style={styles.listenText}>▶️ Kaydımı dinle</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.listenButton}
-                onPress={() => speakTargetWith(item.text, { rate })}
-              >
-                <Text style={styles.listenText}>🔊 Aslını dinle</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.plainButton}
+            <View style={styles.actions}>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Button variant="secondary" size="md" icon="play" label="Kaydımı dinle" onPress={playRecording} style={{ flex: 1 }} />
+                <Button variant="secondary" size="md" icon="volume" label="Aslını dinle" onPress={() => speakTargetWith(item.text, { rate })} style={{ flex: 1 }} />
+              </View>
+              <Button
+                icon="arrowRight"
+                label={loopMode && pass < 3 ? `Devam → (tur ${pass + 1})` : "Devam →"}
+                onPress={continueFromReview}
+              />
+              <Button
+                variant="ghost"
+                size="md"
+                icon="replay"
+                label="Tekrar dene"
                 onPress={() => {
                   setRecordingUri(null);
                   setStep("hazir");
                 }}
-              >
-                <Text style={styles.plainText}>↺ Tekrar dene</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.recordButton} onPress={continueFromReview}>
-                <Text style={styles.recordText}>
-                  {loopMode && pass < 3 ? `Devam → (tur ${pass + 1})` : "Devam →"}
-                </Text>
-              </TouchableOpacity>
-            </>
+              />
+            </View>
           )}
 
           {step === "not" && (
-            <>
-              <Text style={styles.noteLabel}>Kendine not ver:</Text>
-              <View style={styles.noteRow}>
-                <TouchableOpacity style={styles.noteChip} onPress={() => void giveNote(0)}>
-                  <Text style={styles.noteChipText}>😕 Tekrar lazım</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.noteChip} onPress={() => void giveNote(1)}>
-                  <Text style={styles.noteChipText}>🙂 İyi</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.noteChip} onPress={() => void giveNote(2)}>
-                  <Text style={styles.noteChipText}>😎 Süper</Text>
-                </TouchableOpacity>
+            <View style={styles.actions}>
+              <Txt variant="overline" color={colors.inkSoft} center>
+                Kendine not ver:
+              </Txt>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {(
+                  [
+                    { g: 0, label: "Tekrar lazım", bg: colors.dangerSoft, fg: colors.danger },
+                    { g: 1, label: "İyi", bg: colors.goldSoft, fg: colors.gold },
+                    { g: 2, label: "Süper", bg: colors.accentSoft, fg: colors.accentDark },
+                  ] as const
+                ).map((n) => (
+                  <PressableScale
+                    key={n.g}
+                    onPress={() => void giveNote(n.g)}
+                    accessibilityLabel={n.label}
+                    style={{ flex: 1, height: 54, borderRadius: 16, backgroundColor: n.bg, alignItems: "center", justifyContent: "center" }}
+                  >
+                    <Txt variant="callout" color={n.fg} style={{ fontWeight: "800" }}>
+                      {n.label}
+                    </Txt>
+                  </PressableScale>
+                ))}
               </View>
-            </>
+            </View>
           )}
         </ScrollView>
       )}
@@ -352,124 +354,33 @@ export default function ShadowingScreen({ onBack, onOpenPronunciation, onOpenRea
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 28 },
-  body: { padding: 20, paddingBottom: 40 },
-  emptyEmoji: { fontSize: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: "800", color: colors.ink },
-  emptyText: { fontSize: 13.5, color: colors.inkSoft, textAlign: "center", lineHeight: 20 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 16,
-    ...shadowLift,
-  },
-  sourceBadge: { fontSize: 11.5, color: colors.inkFaint, fontWeight: "700", marginBottom: 12 },
-  itemText: { fontSize: 24, lineHeight: 40, color: colors.ink, textAlign: "center" },
-  itemTextBig: { fontSize: 32, lineHeight: 52 },
-  // writingDirection Android'de ölü koddu (yön BiDi ile içerikten çıkar);
-  // yerine gerçek Arapça fontu ve kırpmayan satır yüksekliği. Hizalama
-  // kartta ortalı kalır.
-  rtl: { ...arabicText(24), textAlign: "center" },
-  rtlBig: { ...arabicText(32), textAlign: "center" },
-  translit: { fontSize: 15, color: colors.accent, fontWeight: "600", marginTop: 8 },
-  turkish: { fontSize: 14, color: colors.inkSoft, marginTop: 6, textAlign: "center" },
-  tipBox: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-  },
-  tipText: { fontSize: 12.5, color: colors.ink, lineHeight: 18 },
-  listenButton: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  listenText: { color: colors.accent, fontSize: 15, fontWeight: "700" },
-  recordButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 17,
-    alignItems: "center",
-    marginBottom: 10,
-    ...shadow,
-  },
-  recording: { backgroundColor: colors.danger },
-  recordText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  recHint: { textAlign: "center", color: colors.inkSoft, fontSize: 13 },
-  plainButton: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  plainText: { color: colors.ink, fontSize: 14, fontWeight: "600" },
-  noteLabel: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: colors.ink,
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  noteRow: { flexDirection: "row", gap: 8 },
-  noteChip: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    alignItems: "center",
-    ...shadow,
-  },
-  noteChipText: { fontSize: 13, fontWeight: "700", color: colors.ink },
-  primaryButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 15,
-    paddingHorizontal: 28,
-    alignItems: "center",
-    marginTop: 6,
-    ...shadow,
-  },
-  primaryText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
-  secondaryButton: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingVertical: 13,
-    paddingHorizontal: 24,
-    alignItems: "center",
-  },
-  secondaryText: { color: colors.ink, fontSize: 14, fontWeight: "600" },
-  loopChip: {
-    backgroundColor: colors.bg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-  },
-  loopChipActive: { backgroundColor: colors.deep, borderColor: colors.deep },
-  loopChipText: { fontSize: 12, fontWeight: "800", color: colors.inkSoft },
-  loopChipTextActive: { color: colors.onDeep },
-});
+    container: { flex: 1, backgroundColor: colors.bg },
+    body: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 40, gap: 18 },
+    card: { alignItems: "center", gap: 10, paddingVertical: 26 },
+    sourceBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.goldSoft,
+      borderRadius: 14,
+      paddingHorizontal: 11,
+      paddingVertical: 5,
+    },
+    itemText: { fontFamily: "Manrope", fontWeight: "700", fontSize: 21, lineHeight: 30, color: colors.ink, textAlign: "center" },
+    itemTextBig: { fontSize: 30, lineHeight: 40 },
+    rtl: { writingDirection: "rtl", ...arabicText(26) },
+    rtlBig: { writingDirection: "rtl", ...arabicText(36) },
+    actions: { gap: 10 },
+    recording: {
+      height: 58,
+      borderRadius: 18,
+      backgroundColor: colors.danger,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    },
+  });
 }
