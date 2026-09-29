@@ -149,6 +149,18 @@ export function PressableScale({
   testID?: string;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
+  // Yerleşim (flex, genişlik, dış boşluk) dıştaki Pressable'a gitmeli; yoksa
+  // "flex: 1" verilen düğme satırda payını alamaz ve sıkışır.
+  const flat = StyleSheet.flatten(style) ?? {};
+  const outer: ViewStyle = {};
+  const inner: ViewStyle = { ...flat };
+  for (const k of ["flex", "flexGrow", "flexShrink", "flexBasis", "alignSelf", "margin", "marginTop", "marginBottom", "marginLeft", "marginRight", "marginHorizontal", "marginVertical", "position", "top", "left", "right", "bottom"] as const) {
+    if (flat[k] !== undefined) {
+      (outer as Record<string, unknown>)[k] = flat[k];
+      delete (inner as Record<string, unknown>)[k];
+    }
+  }
+  if (outer.flex !== undefined) inner.flex = 1;
   const to = (v: number) =>
     Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
   return (
@@ -175,8 +187,9 @@ export function PressableScale({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: !!disabled }}
       hitSlop={hitSlop}
+      style={outer}
     >
-      <Animated.View style={[style, { transform: [{ scale }] }, disabled && { opacity: 0.45 }]}>
+      <Animated.View style={[inner, { transform: [{ scale }] }, disabled && { opacity: 0.45 }]}>
         {children}
       </Animated.View>
     </Pressable>

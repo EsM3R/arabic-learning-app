@@ -104,3 +104,53 @@ export function summarize(map: StatsMap, now: Date): StatsSummary {
   }
   return out;
 }
+
+/** Haftalık şerit için tek gün. */
+export interface WeekDay {
+  key: string;
+  /** "Pt", "Sa"… */
+  label: string;
+  /** Ayın günü. */
+  day: number;
+  active: boolean;
+  isToday: boolean;
+  future: boolean;
+  /** O gün sesle yapılan iş (mikrofon + Konuşma Odası + gölgeleme). */
+  voice: number;
+}
+
+const TR_DAYS = ["Pz", "Pt", "Sa", "Ça", "Pe", "Cu", "Ct"];
+
+/** Sesli iş: konuşma hedefine doğrudan hizmet eden olaylar. */
+export function voiceCount(day: DayCounts | undefined): number {
+  if (!day) return 0;
+  return (day.spoken ?? 0) + (day.conversationTurn ?? 0) + (day.shadowed ?? 0);
+}
+
+/**
+ * Bu haftanın 7 günü (Pazartesi başlar). Ana ekrandaki şerit ve sesli iş
+ * grafiği bundan çizilir. Seri SAYACI bilinçli olarak yok (bkz. dosya başı):
+ * şerit hangi günler çalıştığını gösterir, "zinciri kırma" baskısı kurmaz.
+ */
+export function weekDays(map: StatsMap, now: Date): WeekDay[] {
+  const todayKey = dateKey(now);
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dow = (monday.getDay() + 6) % 7; // Pazartesi = 0
+  monday.setDate(monday.getDate() - dow);
+  const out: WeekDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+    const key = dateKey(d);
+    const day = map[key];
+    out.push({
+      key,
+      label: TR_DAYS[d.getDay()],
+      day: d.getDate(),
+      active: !!day && Object.values(day).some((n) => (n ?? 0) > 0),
+      isToday: key === todayKey,
+      future: key > todayKey,
+      voice: voiceCount(day),
+    });
+  }
+  return out;
+}

@@ -70,3 +70,23 @@ test("hafta penceresi bugünü içerir, 7 gün öncesini içermez", () => {
   const s = summarize(m, NOW);
   assert.equal(s.week.produced, 1);
 });
+
+test("weekDays: Pazartesi başlar, bugün işaretli, gelecek günler boş", async () => {
+  const { weekDays } = await import("../src/stats.ts");
+  // 2026-09-29 Salı
+  const now = new Date(2026, 8, 29, 10);
+  const days = weekDays(
+    { "2026-09-28": { spoken: 3, conversationTurn: 2 }, "2026-09-29": { reviewed: 4 } },
+    now
+  );
+  assert.equal(days.length, 7);
+  assert.equal(days[0].label, "Pt");
+  assert.equal(days[0].day, 28);
+  assert.equal(days[0].voice, 5);
+  assert.equal(days[0].active, true);
+  assert.equal(days[1].isToday, true);
+  assert.equal(days[1].active, true);
+  assert.equal(days[1].voice, 0);
+  assert.equal(days[2].future, true);
+  assert.equal(days[6].label, "Pz");
+});

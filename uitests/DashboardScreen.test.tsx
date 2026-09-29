@@ -18,7 +18,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import React from "react";
 import { Alert } from "react-native";
-import DashboardScreen from "../src/screens/DashboardScreen";
+import DashboardScreen, { resetHomeTab } from "../src/screens/DashboardScreen";
 import { setActiveLanguage } from "../src/languages";
 import { recordStats, flushStats } from "../src/statsStore";
 import {
@@ -114,6 +114,7 @@ function count(name: string) {
 }
 
 beforeEach(async () => {
+  resetHomeTab();
   seq = 0;
   alerts.length = 0;
   builtCurricula.length = 0;
@@ -156,6 +157,11 @@ async function open(p: Profile = profile()) {
     />
   );
   await act(async () => {});
+}
+
+/** Alt sekme çubuğundan sekmeye geç. */
+function goTab(label: "Bugün" | "Pratik" | "Defter" | "Profil") {
+  fireEvent.press(screen.getByLabelText(label));
 }
 
 // --- uyanış kontrolü: gereksiz harcama --------------------------------------
@@ -217,7 +223,7 @@ test("uyanış kontrolü ÇÖKERSE panel yine de çalışır", async () => {
   await saveVocab(Array.from({ length: 6 }, () => card({ due: past })));
   await open();
   await waitFor(() => expect(mockChat).toHaveBeenCalled());
-  expect(screen.getByText("Mehmet")).toBeTruthy();
+  expect(screen.getByText(/Mehmet/)).toBeTruthy();
 });
 
 test("müfredatı olmayan öğrenci için uyanış kontrolü çalışmaz", async () => {
@@ -263,6 +269,7 @@ test("KISA müfredat sessizce kabul edilmez", async () => {
 test("defter BOŞKEN sınav açmak istek harcamaz", async () => {
   // Hocanın "tekrar edecek kelime yok" demesi için para ödemek anlamsız.
   await open();
+  goTab("Pratik");
   await waitFor(() => expect(screen.getByText(/ile Tekrar/)).toBeTruthy());
   fireEvent.press(screen.getByText(/ile Tekrar/));
   expect(lastAlert()?.title).toMatch(/Kelime defteri boş/);
@@ -272,6 +279,7 @@ test("defter BOŞKEN sınav açmak istek harcamaz", async () => {
 test("defterde kelime VARSA sınav açılır", async () => {
   await saveVocab([card()]);
   await open();
+  goTab("Pratik");
   await waitFor(() => expect(screen.getByText(/ile Tekrar/)).toBeTruthy());
   fireEvent.press(screen.getByText(/ile Tekrar/));
   expect(calls.quiz).toBe(1);
@@ -324,6 +332,7 @@ test("hafta özeti gün serisi değil ÜRETİM anlatır", async () => {
   await recordStats(["produced", "produced", "reviewed", "shadowed"]);
   await flushStats();
   await open();
+  goTab("Defter");
   await waitFor(() => expect(screen.getByText(/Bu hafta:/)).toBeTruthy());
   const line = ([] as unknown[])
     .concat(screen.getByText(/Bu hafta:/).props.children)
@@ -337,12 +346,26 @@ test("hafta özeti gün serisi değil ÜRETİM anlatır", async () => {
 
 test("sıfırlama tek dokunuşla olmaz — onay ister", async () => {
   await open();
-  await waitFor(() => expect(screen.getByText("Mehmet")).toBeTruthy());
-  fireEvent.press(screen.getByText(/⋯|Ayarlar/));
-  pressAlert(/Sıfırla/);
+  goTab("Profil");
+  fireEvent.press(await screen.findByLabelText("Sıfırla"));
   expect(lastAlert()?.body).toMatch(/Emin misin/);
   expect(calls.reset ?? 0).toBe(0);
 
   pressAlert(/Vazgeç/);
   expect(calls.reset ?? 0).toBe(0);
+});
+
+// --- sekmeler ---------------------------------------------------------------
+
+test("sekmeler: ortadaki mikrofon Konuşma Odası'nı açar, dönüşte sekme hatırlanır", async () => {
+  await open();
+  fireEvent.press(screen.getByLabelText("Hemen konuş"));
+  expect(calls.conversation).toBe(1);
+  goTab("Pratik");
+  expect(screen.getByText("Cümle Kurma")).toBeTruthy();
+  screen.unmount();
+  await open();
+  // Alt ekrandan dönen öğrenci Pratik'te kalır
+  expect(screen.getByText("Cümle Kurma")).toBeTruthy();
+  goTab("Bugün");
 });

@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import ErrorBoundary from "./src/components/ErrorBoundary";
 import { installGlobalErrorHandler, reportError } from "./src/errorLog";
 import DashboardScreen from "./src/screens/DashboardScreen";
@@ -293,6 +294,7 @@ export default function App() {
   };
 
   return (
+    <SafeAreaProvider>
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style="auto" />
       {screen.name === "loading" && (
@@ -397,5 +399,6 @@ export default function App() {
         />
       )}
     </View>
+    </SafeAreaProvider>
   );
 }
