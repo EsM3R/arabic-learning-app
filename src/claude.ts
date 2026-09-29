@@ -26,9 +26,12 @@ import {
   debriefUserMessage,
   pronunciationSystem,
   readingTextSystem,
+  sentenceBuildSystem,
   readingTextUserMessage,
 } from "./prompts";
 import { normalizeDebrief } from "./conversation";
+import { normalizeBuildSet } from "./sentencebuilding";
+import type { BuildSet, Pattern, Theme } from "./sentencebuilding";
 import type { Debrief, Scenario } from "./conversation";
 import {
   buildReadingRequest,
@@ -495,4 +498,81 @@ export async function generateDebrief(
     apiKey,
   });
   return normalizeDebrief(parsed);
+}
+
+const STEP_SCHEMA = {
+  type: "object",
+  properties: {
+    trPiece: { type: "string" },
+    trSoFar: { type: "string" },
+    target: { type: "string" },
+    alts: { type: "array", items: { type: "string" } },
+    translit: { type: "string" },
+    note: { type: "string" },
+  },
+  required: ["trPiece", "trSoFar", "target", "alts", "translit", "note"],
+  additionalProperties: false,
+} as const;
+
+const BUILD_SET_SCHEMA = {
+  type: "object",
+  properties: {
+    intro: { type: "string" },
+    sentences: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          tr: { type: "string" },
+          steps: { type: "array", items: STEP_SCHEMA },
+          blocks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                target: { type: "string" },
+                tr: { type: "string" },
+                note: { type: "string" },
+                contrast: { type: "string" },
+                alts: { type: "array", items: { type: "string" } },
+              },
+              required: ["target", "tr", "note", "contrast", "alts"],
+              additionalProperties: false,
+            },
+          },
+          reorder: { type: "string" },
+        },
+        required: ["tr", "steps", "blocks", "reorder"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["intro", "sentences"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Cümle kurma seti — tek yapılandırılmış çağrı. Set cihazda saklanır ve
+ * tekrar tekrar çalışılır; her açılışta yeniden üretilmez.
+ */
+export async function generateBuildSet(
+  profile: Profile,
+  pattern: Pattern,
+  theme: Theme,
+  knownWords: string[]
+): Promise<BuildSet> {
+  await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const parsed = await provider.structured<unknown>({
+    system: sentenceBuildSystem(profile, pattern, theme, knownWords),
+    userMessage: "Cümle kurma setimi hazırla.",
+    schema: BUILD_SET_SCHEMA as unknown as Record<string, unknown>,
+    model,
+    apiKey,
+  });
+  const set = normalizeBuildSet(parsed, pattern.id, theme.id);
+  if (set.sentences.length < 3) {
+    throw new Error("Set beklenenden kısa geldi (modelin cevabı şemaya uymamış). Tekrar denemek genelde çözer.");
+  }
+  return set;
 }

@@ -177,6 +177,7 @@ export interface NavigationSuggestion {
     | "quiz"
     | "pronunciation"
     | "conversation"
+    | "sentences"
     | "mistakes"
     | "module"
     | "reading"

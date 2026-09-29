@@ -15,7 +15,9 @@ import {
   ladderSummary,
   MASTER_SENTENCES,
   nextPattern,
-  normalizeDrillSet,
+  normalizeBuildSet,
+  reorderStep,
+  THEMES,
   PATTERN_LADDER,
   patternsDueForReview,
   recordAttempt,
@@ -95,39 +97,61 @@ test("Arap yazısında hareke farkı yanlış sayılmaz", () => {
 // --- model çıktısı ------------------------------------------------------------------
 
 test("bozuk model çıktısı ÇÖKERTMEZ", () => {
-  const d = normalizeDrillSet(null, "istek");
+  const d = normalizeBuildSet(null, "istek", "rutin");
   assert.equal(d.patternId, "istek");
+  assert.equal(d.themeId, "rutin");
   assert.deepEqual(d.sentences, []);
-  assert.deepEqual(d.examples, []);
 });
 
-test("hedefi boş adım atılır; tek adımlı cümle bırakılmaz", () => {
-  // Boş hedefle karşılaştırma her cevabı yanlış sayardı; tek adımlı cümlede
-  // parça parça kurmanın anlamı kalmaz.
-  const d = normalizeDrillSet(
+test("videodaki cümle: çekirdekten dışarı, yapı taşı, karşıtlık, bağlacın yeri", () => {
+  // Transkriptteki ikinci cümle, olduğu gibi.
+  const d = normalizeBuildSet(
     {
-      formula: "I want to + fiil",
+      intro: "Günlük rutin — bağlaçlar",
       sentences: [
         {
-          tr: "Eve gitmek istiyorum.",
+          tr: "Kahvaltı yapmadan önce duş alırım.",
           steps: [
-            { trPiece: "istiyorum", trSoFar: "istiyorum", target: "I want" },
-            { trPiece: "gitmek", trSoFar: "gitmek istiyorum", target: "I want to go", alts: ["I wanna go", 5] },
-            { trPiece: "eve", trSoFar: "eve gitmek istiyorum", target: "" },
+            { trPiece: "duş alırım", trSoFar: "duş alırım", target: "I take a shower", alts: ["I have a shower"] },
+            { trPiece: "kahvaltı yapmadan önce", trSoFar: "Kahvaltı yapmadan önce duş alırım.", target: "Before I have breakfast, I take a shower." },
+            { trPiece: "x", trSoFar: "x", target: "" },
           ],
+          blocks: [
+            { target: "before", tr: "-madan önce", note: "iki eylemi bağlar", contrast: "ago sadece 'önce' demek: three days ago", alts: [] },
+            { target: "", tr: "boş" },
+          ],
+          reorder: "I take a shower before I have breakfast.",
         },
         { tr: "Tek adım.", steps: [{ trPiece: "a", trSoFar: "a", target: "A" }] },
-        { tr: "", steps: [] },
       ],
-      examples: [{ target: "I want to eat.", tr: "Yemek istiyorum." }, { target: "", tr: "x" }],
     },
-    "istek"
+    "zaman-baglac",
+    "rutin"
   );
   assert.equal(d.sentences.length, 1);
-  assert.equal(d.sentences[0].steps.length, 2);
-  assert.deepEqual(d.sentences[0].steps[1].alts, ["I wanna go"]);
-  assert.equal(d.examples.length, 1);
-  assert.equal(d.formula, "I want to + fiil");
+  const s0 = d.sentences[0];
+  assert.equal(s0.steps.length, 2); // boş hedefli adım atıldı
+  assert.deepEqual(s0.steps[0].alts, ["I have a shower"]);
+  assert.equal(s0.blocks.length, 1);
+  assert.match(s0.blocks[0].contrast, /ago/);
+  assert.equal(reorderStep(s0)?.target, "I take a shower before I have breakfast.");
+  // İki sıralama da doğru; ama bağlaç adımında İSTENEN öteki sıralama.
+  assert.equal(checkStep(reorderStep(s0)!, "I take a shower before I have breakfast", "latin"), "dogru");
+});
+
+test("bağlaç yeri değişmeyen cümlede ek adım yok", () => {
+  const d = normalizeBuildSet(
+    { sentences: [{ tr: "a b", steps: [{ trSoFar: "a", target: "A" }, { trSoFar: "a b", target: "A B" }] }] },
+    "olmak",
+    "rutin"
+  );
+  assert.equal(reorderStep(d.sentences[0]), null);
+});
+
+test("her temanın hikâye akışı var", () => {
+  assert.ok(THEMES.length >= 8);
+  assert.equal(new Set(THEMES.map((t) => t.id)).size, THEMES.length);
+  for (const t of THEMES) assert.ok(t.arc.split(",").length >= 4, t.id);
 });
 
 // --- ilerleme -----------------------------------------------------------------------

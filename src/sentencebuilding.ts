@@ -1,25 +1,32 @@
 /**
  * CÜMLE KURMA — saf mantık (cihaz modülü yok; tests/sentencebuilding.test.ts).
  *
- * Kullanıcının getirdiği yöntem: Türkçe bir cümle verilir, hedef dile PARÇA
- * PARÇA çevrilerek kurulur. Türkçe ile İngilizcenin söz dizimi ters olduğu için
- * (Türkçede fiil sonda, İngilizcede başta) cümle ÇEKİRDEKTEN dışarı doğru
- * büyütülür:
+ * Kullanıcının getirdiği yöntem (Furkan Çetin'in videosunun transkriptinden):
  *
- *   Dün akşam arkadaşımla sinemaya gitmek istedim.
- *   istedim            → I wanted
- *   gitmek istedim     → I wanted to go
- *   sinemaya           → I wanted to go to the cinema
- *   arkadaşımla        → I wanted to go to the cinema with my friend
- *   dün akşam          → Last night I wanted to go to the cinema with my friend.
+ * 1. Cümleler TEK TEK değil, BİR HİKÂYE olarak gelir — "günlük rutinim":
+ *    uyanırım → duş alırım → evden çıkarım → işe giderim → eve gelirim →
+ *    televizyon açarım → yatarım. Birbirine bağlı, gerçek hayattan.
+ * 2. Her cümle ANA YÜKLEMDEN başlayıp dışarı doğru kurulur:
+ *    "Sabahları erken uyanmayı seviyorum" → I like → I like to wake up →
+ *    I like to wake up early → I like to wake up early in the morning.
+ * 3. Her cümle 1-2 YAPI TAŞI öğretir: bağlaç (before, after, when, because,
+ *    however), zaman ifadesi (in the morning, at around 7 pm), kalıp
+ *    (take a shower, turn on the TV, leave home, go to bed, by bus).
+ * 4. KARIŞTIRILANLAR açıkça ayrılır: ago/before, later/after, with/by,
+ *    open/turn on — Türk öğrencinin tam düştüğü yerler.
+ * 5. ALTERNATİFLER gösterilir: take/have a shower, sometimes/from time to
+ *    time, often/frequently, around/about, like doing/like to do.
+ * 6. Bağlacın YERİ değişebilir: "Before I have breakfast, I take a shower"
+ *    = "I take a shower before I have breakfast". İkisi de söyletilir.
+ * 7. SARMAL: son cümleler önceki yapı taşlarını yeniden birleştirir —
+ *    "bunu da öğrendik, artık rahatlıkla çevirebiliriz".
  *
- * Neden işe yarıyor: konuşmak kafada hazır kalıp olması demek. Öğrenci her
- * adımda cümlenin TAMAMINI yeniden söyler; kalıp tekrarla otomatikleşir ve
- * "Türkçe düşünüp çeviremiyorum" duvarı adım adım aşılır.
+ * Videodan tek fark: videoda öğretmen çevirir, öğrenci izler. Burada öğrenci
+ * ÇEVİRİR ve SESLİ SÖYLER — izlemek konuşturmaz. Her adımda cümlenin TAMAMI
+ * yeniden söylenir; parçalar tekrarla otomatikleşir.
  *
- * Merdiven dilden bağımsız, Türkçe dilbilgisi kavramlarıyla yazıldı: "istek
- * (-mek istemek)" her dilde vardır, hedef dildeki formülü model üretir. Bu
- * yüzden aynı sistem sekiz dilde de çalışır.
+ * Kalıp merdiveni omurga olarak kalıyor: her set bir kalıba ODAKLANIR ama o
+ * kalıbı bir temanın içinde, hikâye cümleleriyle çalıştırır.
  */
 import type { ScriptId } from "./scripts.ts";
 import { normalizeTarget } from "./textnorm.ts";
@@ -98,6 +105,32 @@ export const PATTERN_LADDER: Pattern[] = [
   { id: "deyim", band: "C1", title: "Günlük deyimler ve kalıplar", concept: "doğal günlük deyimler ve söz öbekleri (phrasal verb vb.)" },
 ];
 
+/** Hikâye temaları — setin cümleleri bu temada birbirine bağlı ilerler. */
+export interface Theme {
+  id: string;
+  title: string;
+  emoji: string;
+  /** Türkçe: hikâyenin akışı; model cümleleri bu sırayla kurar. */
+  arc: string;
+}
+
+export const THEMES: Theme[] = [
+  { id: "rutin", title: "Günlük rutinim", emoji: "⏰", arc: "uyanmak, duş, kahvaltı, evden çıkmak, işe/okula gitmek, eve dönmek, akşam, yatmak" },
+  { id: "haftasonu", title: "Hafta sonum", emoji: "🌤️", arc: "geç uyanmak, arkadaşlarla buluşmak, dışarıda yemek, alışveriş, film, erken yatmamak" },
+  { id: "is", title: "İş günüm", emoji: "💼", arc: "işe varmak, toplantı, e-postalar, öğle arası, bir sorun çıkması, eve dönüş" },
+  { id: "tatil", title: "Geçen tatilim", emoji: "✈️", arc: "yolculuğa hazırlık, havaalanı, otele varmak, gezmek, yemek, bir aksilik, dönüş" },
+  { id: "aile", title: "Ailem", emoji: "👨‍👩‍👧", arc: "aile bireyleri, nerede yaşadıkları, ne iş yaptıkları, birlikte ne yaptığımız, bir anı" },
+  { id: "yemek", title: "Yemek ve mutfak", emoji: "🍳", arc: "market alışverişi, yemek yapmak, tarif, sofrayı kurmak, bulaşık, sevdiğim yemekler" },
+  { id: "saglik", title: "Sağlık ve spor", emoji: "🏃", arc: "hastalanmak, doktora gitmek, ilaç, iyileşmek, spora başlamak, alışkanlıklar" },
+  { id: "sehir", title: "Şehirde bir gün", emoji: "🏙️", arc: "toplu taşıma, yol sormak, bir yere geç kalmak, kafe, müze, eve dönüş" },
+  { id: "gelecek", title: "Planlarım", emoji: "🎯", arc: "gelecek yıl, yeni bir dil, iş değiştirmek, taşınmak, hayaller ve koşullar" },
+  { id: "anilar", title: "Çocukluğum", emoji: "🧸", arc: "eskiden yaptıklarım, okul, arkadaşlar, bir olay, şimdi ne değişti" },
+];
+
+export function themeById(id: string): Theme | undefined {
+  return THEMES.find((t) => t.id === id);
+}
+
 const BANDS: Band[] = ["A1", "A2", "B1", "B2", "C1"];
 
 export function toBand(level: string | undefined): Band {
@@ -127,24 +160,42 @@ export interface BuildStep {
   alts: string[];
   /** Latin dışı dillerde okunuş; Latin dillerde "". */
   translit: string;
-  /** Bu adımda neyin değiştiğine dair tek cümlelik Türkçe not. */
+  /** Bu adımda neyin eklendiğine dair tek cümlelik Türkçe not. */
   note: string;
+}
+
+/** Cümlenin öğrettiği yapı taşı: bağlaç, zaman ifadesi ya da kalıp. */
+export interface BuildBlock {
+  /** Hedef dilde parça, örn. "before", "turn on", "at around 7 pm". */
+  target: string;
+  /** Türkçe karşılığı, örn. "-madan önce". */
+  tr: string;
+  /** Türkçe kısa açıklama. */
+  note: string;
+  /** Karıştırılan şey ve farkı: "ago sadece 'önce' demek (3 gün önce)". Yoksa "". */
+  contrast: string;
+  /** Eş seçenekler: "have a shower", "from time to time". */
+  alts: string[];
 }
 
 export interface BuildSentence {
   /** Tam Türkçe cümle. */
   tr: string;
   steps: BuildStep[];
+  /** Bu cümlenin öğrettiği 1-2 yapı taşı. */
+  blocks: BuildBlock[];
+  /**
+   * Bağlaç cümlenin başından ortasına alınabiliyorsa o sıralama (hedef
+   * dilde). Son adımdan sonra ayrıca söyletilir. Yoksa "".
+   */
+  reorder: string;
 }
 
-export interface DrillSet {
+export interface BuildSet {
   patternId: string;
-  /** Hedef dildeki formül, örn. "I want to + fiil". */
-  formula: string;
-  /** Kalıbın Türkçe açıklaması — 2-3 cümle. */
-  explain: string;
-  /** Hazır örnekler: dinlenir, okunur (kurmadan önce kulak alışsın). */
-  examples: { target: string; translit: string; tr: string }[];
+  themeId: string;
+  /** Setin kısa Türkçe tanıtımı — hangi hikâye, hangi kalıp. */
+  intro: string;
   sentences: BuildSentence[];
   createdAt: string;
 }
@@ -153,11 +204,16 @@ const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 /**
- * Model çıktısını güvenli biçime toparlar. Eksik adım atılır; hedefi boş olan
- * adım hiç gösterilmez (boş hedefle karşılaştırma her cevabı "yanlış" sayardı).
- * Tek adımlı cümle bırakılmaz — parça parça kurmanın anlamı kalmaz.
+ * Model çıktısını güvenli biçime toparlar. Hedefi boş adım atılır (boş
+ * hedefle karşılaştırma her cevabı "yanlış" sayardı); tek adımlı cümle
+ * bırakılmaz (parça parça kurmanın anlamı kalmaz).
  */
-export function normalizeDrillSet(raw: unknown, patternId: string, now = new Date()): DrillSet {
+export function normalizeBuildSet(
+  raw: unknown,
+  patternId: string,
+  themeId: string,
+  now = new Date()
+): BuildSet {
   const r = (raw ?? {}) as Record<string, unknown>;
   const sentences: BuildSentence[] = arr(r.sentences)
     .map((s) => {
@@ -176,24 +232,40 @@ export function normalizeDrillSet(raw: unknown, patternId: string, now = new Dat
         })
         .filter((st) => st.target && st.trSoFar)
         .slice(0, 8);
-      return { tr: str(o.tr), steps };
+      const blocks: BuildBlock[] = arr(o.blocks)
+        .map((bl) => {
+          const x = (bl ?? {}) as Record<string, unknown>;
+          return {
+            target: str(x.target),
+            tr: str(x.tr),
+            note: str(x.note),
+            contrast: str(x.contrast),
+            alts: arr(x.alts).map(str).filter(Boolean).slice(0, 4),
+          };
+        })
+        .filter((bl) => bl.target && bl.tr)
+        .slice(0, 3);
+      return { tr: str(o.tr), steps, blocks, reorder: str(o.reorder) };
     })
     .filter((s) => s.tr && s.steps.length >= 2)
-    .slice(0, 8);
-  const examples = arr(r.examples)
-    .map((e) => {
-      const o = (e ?? {}) as Record<string, unknown>;
-      return { target: str(o.target), translit: str(o.translit), tr: str(o.tr) };
-    })
-    .filter((e) => e.target && e.tr)
-    .slice(0, 12);
+    .slice(0, 10);
+  return { patternId, themeId, intro: str(r.intro), sentences, createdAt: now.toISOString() };
+}
+
+/**
+ * Bağlacın yerini değiştirme adımı — basamak gibi denetlensin diye BuildStep
+ * biçiminde. Yalnız öteki sıralama kabul edilir: aynı cümleyi tekrar etmek
+ * alıştırmayı boşa çıkarırdı.
+ */
+export function reorderStep(sentence: BuildSentence): BuildStep | null {
+  if (!sentence.reorder) return null;
   return {
-    patternId,
-    formula: str(r.formula),
-    explain: str(r.explain),
-    examples,
-    sentences,
-    createdAt: now.toISOString(),
+    trPiece: "",
+    trSoFar: sentence.tr,
+    target: sentence.reorder,
+    alts: [],
+    translit: "",
+    note: "Aynı cümle, bağlaç bu kez ortada.",
   };
 }
 

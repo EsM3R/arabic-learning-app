@@ -63,6 +63,7 @@ interface Props {
   onOpenShadowing: () => void;
   onOpenFluency: () => void;
   onOpenConversation: () => void;
+  onOpenSentences: () => void;
   onSwitchLanguage: (id: LanguageId) => void;
   onOpenLevel: () => void;
   /** Panelden kurulan müfredatı profile yazar. */
@@ -84,6 +85,7 @@ export default function DashboardScreen({
   onOpenShadowing,
   onOpenFluency,
   onOpenConversation,
+  onOpenSentences,
   onSwitchLanguage,
   onOpenLevel,
   onCurriculumBuilt,
@@ -332,6 +334,7 @@ export default function DashboardScreen({
     else if (s.screen === "shadowing") onOpenShadowing();
     else if (s.screen === "fluency") onOpenFluency();
     else if (s.screen === "conversation") onOpenConversation();
+    else if (s.screen === "sentences") onOpenSentences();
     else if (s.screen === "mistakes") onOpenMistakes();
     else if (s.screen === "module") {
       const target = curriculum?.modules.find((m) => m.id === s.moduleId);
@@ -656,6 +659,18 @@ export default function DashboardScreen({
             </View>
             <Text style={styles.chatButtonArrow}>›</Text>
           </LinearGradient>
+        </TouchableOpacity>
+
+        {/* CÜMLE KURMA — Türkçe cümleyi parça parça hedef dile kurmak. */}
+        <TouchableOpacity style={styles.quizCard} onPress={onOpenSentences} activeOpacity={0.85}>
+          <View style={[styles.iconSquare, { backgroundColor: colors.accentSoft }]}>
+            <Text style={styles.iconSquareText}>🧩</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Cümle Kurma</Text>
+            <Text style={styles.cardMeta}>Türkçe cümleyi parça parça kur — sıfırdan ileri düzeye</Text>
+          </View>
+          <Text style={styles.cardArrow}>›</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onFreeChat} activeOpacity={0.85}>

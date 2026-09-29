@@ -21,6 +21,7 @@ export type StatEvent =
   | "fluencyRound" // tamamlanan 4/3/2 akıcılık turu
   | "repairUsed" // öğrencinin yaptığı anlam onarımı ("anlamadım", "tekrar eder misin")
   | "conversationTurn" // Konuşma Odası'nda öğrencinin sesle aldığı sıra
+  | "sentenceBuilt" // Cümle Kurma'da baştan sona kurulan cümle
   | "mistakeClosed"; // hocanın kapattığı hata
 
 export type DayCounts = Partial<Record<StatEvent, number>>;

@@ -522,3 +522,47 @@ ${transcriptForDebrief(turns)}
 
 Değerlendirmeyi hazırla.`;
 }
+
+// ---------------------------------------------------------------------------
+// CÜMLE KURMA
+// ---------------------------------------------------------------------------
+
+/**
+ * Cümle kurma seti promptu — kullanıcının getirdiği yöntem (bkz.
+ * src/sentencebuilding.ts başlığı). Model hedef dildeki cümleleri ve parça
+ * parça adımları üretir; denetim cihazda yapılır, bu yüzden adımların
+ * TUTARLI olması (her adım bir öncekini içermesi) şart.
+ */
+export function sentenceBuildSystem(
+  profile: Profile,
+  pattern: { title: string; concept: string },
+  theme: { title: string; arc: string },
+  known: string[]
+): string {
+  const p = getActivePack();
+  const level = profile.assessment?.speakingLevel ?? "A1";
+  const translitRule =
+    p.script === "latin"
+      ? 'translit alanları "" olsun.'
+      : "translit alanlarına Türkçe okunuşa yakın transkripsiyon yaz; hedef metinde tam hareke/vurgu kullan.";
+  return `Sen Türk öğrencilere ${p.label} öğreten bir hocasın. Şimdi bir CÜMLE KURMA seti hazırlayacaksın.
+
+Öğrenci: ${profile.name}, konuşma seviyesi ${level}.
+ODAK KALIP: ${pattern.title} — ${pattern.concept}
+HİKÂYE TEMASI: ${theme.title} (akış: ${theme.arc})
+${known.length ? `Öğrencinin bildiği kelimelerden yararlan: ${known.slice(0, 80).join(", ")}` : ""}
+
+YÖNTEM — bundan sapma:
+1. 7-8 Türkçe cümle yaz; hepsi AYNI HİKÂYENİN parçası, sırayla ilerlesin (birinci tekil şahıs, gerçek hayattan, sade). Odak kalıp cümlelerin en az yarısında geçsin.
+2. Her cümle 1-2 YAPI TAŞI öğretsin: bağlaç (önce/sonra/-ince/çünkü/ama/ancak), zaman ifadesi (sabahları, saat 7 gibi), günlük kalıp (duş almak, televizyonu açmak, evden çıkmak, yatağa girmek, otobüsle gitmek).
+3. Cümleyi ANA YÜKLEMDEN başlayarak DIŞARI DOĞRU kur: ilk adım yalnız özne+yüklem ("I like"), her yeni adım bir Türkçe parça ekler ve hedef dildeki cümlenin o ana kadarki TAM hâlini verir. Her adımın target'ı bir önceki adımın target'ını anlamca İÇERSİN. Adım sayısı 2-6.
+4. trPiece: bu adımda eklenen Türkçe parça. trSoFar: Türkçe cümlenin bu adıma kadarki hâli (Türkçe söz dizimiyle, doğal). note: bu adımda ne eklendiğini tek cümle Türkçe açıkla ("'erken' için early, fiilden sonra gelir").
+5. alts: aynı adımın gerçekten doğru başka söyleyişleri (take/have a shower, like doing/like to do, around/about). Uydurma alternatif yazma.
+6. blocks: cümlenin öğrettiği yapı taşları. contrast alanında Türklerin KARIŞTIRDIĞI şeyi açıkla (ago/before, later/after, with/by, open/turn on gibi); karışıklık yoksa "".
+7. reorder: cümle bağlaçla başlıyorsa ve bağlaç ortaya da alınabiliyorsa o sıralamanın TAM hâli; yoksa "".
+8. SON 2 cümle, önceki cümlelerde öğretilen yapı taşlarını YENİDEN birleştirsin — yeni taş getirmesin.
+9. Seviye ${level}: kelimeler seviyeye uygun, cümle uzunluğu makul.
+${translitRule}
+intro: setin 1-2 cümlelik Türkçe tanıtımı.
+Yalnız JSON döndür.`;
+}

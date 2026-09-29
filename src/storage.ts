@@ -95,6 +95,21 @@ export async function saveReviewMode(mode: string): Promise<void> {
   await AsyncStorage.setItem("reviewMode.v1", mode);
 }
 
+/**
+ * CÜMLE KURMA: kalıp ilerlemesi ve kayıtlı setler (dil başına). Setler
+ * saklanır ki aynı set tekrar tekrar çalışılabilsin — her açılışta yeniden
+ * üretmek hem para hem tekrar fırsatı kaybı olurdu.
+ */
+export async function loadBuildProgress<T>(): Promise<T> {
+  const raw = await AsyncStorage.getItem(langKey("buildProgress"));
+  return (raw ? JSON.parse(raw) : {}) as T;
+}
+export async function saveBuildProgress(map: unknown): Promise<void> {
+  await AsyncStorage.setItem(langKey("buildProgress"), JSON.stringify(map));
+}
+export const loadBuildSets = <T>() => loadList<T>(langKey("buildSets"));
+export const saveBuildSets = <T>(list: T[]) => saveList(langKey("buildSets"), list);
+
 /** Shadowing öz-notları (SRS değil; kuyruk sıralamasını etkiler). */
 export async function loadShadowNotes<T>(): Promise<T> {
   const raw = await AsyncStorage.getItem(langKey("shadowNotes"));
