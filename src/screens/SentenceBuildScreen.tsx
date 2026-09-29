@@ -18,6 +18,7 @@ import { isRtl } from "../scripts";
 import {
   checkStep,
   ladderSummary,
+  masteryStatus,
   nextPattern,
   patternById,
   recordAttempt,
@@ -63,8 +64,11 @@ interface Props {
  */
 type Phase = "home" | "loading" | "preview" | "drill" | "blocks" | "done";
 
-/** En fazla bu kadar set saklanır (dil başına). */
-const KEEP_SETS = 30;
+/**
+ * En fazla bu kadar set saklanır (dil başına). Sınır cümle SAYISINDA değil
+ * depoda: öğrenci istediği kadar yeni set üretebilir, en eskiler düşer.
+ */
+const KEEP_SETS = 60;
 
 /**
  * CÜMLE KURMA — Türkçe cümleyi hedef dile PARÇA PARÇA kurmak.
@@ -122,6 +126,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   // ------------------------------------------------------------------ set seçimi
   const openTheme = (theme: Theme) => {
+    // Aynı kalıp+temada birden çok set olabilir (devam setleri): en yenisi.
     const saved = sets.find((s) => s.patternId === focus.id && s.themeId === theme.id);
     if (saved) {
       start(saved);
@@ -137,11 +142,21 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     );
   };
 
-  const generate = async (theme: Theme) => {
+  /**
+   * Yeni set. Aynı kalıp+temada daha önce kurulan cümleler modele "tekrarlama,
+   * hikâye devam etsin" diye verilir — böylece örnek sınırı yok: öğrenci
+   * kalıp oturana kadar istediği kadar yeni cümle ister.
+   */
+  const generate = async (theme: Theme, patternId = focus.id) => {
+    const pattern = patternById(patternId) ?? focus;
     setPhase("loading");
     try {
       const vocab = await loadVocab();
-      const made = await generateBuildSet(profile, focus, theme, vocab.map((c) => c.arabic));
+      const avoid = sets
+        .filter((s) => s.patternId === pattern.id && s.themeId === theme.id)
+        .reverse()
+        .flatMap((s) => s.sentences.map((x) => x.tr));
+      const made = await generateBuildSet(profile, pattern, theme, vocab.map((c) => c.arabic), avoid);
       const next = [made, ...sets].slice(0, KEEP_SETS);
       setSets(next);
       await saveBuildSets(next);
@@ -280,6 +295,16 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
             <Text style={styles.focusLabel}>ŞİMDİKİ KALIP · {focus.band}</Text>
             <Text style={styles.focusTitle}>{focus.title}</Text>
             <Text style={styles.focusSub}>{focus.concept}</Text>
+            {(() => {
+              const m = masteryStatus(progress[focus.id]);
+              return (
+                <Text style={styles.focusProgress}>
+                  {m.sentences}/{m.needSentences} cümle
+                  {m.accuracy !== null ? ` · son isabet %${Math.round(m.accuracy * 100)}` : ""}
+                  {" · oturması için %85"}
+                </Text>
+              );
+            })()}
           </View>
 
           <View style={styles.ladderRow}>
@@ -351,8 +376,25 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           >
             <Text style={styles.secondaryText}>{savedBlocks ? "✓ Defterde" : "📇 Yapı taşlarını deftere ekle"}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.primary} onPress={() => start(set)}>
-            <Text style={styles.primaryText}>↺ Aynı seti tekrar</Text>
+          <TouchableOpacity
+            style={styles.primary}
+            onPress={() => {
+              const theme = THEMES.find((t) => t.id === set.themeId);
+              if (!theme) return;
+              Alert.alert(
+                "Yeni cümleler",
+                "Hikâye kaldığı yerden devam etsin mi? Aynı kalıpla, daha önce kurmadığın 7-8 yeni cümle gelir. Bu bir API isteği harcar.",
+                [
+                  { text: "Vazgeç", style: "cancel" },
+                  { text: "Evet, devam", onPress: () => void generate(theme, set.patternId) },
+                ]
+              );
+            }}
+          >
+            <Text style={styles.primaryText}>➕ Devam — yeni cümleler</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondary} onPress={() => start(set)}>
+            <Text style={styles.secondaryText}>↺ Aynı seti tekrar</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondary} onPress={() => setPhase("home")}>
             <Text style={styles.secondaryText}>Başka hikâye</Text>
@@ -539,6 +581,7 @@ function makeStyles(colors: Palette) {
     focusLabel: { color: colors.goldDeep, fontSize: 11, fontWeight: "800", letterSpacing: 0.6 },
     focusTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 4 },
     focusSub: { color: "rgba(255,255,255,0.8)", fontSize: 13.5, marginTop: 6, lineHeight: 20 },
+    focusProgress: { color: colors.goldDeep, fontSize: 12.5, fontWeight: "700", marginTop: 10 },
     ladderRow: { flexDirection: "row", gap: 8, marginBottom: 18 },
     ladderCell: { flex: 1, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingVertical: 8, alignItems: "center" },
     ladderBand: { fontSize: 11, fontWeight: "800", color: colors.inkFaint },

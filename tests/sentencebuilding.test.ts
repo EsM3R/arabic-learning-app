@@ -13,7 +13,9 @@ import {
   checkStep,
   isMastered,
   ladderSummary,
+  MASTER_ACCURACY,
   MASTER_SENTENCES,
+  masteryStatus,
   nextPattern,
   normalizeBuildSet,
   reorderStep,
@@ -198,4 +200,38 @@ test("merdiven özeti bant bant sayar", () => {
   const a1 = ladderSummary(m).find((b) => b.band === "A1")!;
   assert.equal(a1.done, 1);
   assert.ok(a1.total > 5);
+});
+
+test("OTURMA ölçütü sıkı: en az 12 cümle ve %85 — birkaç şanslı doğru yetmez", () => {
+  // Kullanıcının isteği: "tam kavradığımı çözsün".
+  assert.ok(MASTER_SENTENCES >= 12);
+  assert.ok(MASTER_ACCURACY >= 0.85);
+  let m: ProgressMap = {};
+  for (let i = 0; i < 5; i += 1) m = recordAttempt(m, "istek", "dogru", true);
+  assert.equal(isMastered(m.istek), false);
+});
+
+test("oturma SON denemelere bakar — ilk günlerin yanlışları sonsuza kadar tutmaz", () => {
+  let m: ProgressMap = {};
+  for (let i = 0; i < 30; i += 1) m = recordAttempt(m, "istek", "yanlis", false); // başta zorlandı
+  for (let i = 0; i < 20; i += 1) m = recordAttempt(m, "istek", "dogru", true); // sonra oturttu
+  assert.equal(m.istek.correct / m.istek.attempts < 0.85, true); // toplam isabet düşük
+  assert.equal(isMastered(m.istek), true); // ama son 20 kusursuz
+});
+
+test("eski doğrular unutulmuş kalıbı 'oturdu' göstermez", () => {
+  let m: ProgressMap = {};
+  for (let i = 0; i < 40; i += 1) m = recordAttempt(m, "istek", "dogru", true);
+  for (let i = 0; i < 10; i += 1) m = recordAttempt(m, "istek", "yanlis", false);
+  assert.equal(isMastered(m.istek), false);
+});
+
+test("ilerleme durumu ekrana hazır: kaç cümle, son isabet", () => {
+  let m: ProgressMap = {};
+  for (let i = 0; i < 10; i += 1) m = recordAttempt(m, "istek", i < 8 ? "dogru" : "yanlis", true);
+  const st = masteryStatus(m.istek);
+  assert.equal(st.sentences, 10);
+  assert.equal(st.needSentences, MASTER_SENTENCES);
+  assert.equal(st.accuracy, 0.8);
+  assert.equal(masteryStatus(undefined).accuracy, null);
 });

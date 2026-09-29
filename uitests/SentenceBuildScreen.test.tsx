@@ -251,3 +251,40 @@ test("üretim hatası ekranı kilitlemez", async () => {
   await waitFor(() => expect(alerts.some((a) => /hazırlanamadı/.test(a.title ?? ""))).toBe(true));
   expect(screen.getByText(/Günlük rutinim/)).toBeTruthy(); // seçime döndü
 });
+
+test("SINIR YOK: set sonunda 'Devam' yeni cümleler ister, eskileri tekrarlatmaz", async () => {
+  await openAndStart();
+  const all = [
+    ["I take a shower", "Before I have breakfast, I take a shower.", "I take a shower before I have breakfast."],
+  ];
+  for (const t of all[0]) {
+    say(t);
+    await waitFor(() => expect(screen.getByText(/Devam ›/)).toBeTruthy());
+    fireEvent.press(screen.getByText(/Devam ›/));
+  }
+  fireEvent.press(screen.getByText(/Sıradaki cümle/));
+  fireEvent.press(screen.getByText(/Kurmaya başla/));
+  for (const t of ["I turn on the TV", "When I arrive at home, I turn on the TV."]) {
+    say(t);
+    await waitFor(() => expect(screen.getByText(/Devam ›/)).toBeTruthy());
+    fireEvent.press(screen.getByText(/Devam ›/));
+  }
+  fireEvent.press(screen.getByText(/Seti bitir/));
+  await waitFor(() => expect(screen.getByText(/Devam — yeni cümleler/)).toBeTruthy());
+
+  fireEvent.press(screen.getByText(/Devam — yeni cümleler/));
+  const ok = alerts[alerts.length - 1].buttons!.find((b) => /Evet/.test(b.text ?? ""))!;
+  await act(async () => {
+    ok.onPress?.();
+  });
+  await waitFor(() => expect(mockGen).toHaveBeenCalledTimes(2));
+  const avoid = mockGen.mock.calls[1][4] as string[];
+  expect(avoid).toEqual(["Kahvaltı yapmadan önce duş alırım.", "Eve vardığımda televizyonu açarım."]);
+  await waitFor(async () => expect(await loadBuildSets()).toHaveLength(2)); // ikisi de saklı
+});
+
+test("kalıbın ilerlemesi ana ekranda görünür", async () => {
+  render(<SentenceBuildScreen profile={profile} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText(/0\/12 cümle/)).toBeTruthy());
+  expect(screen.getByText(/oturması için %85/)).toBeTruthy();
+});

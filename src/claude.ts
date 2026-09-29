@@ -560,12 +560,13 @@ export async function generateBuildSet(
   profile: Profile,
   pattern: Pattern,
   theme: Theme,
-  knownWords: string[]
+  knownWords: string[],
+  avoid: string[] = []
 ): Promise<BuildSet> {
   await guardBudget(profile);
   const { provider, model, apiKey } = requireKey(profile);
   const parsed = await provider.structured<unknown>({
-    system: sentenceBuildSystem(profile, pattern, theme, knownWords),
+    system: sentenceBuildSystem(profile, pattern, theme, knownWords, avoid),
     userMessage: "Cümle kurma setimi hazırla.",
     schema: BUILD_SET_SCHEMA as unknown as Record<string, unknown>,
     model,

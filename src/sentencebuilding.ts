@@ -355,17 +355,53 @@ export interface PatternProgress {
   /** Tamamlanan cümle sayısı (bütün adımları bitirilen). */
   sentencesDone: number;
   lastAt: string;
+  /**
+   * Son denemeler (1 doğru, 0 yanlış), en fazla RECENT_WINDOW. Oturma kararı
+   * TOPLAM isabete değil buna bakar: ilk günlerin yanlışları, kalıbı artık
+   * bilen öğrenciyi sonsuza kadar tutmasın; eski doğrular da unutulmuş bir
+   * kalıbı "oturdu" göstermesin.
+   */
+  recent?: number[];
 }
 
 export type ProgressMap = Record<string, PatternProgress>;
 
-/** Bir kalıp "oturdu" sayılır: en az 4 cümle kurulmuş ve isabet %80+. */
-export const MASTER_SENTENCES = 4;
-export const MASTER_ACCURACY = 0.8;
+/**
+ * Bir kalıp "OTURDU" sayılır: en az 12 cümle kurulmuş VE son 20 denemede
+ * isabet %85+. Kullanıcının isteği: "tam kavradığımı çözsün". Eski ölçüt
+ * (4 cümle, %80) birkaç şanslı doğruyla geçiliyordu.
+ */
+export const MASTER_SENTENCES = 12;
+export const MASTER_ACCURACY = 0.85;
+export const RECENT_WINDOW = 20;
+/** Son-deneme isabeti ancak bu kadar deneme birikince anlamlı. */
+const MIN_RECENT = 10;
+
+function recentAccuracy(p: PatternProgress): number | null {
+  const r = p.recent ?? [];
+  if (r.length < MIN_RECENT) return p.attempts >= MIN_RECENT ? p.correct / p.attempts : null;
+  return r.reduce((a, b) => a + b, 0) / r.length;
+}
 
 export function isMastered(p: PatternProgress | undefined): boolean {
   if (!p || p.attempts === 0) return false;
-  return p.sentencesDone >= MASTER_SENTENCES && p.correct / p.attempts >= MASTER_ACCURACY;
+  const acc = recentAccuracy(p);
+  return p.sentencesDone >= MASTER_SENTENCES && acc !== null && acc >= MASTER_ACCURACY;
+}
+
+/** Ekranda gösterilecek ilerleme: kaç cümle kaldı, son isabet. */
+export function masteryStatus(p: PatternProgress | undefined): {
+  sentences: number;
+  needSentences: number;
+  accuracy: number | null;
+  mastered: boolean;
+} {
+  return {
+    sentences: p?.sentencesDone ?? 0,
+    needSentences: MASTER_SENTENCES,
+    accuracy: p ? recentAccuracy(p) : null,
+    mastered: isMastered(p),
+  };
 }
 
 export function recordAttempt(
@@ -376,14 +412,16 @@ export function recordAttempt(
   now = new Date()
 ): ProgressMap {
   const prev = map[patternId] ?? { attempts: 0, correct: 0, sentencesDone: 0, lastAt: "" };
+  // "yakın" doğru sayılır: tek kelimelik kayma çoğu zaman ses tanımadan.
+  const hit = verdict === "yanlis" ? 0 : 1;
   return {
     ...map,
     [patternId]: {
       attempts: prev.attempts + 1,
-      // "yakın" doğru sayılır: tek kelimelik kayma çoğu zaman ses tanımadan.
-      correct: prev.correct + (verdict === "yanlis" ? 0 : 1),
+      correct: prev.correct + hit,
       sentencesDone: prev.sentencesDone + (sentenceFinished ? 1 : 0),
       lastAt: now.toISOString(),
+      recent: [...(prev.recent ?? []), hit].slice(-RECENT_WINDOW),
     },
   };
 }

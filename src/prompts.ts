@@ -537,7 +537,8 @@ export function sentenceBuildSystem(
   profile: Profile,
   pattern: { title: string; concept: string },
   theme: { title: string; arc: string },
-  known: string[]
+  known: string[],
+  avoid: string[] = []
 ): string {
   const p = getActivePack();
   const level = profile.assessment?.speakingLevel ?? "A1";
@@ -551,6 +552,7 @@ export function sentenceBuildSystem(
 ODAK KALIP: ${pattern.title} — ${pattern.concept}
 HİKÂYE TEMASI: ${theme.title} (akış: ${theme.arc})
 ${known.length ? `Öğrencinin bildiği kelimelerden yararlan: ${known.slice(0, 80).join(", ")}` : ""}
+${avoid.length ? `DEVAM SETİ: öğrenci bu temada şu cümleleri zaten kurdu — hiçbirini TEKRARLAMA, hikâye kaldığı yerden devam etsin, odak kalıbı YENİ fiillerle ve YENİ durumlarda kullan; önceki setlerin yapı taşlarını ara ara geri getir:\n${avoid.slice(-40).map((t) => `- ${t}`).join("\n")}` : ""}
 
 YÖNTEM — bundan sapma:
 1. 7-8 Türkçe cümle yaz; hepsi AYNI HİKÂYENİN parçası, sırayla ilerlesin (birinci tekil şahıs, gerçek hayattan, sade). Odak kalıp cümlelerin en az yarısında geçsin.
