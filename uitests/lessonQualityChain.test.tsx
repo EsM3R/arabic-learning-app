@@ -103,7 +103,7 @@ async function reopenLesson() {
 async function studentSays(text: string) {
   const before = captured.calls;
   fireEvent.changeText(screen.getByPlaceholderText(/yaz/i), text);
-  fireEvent.press(screen.getByText("↑"));
+  fireEvent.press(screen.getByLabelText("Gönder"));
   await waitFor(() => expect(captured.calls).toBeGreaterThan(before));
 }
 
@@ -115,6 +115,8 @@ beforeEach(async () => {
   setActiveLanguage("ar");
   const AsyncStorage = require("@react-native-async-storage/async-storage");
   await AsyncStorage.clear();
+  // Bu testler yazı kutusunu sürer: yazılı düzende başla (sesli ders ayrı test edilir).
+  await AsyncStorage.setItem("chatPrefs.v1", JSON.stringify({ voice: false, textScale: 1 }));
 });
 
 test("ders ölçülür ve DİSKE yazılır", async () => {

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
+import { Badge, IconButton, PressableScale, TeacherAvatar, Txt } from "../components/kit";
+import LessonSummaryView from "./LessonSummaryView";
 import type { ChatVoice } from "../components/ChatView";
 import Header from "../components/Header";
 import { agenticChat } from "../claude";
@@ -51,6 +53,7 @@ import {
   loadChatPrefs,
   saveChat,
   saveChatPrefs,
+  TEXT_SCALES,
   saveLessonQuality,
   touchLastActivity,
 } from "../storage";
@@ -486,12 +489,20 @@ export default function LessonScreen({
     void runTurn(history);
   };
 
+  /** Ders sonu özeti açık mı (modül dersleri). */
+  const [summary, setSummary] = useState(false);
+  /** Oturum başlangıcı — özet bu andan sonraki kayıtları sayar. */
+  const sessionStart = useRef(new Date().toISOString()).current;
+
   const complete = () => {
     if (!module) return;
-    Alert.alert("Modülü tamamla", `"${module.title}" tamamlandı olarak işaretlensin mi?`, [
-      { text: "Henüz değil", style: "cancel" },
-      { text: "Evet, tamamladım", onPress: () => onCompleteModule(module.id) },
-    ]);
+    stopSpeaking();
+    setSummary(true);
+  };
+
+  const cycleTextScale = () => {
+    const i = TEXT_SCALES.indexOf(prefs.textScale);
+    updatePrefs({ textScale: TEXT_SCALES[(i + 1) % TEXT_SCALES.length] });
   };
 
   const pack = getActivePack();
@@ -511,28 +522,46 @@ export default function LessonScreen({
     speakMessage,
   };
 
+  if (summary && module) {
+    return (
+      <LessonSummaryView
+        module={module}
+        messages={messages}
+        since={sessionStart}
+        onFinish={() => onCompleteModule(module.id)}
+        onContinue={() => setSummary(false)}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Header
+        leading={<TeacherAvatar size={40} speaking={speaking} />}
         title={quiz ? `${pack.teacherName} ile Tekrar` : module ? module.title : "Serbest Sohbet"}
         subtitle={
-          quiz
-            ? "Sözlü kelime sınavı — takvimi hocan kurar"
-            : module
-              ? `${pack.tracks[module.track].short} · ${module.level}`
-              : `${pack.teacherName} ile ${pack.tracks.konusma.short.toLowerCase()} pratiği`
+          speaking
+            ? `${pack.teacherName} konuşuyor`
+            : quiz
+              ? "Sözlü kelime sınavı — takvimi hocan kurar"
+              : module
+                ? `${pack.tracks[module.track].short} · ${module.level}`
+                : `${pack.teacherName} ile ${pack.tracks.konusma.short.toLowerCase()} pratiği`
         }
         onBack={onBack}
         right={
-          module && !isDone ? (
-            <TouchableOpacity style={styles.completeButton} onPress={complete}>
-              <Text style={styles.completeText}>Dersi Tamamla</Text>
-            </TouchableOpacity>
-          ) : isDone ? (
-            <View style={styles.doneBadgeWrap}>
-              <Text style={styles.doneBadge}>✓ Bitti</Text>
-            </View>
-          ) : null
+          <>
+            <PressableScale onPress={cycleTextScale} accessibilityLabel="Yazı boyutu" style={styles.sizeBtn}>
+              <Txt variant="headline" style={{ fontSize: 14 }}>
+                Aa
+              </Txt>
+            </PressableScale>
+            {module && !isDone ? (
+              <IconButton icon="check" label="Dersi Tamamla" variant="gold" size={40} onPress={complete} />
+            ) : isDone ? (
+              <Badge text="Bitti" tone="accent" />
+            ) : null}
+          </>
         }
       />
       <ChatView
@@ -548,33 +577,23 @@ export default function LessonScreen({
         }}
         voice={chatVoice}
         textScale={prefs.textScale}
-        onTextScale={(textScale) => updatePrefs({ textScale })}
       />
     </View>
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
-function makeStyles(colors: Palette) {
+function makeStyles(c: Palette) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  completeButton: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  completeText: { color: colors.gold, fontWeight: "800", fontSize: 12 },
-  doneBadgeWrap: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-  },
-  doneBadge: { color: colors.accentDark, fontWeight: "800", fontSize: 12 },
-});
+    container: { flex: 1, backgroundColor: c.bg },
+    sizeBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.card,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  });
 }

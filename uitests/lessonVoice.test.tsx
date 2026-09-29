@@ -84,8 +84,8 @@ test("hoca susunca mikrofon kendi açılır, söylenen kendiliğinden gider", as
 test("sesli ders kapatılınca ses yok, söylenen yazı kutusuna düşer", async () => {
   await open();
   await waitFor(() => expect(speak).toHaveBeenCalled());
-  fireEvent.press(screen.getByLabelText("Sesli ders"));
-  await waitFor(() => expect(screen.getByText(/Sesli ders kapalı/)).toBeTruthy());
+  fireEvent.press(screen.getByLabelText("Yazarak cevap ver"));
+  await waitFor(() => expect(screen.getByLabelText("Sesli derse geç")).toBeTruthy());
   const raw = await AsyncStorage.getItem("chatPrefs.v1");
   expect(JSON.parse(raw!).voice).toBe(false);
 
@@ -98,7 +98,7 @@ test("sesli ders kapatılınca ses yok, söylenen yazı kutusuna düşer", async
 
 test("yazı boyutu büyütülür ve tercih kalıcıdır", async () => {
   await open();
-  fireEvent.press(screen.getByLabelText("Yazıyı büyüt"));
+  fireEvent.press(screen.getByLabelText("Yazı boyutu"));
   await waitFor(async () => {
     const raw = await AsyncStorage.getItem("chatPrefs.v1");
     expect(JSON.parse(raw!).textScale).toBe(1.15);
@@ -109,6 +109,32 @@ test("Latin dilde ses modeli yoksa sesli ders açılmaz (Türkçe İngilizce aks
   setActiveLanguage("en");
   mockReply = "Good. Now you say it.";
   await open();
-  expect(screen.getByText(/Ayarlar'dan ses modeli seç/)).toBeTruthy();
+  // Sesli ders yok: yazılı düzen, basılı tut-konuş mikrofonu
+  await waitFor(() => expect(screen.getByLabelText("Basılı tutarak konuş")).toBeTruthy());
+  expect(screen.queryByLabelText("Sesli derse geç")).toBeNull();
   expect(speak).not.toHaveBeenCalled();
+});
+
+test("Dersi Tamamla onay kutusu yerine ders sonu özetini açar; özet modülü kapatır", async () => {
+  const done: string[] = [];
+  const mod = { id: "k2", track: "konusma", title: "Kendini tanıt", description: "", level: "A1", objectives: [] };
+  render(
+    <LessonScreen
+      profile={profile}
+      module={mod as never}
+      onBack={() => {}}
+      onCompleteModule={(id) => done.push(id)}
+      onProfileChange={() => {}}
+      onNavigate={() => {}}
+    />
+  );
+  await waitFor(() => expect(mockCalls.length).toBeGreaterThan(0));
+  fireEvent.press(screen.getByLabelText("Dersi Tamamla"));
+  await waitFor(() => expect(screen.getByText("Ders tamam")).toBeTruthy());
+  expect(screen.getByText(/kez sesle konuştun/)).toBeTruthy();
+  fireEvent.press(screen.getByLabelText("Derse devam et"));
+  await waitFor(() => expect(screen.getByLabelText("Dersi Tamamla")).toBeTruthy());
+  fireEvent.press(screen.getByLabelText("Dersi Tamamla"));
+  fireEvent.press(await screen.findByLabelText("Dersi tamamla"));
+  expect(done).toEqual(["k2"]);
 });

@@ -97,6 +97,8 @@ beforeEach(async () => {
   setActiveLanguage("ar");
   const AsyncStorage = require("@react-native-async-storage/async-storage");
   await AsyncStorage.clear();
+  // Bu testler yazı kutusunu sürer: yazılı düzende başla (sesli ders ayrı test edilir).
+  await AsyncStorage.setItem("chatPrefs.v1", JSON.stringify({ voice: false, textScale: 1 }));
 });
 
 test("açılışta hocayı uygulama başlatır", async () => {
@@ -136,7 +138,7 @@ test("onarım hamlesi kullanılınca prompt bunu SONRAKİ turda bilir", async ()
   captured.calls = 0;
 
   fireEvent.changeText(screen.getByPlaceholderText(/buraya yaz/i), "merhaba");
-  fireEvent.press(screen.getByText("↑")); // gönder düğmesi
+  fireEvent.press(screen.getByLabelText("Gönder")); // gönder düğmesi
   await waitFor(() => expect(captured.calls).toBeGreaterThan(0));
 
   const d = dynamicPrompt();
@@ -149,7 +151,7 @@ test("öğrenci onarım kalıbı yazınca KAYDEDİLİR", async () => {
   // refleksi kazandığını asla göremez.
   await openLesson();
   fireEvent.changeText(screen.getByPlaceholderText(/buraya yaz/i), "لَمْ أَفْهَمْ");
-  fireEvent.press(screen.getByText("↑")); // gönder düğmesi
+  fireEvent.press(screen.getByLabelText("Gönder")); // gönder düğmesi
 
   await waitFor(async () => {
     expect(await loadRepairSeen()).toContain("anlamadim");
@@ -161,7 +163,7 @@ test("öğrenci onarım kalıbı yazınca KAYDEDİLİR", async () => {
 test("sıradan cümle onarım sayılmaz — ölçüm şişmez", async () => {
   await openLesson();
   fireEvent.changeText(screen.getByPlaceholderText(/buraya yaz/i), "ذَهَبْتُ إِلَى السُّوقِ");
-  fireEvent.press(screen.getByText("↑")); // gönder düğmesi
+  fireEvent.press(screen.getByLabelText("Gönder")); // gönder düğmesi
   await waitFor(() => expect(captured.calls).toBeGreaterThan(1));
   expect(await loadRepairSeen()).toEqual([]);
 });
@@ -169,7 +171,7 @@ test("sıradan cümle onarım sayılmaz — ölçüm şişmez", async () => {
 test("hedef alfabede yazılan cümle ÜRETİM sayılır", async () => {
   await openLesson();
   fireEvent.changeText(screen.getByPlaceholderText(/buraya yaz/i), "أَنَا فِي الْبَيْتِ");
-  fireEvent.press(screen.getByText("↑")); // gönder düğmesi
+  fireEvent.press(screen.getByLabelText("Gönder")); // gönder düğmesi
   await waitFor(async () => {
     const stats = await loadStatsSummary();
     expect(stats.total.produced).toBeGreaterThan(0);
@@ -181,7 +183,7 @@ test("TÜRKÇE yazılan cümle üretim sayılmaz — dürüst metrik", async () 
   // yazınca sayılmamalı, yoksa "ürettiğin cümle" sayacı yalan söyler.
   await openLesson();
   fireEvent.changeText(screen.getByPlaceholderText(/buraya yaz/i), "bugün markete gittim");
-  fireEvent.press(screen.getByText("↑")); // gönder düğmesi
+  fireEvent.press(screen.getByLabelText("Gönder")); // gönder düğmesi
   await waitFor(() => expect(captured.calls).toBeGreaterThan(1));
   const stats = await loadStatsSummary();
   expect(stats.total.produced ?? 0).toBe(0);

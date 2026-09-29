@@ -13,13 +13,15 @@ interface Props {
   tone?: "light" | "deep";
   /** Geri yerine kapat (×) — tam ekran akışlarda. */
   closeIcon?: boolean;
+  /** Başlığın solunda (avatar vb.). */
+  leading?: React.ReactNode;
 }
 
 /**
  * İç ekranların ortak üst çubuğu. Güvenli alanı kendi ölçer (eski sürüm
  * 58 px'i elle yazıyordu), geri düğmesi 44 px dokunma alanlı bir ikon.
  */
-export default function Header({ title, subtitle, onBack, right, tone = "light", closeIcon }: Props) {
+export default function Header({ title, subtitle, onBack, right, tone = "light", closeIcon, leading }: Props) {
   const c = useTheme();
   const insets = useInsets();
   const deep = tone === "deep";
@@ -48,7 +50,8 @@ export default function Header({ title, subtitle, onBack, right, tone = "light",
       ) : (
         <View style={{ width: 12 }} />
       )}
-      <View style={{ flex: 1, gap: 1 }}>
+      {leading}
+      <View style={{ flex: 1, gap: 1, marginLeft: leading ? 4 : 0 }}>
         <Txt variant="headline" color={deep ? c.onDeep : c.ink} numberOfLines={1}>
           {title}
         </Txt>

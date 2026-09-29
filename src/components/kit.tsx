@@ -747,7 +747,14 @@ export function TeacherAvatar({ size = 44, speaking = false, ring = true }: { si
     return () => loop.stop();
   }, [speaking, pulse]);
   const inner = ring ? size - 10 : size;
-  const letterFont = pack.script === "latin" ? { fontFamily: "Fraunces", fontWeight: "600" as const } : arabicText(Math.round(inner * 0.46));
+  const latin = pack.script === "latin";
+  const fsz = Math.round(inner * (latin ? 0.46 : 0.5));
+  // Naskh'ın satır yüksekliği harekeler için çok yüksek; avatarda tek harf
+  // var, harfi daireye oturtmak için satırı daire kadar tutup optik olarak
+  // biraz aşağı itiyoruz (Arap harfleri taban çizgisinin üstünde durur).
+  const letterStyle: TextStyle = latin
+    ? { fontFamily: "Fraunces", fontWeight: "600", fontSize: fsz, lineHeight: inner, textAlign: "center" }
+    : { fontFamily: "NotoNaskhArabic", fontSize: fsz, lineHeight: inner * 1.2, textAlign: "center", marginTop: inner * 0.12 };
   return (
     <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
       {ring && (
@@ -774,12 +781,7 @@ export function TeacherAvatar({ size = 44, speaking = false, ring = true }: { si
           justifyContent: "center",
         }}
       >
-        <Text
-          style={[
-            letterFont,
-            { color: "#FFFFFF", fontSize: Math.round(inner * 0.46), lineHeight: undefined, textAlign: "center" },
-          ]}
-        >
+        <Text style={[letterStyle, { color: "#FFFFFF", includeFontPadding: false }]}>
           {pack.avatarLetter}
         </Text>
       </View>
