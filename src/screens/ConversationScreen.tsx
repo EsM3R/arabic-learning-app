@@ -11,7 +11,24 @@ import {
   View,
 } from "react-native";
 import { AgentContext } from "../agent";
+import { StatusBar } from "expo-status-bar";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import {
+  Button,
+  Chip,
+  ListGroup,
+  ListRow,
+  PressableScale,
+  SectionLabel,
+  StarPattern,
+  Surface,
+  TargetText,
+  TeacherAvatar,
+  Txt,
+  useInsets,
+  Wave,
+} from "../components/kit";
 import { agenticChat, generateDebrief } from "../claude";
 import { isBudgetError } from "../budget";
 import {
@@ -39,7 +56,7 @@ import {
   saveVocab,
   touchLastActivity,
 } from "../storage";
-import { radius, shadow, shadowLift } from "../theme";
+import { arabicText, shadowLift } from "../theme";
 import type { Palette } from "../theme";
 import { useDictation } from "../useDictation";
 import { useTheme } from "../useTheme";
@@ -83,6 +100,7 @@ const SILENCE_MS = 2200;
 export default function ConversationScreen({ profile, onBack }: Props) {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useInsets();
   const pack = getActivePack();
   const level = profile.assessment?.speakingLevel ?? "A1";
   /**
@@ -420,39 +438,48 @@ export default function ConversationScreen({ profile, onBack }: Props) {
 
   if (phase === "pick") {
     return (
-      <View style={styles.container}>
+      <View style={styles.light}>
         <Header title="Konuşma Odası" subtitle="yazmak yok, konuşmak var" onBack={onBack} />
-        <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.lead}>
-            Burada hoca konuşur, sen konuşursun. Metin kutusu yok. Sahnede hoca
-            karakterden çıkmaz ve seni düzeltmez — düzeltmeler sahne bitince gelir.
-          </Text>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Txt variant="callout" color={colors.inkSoft} style={{ marginBottom: 16 }}>
+            Burada hoca konuşur, sen konuşursun. Metin kutusu yok. Sahnede hoca karakterden çıkmaz
+            ve seni düzeltmez — düzeltmeler sahne bitince gelir.
+          </Txt>
 
-          <TouchableOpacity style={styles.freeCard} onPress={() => start(null)} activeOpacity={0.85}>
-            <Text style={styles.freeEmoji}>🗣️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.freeTitle}>{pack.teacherName} ile sesli sohbet</Text>
-              <Text style={styles.freeSub}>Konu yok, sahne yok — sadece konuş</Text>
-            </View>
-            <Text style={styles.arrow}>›</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.sectionTitle}>Rol sahneleri · {level}</Text>
-          {scenarios.map((s) => (
-            <TouchableOpacity
-              key={s.id}
-              style={styles.sceneCard}
-              onPress={() => start(s)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.sceneEmoji}>{s.emoji}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sceneTitle}>{s.title}</Text>
-                <Text style={styles.sceneSub}>{s.situation}</Text>
+          <PressableScale onPress={() => start(null)} accessibilityLabel={`${pack.teacherName} ile sesli sohbet`}>
+            <View style={styles.freeCard}>
+              <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.1} />
+              <TeacherAvatar size={52} />
+              <View style={{ flex: 1, gap: 3 }}>
+                <Txt variant="title3" color={colors.onDeep}>
+                  {pack.teacherName} ile sesli sohbet
+                </Txt>
+                <Txt variant="caption" color={colors.onDeepSoft}>
+                  Konu yok, sahne yok — sadece konuş
+                </Txt>
               </View>
-              <Text style={styles.sceneLevel}>{s.minLevel}+</Text>
-            </TouchableOpacity>
-          ))}
+              <Icon name="chevronRight" size={22} color={colors.goldDeep} />
+            </View>
+          </PressableScale>
+
+          <SectionLabel title={`Rol sahneleri · ${level}`} style={{ marginTop: 24 }} />
+          <ListGroup>
+            {scenarios.map((s) => (
+              <ListRow
+                key={s.id}
+                icon="scene"
+                tone="gold"
+                title={s.title}
+                subtitle={s.situation}
+                onPress={() => start(s)}
+                right={
+                  <Txt variant="caption" color={colors.gold} style={{ fontWeight: "800" }}>
+                    {s.minLevel}+
+                  </Txt>
+                }
+              />
+            ))}
+          </ListGroup>
         </ScrollView>
       </View>
     );
@@ -460,99 +487,119 @@ export default function ConversationScreen({ profile, onBack }: Props) {
 
   if (phase === "debrief") {
     return (
-      <View style={styles.container}>
-        <Header
-          title={scenario ? scenario.title : "Sesli sohbet"}
-          subtitle="değerlendirme"
-          onBack={onBack}
-        />
-        <ScrollView contentContainerStyle={styles.body}>
+      <View style={styles.light}>
+        <Header title={scenario ? scenario.title : "Sesli sohbet"} subtitle="değerlendirme" onBack={onBack} />
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           {!debrief && !debriefError && (
             <View style={styles.center}>
               <ActivityIndicator size="large" color={colors.accent} />
-              <Text style={styles.busy}>{pack.teacherName} konuşmayı değerlendiriyor…</Text>
+              <Txt variant="callout" color={colors.inkSoft}>
+                {pack.teacherName} konuşmayı değerlendiriyor…
+              </Txt>
             </View>
           )}
           {debriefError && (
             <View style={styles.center}>
-              <Text style={styles.errText}>{debriefError}</Text>
-              <TouchableOpacity style={styles.primary} onPress={() => void finish()}>
-                <Text style={styles.primaryText}>Tekrar dene</Text>
-              </TouchableOpacity>
+              <Txt variant="callout" color={colors.danger} center>
+                {debriefError}
+              </Txt>
+              <Button label="Tekrar dene" icon="refresh" onPress={() => void finish()} />
             </View>
           )}
           {debrief && (
-            <>
+            <View style={{ gap: 14 }}>
               <View style={styles.summaryCard}>
+                <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.08} />
                 {debrief.goalReached !== null && (
-                  <Text style={styles.goal}>
-                    {debrief.goalReached ? "🎯 Hedefe ulaştın" : "🎯 Hedefe bu kez ulaşılmadı"}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Icon name="target" size={16} color={colors.goldDeep} />
+                    <Txt variant="overline" color={colors.goldDeep}>
+                      {debrief.goalReached ? "Hedefe ulaştın" : "Hedefe bu kez ulaşılmadı"}
+                    </Txt>
+                  </View>
                 )}
-                <Text style={styles.summaryText}>{debrief.summary}</Text>
-                <Text style={styles.meta}>
+                <Txt variant="title3" color={colors.onDeep} style={{ marginTop: 8 }}>
+                  {debrief.summary}
+                </Txt>
+                <Txt variant="caption" color={colors.onDeepSoft} style={{ marginTop: 12 }}>
                   {studentTurns} sıra konuştun · {Math.max(1, Math.round((Date.now() - startedAt.current) / 60000))} dk
-                </Text>
+                </Txt>
               </View>
 
               {debrief.keep.length > 0 && (
-                <View style={styles.block}>
-                  <Text style={styles.blockTitle}>✓ İyi yaptıkların</Text>
+                <Surface style={{ gap: 8 }}>
+                  <Txt variant="headline" style={{ fontSize: 15 }}>
+                    İyi yaptıkların
+                  </Txt>
                   {debrief.keep.map((k, i) => (
-                    <Text key={i} style={styles.keepText}>• {k}</Text>
+                    <View key={i} style={{ flexDirection: "row", gap: 10 }}>
+                      <Icon name="check" size={18} color={colors.accentDark} strokeWidth={2.4} />
+                      <Txt variant="callout" style={{ flex: 1 }}>
+                        {k}
+                      </Txt>
+                    </View>
                   ))}
-                </View>
+                </Surface>
               )}
 
               {debrief.corrections.length > 0 && (
-                <View style={styles.block}>
-                  <Text style={styles.blockTitle}>Düzeltmeler</Text>
+                <Surface style={{ gap: 12 }}>
+                  <Txt variant="headline" style={{ fontSize: 15 }}>
+                    Düzeltmeler
+                  </Txt>
                   {debrief.corrections.map((c, i) => (
-                    <View key={i} style={styles.corr}>
-                      <Text style={[styles.said, isRtl(pack.script) && styles.rtl]}>✗ {c.said}</Text>
-                      <Text style={[styles.better, isRtl(pack.script) && styles.rtl]}>✓ {c.better}</Text>
-                      <Text style={styles.why}>{c.why}</Text>
+                    <View key={i} style={{ gap: 2, paddingTop: i > 0 ? 12 : 0, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.line }}>
+                      <Txt variant="body" color={colors.danger} style={[{ textDecorationLine: "line-through" }, isRtl(pack.script) && styles.rtl]}>
+                        {c.said}
+                      </Txt>
+                      <Txt variant="bodyStrong" color={colors.accentDark} style={isRtl(pack.script) ? styles.rtl : undefined}>
+                        {c.better}
+                      </Txt>
+                      <Txt variant="caption" color={colors.inkSoft}>
+                        {c.why}
+                      </Txt>
                     </View>
                   ))}
-                  <Text style={styles.note}>Hata defterine yazıldı; hocan sonraki derslerde döndürecek.</Text>
-                </View>
+                  <Txt variant="caption" color={colors.inkFaint}>
+                    Hata defterine yazıldı; hocan sonraki derslerde döndürecek.
+                  </Txt>
+                </Surface>
               )}
 
               {debrief.phrases.length > 0 && (
-                <View style={styles.block}>
-                  <Text style={styles.blockTitle}>Bir dahaki sefere</Text>
+                <Surface style={{ gap: 10 }}>
+                  <Txt variant="headline" style={{ fontSize: 15 }}>
+                    Bir dahaki sefere
+                  </Txt>
                   {debrief.phrases.map((p, i) => (
-                    <View key={i} style={styles.phrase}>
-                      <Text style={[styles.phraseTarget, isRtl(pack.script) && styles.rtl]}>{p.target}</Text>
-                      <Text style={styles.phraseMeta}>
+                    <View key={i} style={{ gap: 2 }}>
+                      <TargetText size={19}>{p.target}</TargetText>
+                      <Txt variant="caption" color={colors.inkSoft}>
                         {p.translit ? `${p.translit} — ` : ""}
                         {p.tr}
-                      </Text>
+                      </Txt>
                     </View>
                   ))}
-                  <TouchableOpacity
-                    style={[styles.secondary, savedPhrases && styles.secondaryDone]}
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    icon={savedPhrases ? "check" : "bookmark"}
+                    label={savedPhrases ? "Defterde" : "Kalıpları deftere ekle"}
                     disabled={savedPhrases}
                     onPress={() => void savePhrases()}
-                  >
-                    <Text style={styles.secondaryText}>
-                      {savedPhrases ? "✓ Defterde" : "📇 Kalıpları deftere ekle"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  />
+                </Surface>
               )}
 
-              <TouchableOpacity style={styles.primary} onPress={() => setPhase("pick")}>
-                <Text style={styles.primaryText}>Yeni konuşma</Text>
-              </TouchableOpacity>
-            </>
+              <Button icon="mic" label="Yeni konuşma" onPress={() => setPhase("pick")} />
+            </View>
           )}
         </ScrollView>
       </View>
     );
   }
 
-  // Konuşma sürüyor: varlık + durum + isteğe bağlı transkript.
+  // Konuşma sürüyor: koyu sahne, ortada nefes alan varlık.
   const status =
     phase === "think"
       ? "düşünüyor…"
@@ -563,101 +610,130 @@ export default function ConversationScreen({ profile, onBack }: Props) {
           : "sıra sende";
 
   return (
-    <View style={styles.container}>
+    <View style={styles.stageWrap}>
+      <StatusBar style="light" />
+      <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.05} />
       <Header
-        title={scenario ? `${scenario.emoji} ${scenario.title}` : `${pack.teacherName} ile sohbet`}
+        tone="deep"
+        closeIcon
+        title={scenario ? scenario.title : `${pack.teacherName} ile sohbet`}
         subtitle={status}
         onBack={confirmLeave}
         right={
-          <TouchableOpacity
-            style={[styles.chip, handsFree && styles.chipOn]}
+          <Chip
+            onDeep
+            selected={handsFree}
+            icon={handsFree ? "hand" : "mic"}
+            label={handsFree ? "Eller serbest" : "Basılı tut"}
             onPress={() => {
               const next = !handsFree;
               setHandsFree(next);
               if (!next && phase === "listen") dictation.stop();
             }}
-            hitSlop={8}
-          >
-            <Text style={[styles.chipText, handsFree && styles.chipTextOn]}>
-              {handsFree ? "🙌 eller serbest" : "👆 basılı tut"}
-            </Text>
-          </TouchableOpacity>
+          />
         }
       />
 
       <View style={styles.stage}>
-        <Animated.View
-          style={[
-            styles.presence,
-            phase === "listen" && styles.presenceListen,
-            phase === "teacher" && styles.presenceTalk,
-            { transform: [{ scale: breath }] },
-          ]}
-        >
-          <Text style={styles.presenceEmoji}>
-            {phase === "listen" ? "🎙️" : phase === "think" ? "…" : "🗣️"}
-          </Text>
+        <Animated.View style={[styles.halo3, { transform: [{ scale: breath }] }, phase === "listen" && styles.haloListen]}>
+          <View style={[styles.halo2, phase === "listen" && styles.haloListen2]}>
+            <View
+              style={[
+                styles.presence,
+                phase === "listen" && styles.presenceListen,
+                phase === "teacher" && styles.presenceTalk,
+              ]}
+            >
+              {phase === "think" ? (
+                <ActivityIndicator color={colors.onDeep} />
+              ) : phase === "teacher" ? (
+                <Wave active color={colors.onDeep} bars={5} height={30} />
+              ) : (
+                <Icon name="mic" size={44} color={phase === "listen" ? colors.onGold : colors.onDeep} strokeWidth={1.8} />
+              )}
+            </View>
+          </View>
         </Animated.View>
-        <Text style={styles.status}>{status}</Text>
+        <Txt variant="overline" color={phase === "listen" ? colors.goldDeep : "#7FC8B6"}>
+          {status.toLocaleUpperCase("tr-TR")}
+        </Txt>
         {phase === "teacher" && !!nowSaying && (
-          <Text style={[styles.saying, isRtl(pack.script) && styles.rtl]} numberOfLines={3}>
+          <Text style={[styles.saying, isRtl(pack.script) && containsTargetScript(nowSaying, pack.script) && arabicText(24)]} numberOfLines={4}>
             {nowSaying}
           </Text>
         )}
         {phase === "listen" && (
-          <Text style={styles.partial} numberOfLines={3}>
-            {dictation.partial || (handsFree ? "konuş — susunca sıra geçer" : "bırakınca sıra geçer")}
-          </Text>
+          <Txt variant="title3" color={colors.onDeep} center numberOfLines={3} style={{ fontStyle: "italic" }}>
+            {dictation.partial ? `“${dictation.partial}”` : handsFree ? "konuş — susunca sıra geçer" : "bırakınca sıra geçer"}
+          </Txt>
         )}
-        {dictation.error && <Text style={styles.errText}>{dictation.error}</Text>}
-        {voiceNote && <Text style={styles.voiceNote}>{voiceNote}</Text>}
-        <Text style={styles.voiceTag}>
+        {dictation.error && (
+          <Txt variant="caption" color="#F2A58E" center>
+            {dictation.error}
+          </Txt>
+        )}
+        {voiceNote && (
+          <Txt variant="caption" color={colors.goldDeep} center>
+            {voiceNote}
+          </Txt>
+        )}
+        <Txt variant="caption" color={colors.onDeepSoft} style={{ fontSize: 11 }} center>
           {`beyin: ${useDeepseek ? "DeepSeek" : (profile.provider ?? "anthropic")}`}
           {backend ? ` · ses: ${backend.label}` : " · ses: telefon"}
           {neuralStt ? ` · tanıma: ${voice.provider === "gemini" ? "Gemini" : "OpenAI"}` : " · tanıma: telefon"}
-        </Text>
+        </Txt>
       </View>
 
-      <View style={styles.controls}>
+      <View style={[styles.controls, { paddingBottom: 18 + insets.bottom }]}>
         {phase === "wait" && (
-          <TouchableOpacity
+          <PressableScale
             style={styles.micButton}
             onPressIn={handsFree ? undefined : startListening}
             onPressOut={handsFree ? undefined : () => dictation.stop()}
             onPress={handsFree ? startListening : undefined}
+            accessibilityLabel="Konuş"
           >
-            <Text style={styles.micText}>{handsFree ? "🎙️ Konuş" : "🎙️ Basılı tut ve konuş"}</Text>
-          </TouchableOpacity>
+            <Icon name="mic" size={22} color={colors.onGold} />
+            <Txt variant="button" color={colors.onGold}>
+              {handsFree ? "Konuş" : "Basılı tut ve konuş"}
+            </Txt>
+          </PressableScale>
         )}
         {phase === "listen" && !handsFree && (
-          <TouchableOpacity style={[styles.micButton, styles.micOn]} onPressOut={() => dictation.stop()}>
-            <Text style={styles.micText}>● Dinliyorum — bırakınca biter</Text>
-          </TouchableOpacity>
+          <PressableScale style={[styles.micButton, styles.micOn]} onPressOut={() => dictation.stop()} accessibilityLabel="Dinliyorum">
+            <Icon name="stop" size={20} color="#FFFFFF" />
+            <Txt variant="button" color="#FFFFFF">
+              Dinliyorum — bırakınca biter
+            </Txt>
+          </PressableScale>
         )}
         {phase === "teacher" && (
-          <TouchableOpacity
-            style={styles.ghost}
+          <Button
+            variant="onDeep"
+            icon="hand"
+            label="Sözünü kes, ben konuşayım"
             onPress={() => {
               // Sözünü kes: gerçek konuşmada da olur. Kuyruk iptal, sıra sende.
               queue.current?.cancel();
               startListening();
             }}
-          >
-            <Text style={styles.ghostText}>Sözünü kes, ben konuşayım</Text>
-          </TouchableOpacity>
+          />
         )}
         <View style={styles.row}>
-          <TouchableOpacity style={styles.ghost} onPress={() => setTranscriptOpen((v) => !v)}>
-            <Text style={styles.ghostText}>{transcriptOpen ? "Metni gizle" : "Metni gör"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.endButton} onPress={() => void finish()}>
-            <Text style={styles.endText}>Bitir ve değerlendir</Text>
-          </TouchableOpacity>
+          <Button
+            variant="onDeep"
+            size="md"
+            icon={transcriptOpen ? "eyeOff" : "eye"}
+            label={transcriptOpen ? "Metni gizle" : "Metni gör"}
+            onPress={() => setTranscriptOpen((v) => !v)}
+            style={{ flex: 1 }}
+          />
+          <Button variant="gold" size="md" label="Bitir ve değerlendir" onPress={() => void finish()} style={{ flex: 1 }} />
         </View>
       </View>
 
       {transcriptOpen && (
-        <ScrollView style={styles.transcript} contentContainerStyle={{ padding: 14 }}>
+        <ScrollView style={styles.transcript} contentContainerStyle={{ padding: 16, gap: 8 }}>
           {turns
             .filter((t) => !t.content.startsWith("[Uygulama"))
             .map((t, i) => (
@@ -680,117 +756,80 @@ export default function ConversationScreen({ profile, onBack }: Props) {
 
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.bg },
-    body: { padding: 18, paddingBottom: 40 },
-    center: { alignItems: "center", gap: 12, paddingVertical: 40 },
-    lead: { fontSize: 14, color: colors.inkSoft, lineHeight: 21, marginBottom: 16 },
+    light: { flex: 1, backgroundColor: colors.bg },
+    body: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 40 },
+    center: { alignItems: "center", gap: 14, paddingVertical: 40 },
     freeCard: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 12,
+      gap: 14,
       backgroundColor: colors.deep,
-      borderRadius: radius.xl,
+      borderRadius: 26,
       padding: 18,
-      marginBottom: 20,
-      ...shadowLift,
+      overflow: "hidden",
     },
-    freeEmoji: { fontSize: 28 },
-    freeTitle: { color: "#FFFFFF", fontSize: 16.5, fontWeight: "800" },
-    freeSub: { color: "rgba(255,255,255,0.75)", fontSize: 12.5, marginTop: 2 },
-    arrow: { color: "rgba(255,255,255,0.8)", fontSize: 24, fontWeight: "700" },
-    sectionTitle: { fontSize: 12, fontWeight: "800", color: colors.inkFaint, letterSpacing: 0.6, marginBottom: 10 },
-    sceneCard: {
-      flexDirection: "row",
+    summaryCard: { backgroundColor: colors.deep, borderRadius: 26, padding: 20, overflow: "hidden" },
+    stageWrap: { flex: 1, backgroundColor: colors.deep },
+    stage: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, gap: 16 },
+    halo3: {
+      width: 240,
+      height: 240,
+      borderRadius: 120,
+      backgroundColor: "rgba(63,169,148,0.08)",
       alignItems: "center",
-      gap: 12,
-      backgroundColor: colors.card,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: 14,
-      marginBottom: 10,
-      ...shadow,
+      justifyContent: "center",
+      marginBottom: 12,
     },
-    sceneEmoji: { fontSize: 24 },
-    sceneTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
-    sceneSub: { fontSize: 12.5, color: colors.inkSoft, marginTop: 2, lineHeight: 18 },
-    sceneLevel: { fontSize: 11, fontWeight: "800", color: colors.gold },
-    stage: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 14 },
+    halo2: {
+      width: 186,
+      height: 186,
+      borderRadius: 93,
+      backgroundColor: "rgba(63,169,148,0.14)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    haloListen: { backgroundColor: "rgba(217,192,143,0.08)" },
+    haloListen2: { backgroundColor: "rgba(217,192,143,0.16)" },
     presence: {
-      width: 168,
-      height: 168,
-      borderRadius: 84,
-      backgroundColor: colors.deep,
+      width: 134,
+      height: 134,
+      borderRadius: 67,
+      backgroundColor: "#1F7A66",
       alignItems: "center",
       justifyContent: "center",
       ...shadowLift,
     },
-    presenceListen: { backgroundColor: colors.accent },
-    presenceTalk: { backgroundColor: colors.deepAlt },
-    presenceEmoji: { fontSize: 56 },
-    status: { fontSize: 13, color: colors.inkFaint, fontWeight: "700", letterSpacing: 0.4 },
-    saying: { fontSize: 18, color: colors.ink, textAlign: "center", lineHeight: 28, paddingHorizontal: 12 },
-    partial: { fontSize: 15, color: colors.inkSoft, textAlign: "center", lineHeight: 22, paddingHorizontal: 12, fontStyle: "italic" },
-    errText: { fontSize: 13, color: colors.danger, textAlign: "center", lineHeight: 19 },
-    voiceNote: { fontSize: 11.5, color: colors.gold, textAlign: "center", lineHeight: 16, paddingHorizontal: 16 },
-    voiceTag: { fontSize: 10.5, color: colors.inkFaint, letterSpacing: 0.3, marginTop: 6 },
-    controls: { padding: 18, gap: 10 },
+    presenceListen: { backgroundColor: colors.goldDeep },
+    presenceTalk: { backgroundColor: "#23866F" },
+    saying: {
+      fontFamily: "Fraunces",
+      fontWeight: "500",
+      fontSize: 22,
+      lineHeight: 30,
+      color: colors.onDeep,
+      textAlign: "center",
+    },
+    controls: { paddingHorizontal: 20, paddingTop: 8, gap: 12 },
     micButton: {
-      backgroundColor: colors.accent,
-      borderRadius: radius.xl,
-      paddingVertical: 18,
+      height: 60,
+      borderRadius: 20,
+      backgroundColor: colors.goldDeep,
+      flexDirection: "row",
       alignItems: "center",
-      ...shadowLift,
+      justifyContent: "center",
+      gap: 10,
     },
     micOn: { backgroundColor: colors.danger },
-    micText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
     row: { flexDirection: "row", gap: 10 },
-    ghost: {
-      flex: 1,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingVertical: 12,
-      alignItems: "center",
+    transcript: {
+      maxHeight: 220,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      backgroundColor: "rgba(255,255,255,0.06)",
     },
-    ghostText: { color: colors.inkSoft, fontSize: 13.5, fontWeight: "700" },
-    endButton: {
-      flex: 1,
-      borderRadius: radius.lg,
-      backgroundColor: colors.goldSoft,
-      paddingVertical: 12,
-      alignItems: "center",
-    },
-    endText: { color: colors.gold, fontSize: 13.5, fontWeight: "800" },
-    transcript: { maxHeight: 200, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card },
-    line: { fontSize: 14, lineHeight: 22, marginBottom: 6 },
-    lineUser: { color: colors.accentDark, fontWeight: "700" },
-    lineTeacher: { color: colors.ink },
+    line: { fontFamily: "Manrope", fontSize: 14.5, lineHeight: 22 },
+    lineUser: { color: colors.goldDeep, fontWeight: "700" },
+    lineTeacher: { color: colors.onDeep },
     rtl: { writingDirection: "rtl", textAlign: "right" },
-    chip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.border },
-    chipOn: { backgroundColor: colors.accentSoft, borderColor: "transparent" },
-    chipText: { fontSize: 11.5, fontWeight: "700", color: colors.inkSoft },
-    chipTextOn: { color: colors.accentDark },
-    busy: { fontSize: 14, color: colors.inkSoft },
-    summaryCard: { backgroundColor: colors.deep, borderRadius: radius.xl, padding: 18, marginBottom: 14, ...shadowLift },
-    goal: { color: colors.goldDeep, fontSize: 13, fontWeight: "800", marginBottom: 8 },
-    summaryText: { color: "#FFFFFF", fontSize: 15, lineHeight: 23 },
-    meta: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 10 },
-    block: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 12, ...shadow },
-    blockTitle: { fontSize: 13, fontWeight: "800", color: colors.ink, marginBottom: 8 },
-    keepText: { fontSize: 14, color: colors.accentDark, lineHeight: 21 },
-    corr: { marginBottom: 10 },
-    said: { fontSize: 15, color: colors.danger },
-    better: { fontSize: 15, color: colors.accentDark, fontWeight: "700", marginTop: 2 },
-    why: { fontSize: 12.5, color: colors.inkSoft, marginTop: 3, lineHeight: 18 },
-    note: { fontSize: 11.5, color: colors.inkFaint, marginTop: 4 },
-    phrase: { marginBottom: 8 },
-    phraseTarget: { fontSize: 17, color: colors.ink },
-    phraseMeta: { fontSize: 12.5, color: colors.inkSoft, marginTop: 2 },
-    primary: { backgroundColor: colors.accent, borderRadius: radius.xl, paddingVertical: 15, alignItems: "center", marginTop: 6, ...shadowLift },
-    primaryText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
-    secondary: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingVertical: 11, alignItems: "center", marginTop: 6 },
-    secondaryDone: { opacity: 0.6 },
-    secondaryText: { color: colors.ink, fontSize: 13.5, fontWeight: "700" },
   });
 }

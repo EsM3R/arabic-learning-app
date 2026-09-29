@@ -11,6 +11,25 @@ import {
   View,
 } from "react-native";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import {
+  Badge,
+  Bar,
+  Button,
+  IconButton,
+  ListGroup,
+  ListRow,
+  PressableScale,
+  Ring,
+  Screen,
+  SectionLabel,
+  StarPattern,
+  Surface,
+  TargetText,
+  TeacherAvatar,
+  Txt,
+  Wave,
+} from "../components/kit";
 import { isBudgetError } from "../budget";
 import { generateBuildSet } from "../claude";
 import { getActivePack } from "../languages";
@@ -46,7 +65,7 @@ import {
   touchLastActivity,
 } from "../storage";
 import { normalizeTarget } from "../textnorm";
-import { radius, shadow, shadowLift } from "../theme";
+import { ltrLine } from "../richtext";
 import type { Palette } from "../theme";
 import { useDictation } from "../useDictation";
 import { useTheme } from "../useTheme";
@@ -267,13 +286,51 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   };
 
   // ------------------------------------------------------------------ görünüm
+  /** Setteki cümleler için ince bölütlü ilerleme şeridi. */
+  const sentenceBar = set ? (
+    <View style={styles.segments}>
+      {set.sentences.map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.segment,
+            { backgroundColor: i < si ? colors.accent : i === si ? colors.goldDeep : colors.line },
+          ]}
+        />
+      ))}
+    </View>
+  ) : null;
+
+  /** Türkçe cümle — bu adımda eklenen parça vurgulu. */
+  const trSentence = (piece?: string) => {
+    if (!sentence) return null;
+    const i = piece ? sentence.tr.indexOf(piece) : -1;
+    return (
+      <Txt variant="title2" style={{ fontWeight: "500" }}>
+        {i < 0 ? (
+          sentence.tr
+        ) : (
+          <>
+            {sentence.tr.slice(0, i)}
+            <Txt variant="title2" color={colors.gold} style={{ backgroundColor: colors.highlight, fontWeight: "600" }}>
+              {piece}
+            </Txt>
+            {sentence.tr.slice(i + (piece?.length ?? 0))}
+          </>
+        )}
+      </Txt>
+    );
+  };
+
   if (phase === "loading") {
     return (
       <View style={styles.container}>
         <Header title="Cümle Kurma" subtitle="set hazırlanıyor…" onBack={onBack} />
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.muted}>{pack.teacherName} hikâyeyi ve adımları hazırlıyor…</Text>
+          <TeacherAvatar size={72} speaking />
+          <Txt variant="callout" color={colors.inkSoft} center>
+            {pack.teacherName} hikâyeyi ve adımları hazırlıyor…
+          </Txt>
         </View>
       </View>
     );
@@ -281,73 +338,89 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   if (phase === "home") {
     const summary = ladderSummary(progress);
+    const m = masteryStatus(progress[focus.id]);
     return (
       <View style={styles.container}>
         <Header title="Cümle Kurma" subtitle="Türkçeden parça parça" onBack={onBack} />
-        <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.lead}>
-            Türkçe bir cümle gelir; sen onu ana fiilden başlayıp parça parça kurarsın. Her
-            adımda cümlenin TAMAMINI söyle ya da yaz. Cümleler bir hikâyenin parçası; her biri
-            yeni bir yapı taşı öğretir.
-          </Text>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <Txt variant="callout" color={colors.inkSoft} style={{ marginBottom: 16 }}>
+            Türkçe bir cümle gelir; sen onu ana fiilden başlayıp parça parça kurarsın. Her adımda
+            cümlenin TAMAMINI söyle ya da yaz. Cümleler bir hikâyenin parçası; her biri yeni bir yapı
+            taşı öğretir.
+          </Txt>
 
           <View style={styles.focusCard}>
-            <Text style={styles.focusLabel}>ŞİMDİKİ KALIP · {focus.band}</Text>
-            <Text style={styles.focusTitle}>{focus.title}</Text>
-            <Text style={styles.focusSub}>{focus.concept}</Text>
-            {(() => {
-              const m = masteryStatus(progress[focus.id]);
-              return (
-                <Text style={styles.focusProgress}>
-                  {m.sentences}/{m.needSentences} cümle
-                  {m.accuracy !== null ? ` · son isabet %${Math.round(m.accuracy * 100)}` : ""}
-                  {" · oturması için %85"}
-                </Text>
-              );
-            })()}
+            <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.09} />
+            <Txt variant="overline" color={colors.goldDeep}>
+              {`ŞİMDİKİ KALIP · ${focus.band}`}
+            </Txt>
+            <Txt variant="title2" color={colors.onDeep} style={{ marginTop: 6 }}>
+              {focus.title}
+            </Txt>
+            <Txt variant="callout" color={colors.onDeepSoft} style={{ marginTop: 6 }}>
+              {focus.concept}
+            </Txt>
+            <Bar
+              progress={m.needSentences ? m.sentences / m.needSentences : 0}
+              color={colors.goldDeep}
+              track="rgba(255,255,255,0.14)"
+              style={{ marginTop: 16 }}
+            />
+            <Txt variant="caption" color={colors.goldDeep} style={{ marginTop: 8 }}>
+              {`${m.sentences}/${m.needSentences} cümle${m.accuracy !== null ? ` · son isabet %${Math.round(m.accuracy * 100)}` : ""} · oturması için %85`}
+            </Txt>
           </View>
 
           <View style={styles.ladderRow}>
             {summary.map((b) => (
               <View key={b.band} style={styles.ladderCell}>
-                <Text style={styles.ladderBand}>{b.band}</Text>
-                <Text style={styles.ladderCount}>
+                <Txt variant="overline" color={colors.inkSoft} style={{ fontSize: 10 }}>
+                  {b.band}
+                </Txt>
+                <Txt variant="headline" style={{ fontSize: 14 }}>
                   {b.done}/{b.total}
-                </Text>
+                </Txt>
               </View>
             ))}
           </View>
 
-          <Text style={styles.section}>Hikâye seç</Text>
-          {THEMES.map((t) => {
-            const saved = sets.some((s) => s.patternId === focus.id && s.themeId === t.id);
-            return (
-              <TouchableOpacity key={t.id} style={styles.themeCard} onPress={() => openTheme(t)} activeOpacity={0.85}>
-                <Text style={styles.themeEmoji}>{t.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.themeTitle}>{t.title}</Text>
-                  <Text style={styles.themeSub}>{t.arc}</Text>
-                </View>
-                {saved && <Text style={styles.savedTag}>hazır</Text>}
-              </TouchableOpacity>
-            );
-          })}
+          <SectionLabel title="Hikâye seç" />
+          <ListGroup>
+            {THEMES.map((t) => {
+              const saved = sets.some((x) => x.patternId === focus.id && x.themeId === t.id);
+              return (
+                <ListRow
+                  key={t.id}
+                  icon="bookOpen"
+                  tone="gold"
+                  title={t.title}
+                  subtitle={t.arc}
+                  onPress={() => openTheme(t)}
+                  right={saved ? <Badge text="hazır" tone="accent" /> : undefined}
+                />
+              );
+            })}
+          </ListGroup>
 
           {sets.length > 0 && (
-            <>
-              <Text style={styles.section}>Kayıtlı setler (bedava tekrar)</Text>
-              {sets.slice(0, 8).map((s, i) => {
-                const th = THEMES.find((t) => t.id === s.themeId);
-                const pt = patternById(s.patternId);
-                return (
-                  <TouchableOpacity key={`${s.createdAt}-${i}`} style={styles.savedRow} onPress={() => start(s)}>
-                    <Text style={styles.savedText}>
-                      {th?.emoji} {th?.title ?? s.themeId} · {pt?.title ?? s.patternId}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </>
+            <View style={{ marginTop: 22 }}>
+              <SectionLabel title="Kayıtlı setler · bedava tekrar" />
+              <ListGroup>
+                {sets.slice(0, 8).map((x, i) => {
+                  const th = THEMES.find((t) => t.id === x.themeId);
+                  const pt = patternById(x.patternId);
+                  return (
+                    <ListRow
+                      key={`${x.createdAt}-${i}`}
+                      icon="repeat"
+                      tone="neutral"
+                      title={`${th?.title ?? x.themeId} · ${pt?.title ?? x.patternId}`}
+                      onPress={() => start(x)}
+                    />
+                  );
+                })}
+              </ListGroup>
+            </View>
           )}
         </ScrollView>
       </View>
@@ -361,44 +434,46 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     return (
       <View style={styles.container}>
         <Header title="Cümle Kurma" subtitle="set bitti" onBack={onBack} />
-        <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.focusCard}>
-            <Text style={styles.focusTitle}>🎉 {set.sentences.length} cümle kurdun</Text>
-            <Text style={styles.focusSub}>
-              Adımların %{pct}'i ilk seferde doğru. Aynı seti yarın bir daha çalış — ikinci
-              seferde cümleler kendiliğinden gelmeye başlar.
-            </Text>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <View style={[styles.focusCard, { alignItems: "center" }]}>
+            <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.09} />
+            <Ring progress={pct / 100} size={84} stroke={7} color={colors.goldDeep} track="rgba(255,255,255,0.14)" label={`%${pct}`} labelColor={colors.onDeep} />
+            <Txt variant="title2" color={colors.onDeep} center style={{ marginTop: 14 }}>
+              {`${set.sentences.length} cümle kurdun`}
+            </Txt>
+            <Txt variant="callout" color={colors.onDeepSoft} center style={{ marginTop: 6 }}>
+              Adımların %{pct}'i ilk seferde doğru. Aynı seti yarın bir daha çalış — ikinci seferde
+              cümleler kendiliğinden gelmeye başlar.
+            </Txt>
           </View>
-          <TouchableOpacity
-            style={[styles.secondary, savedBlocks && { opacity: 0.6 }]}
-            disabled={savedBlocks}
-            onPress={() => void saveBlocks()}
-          >
-            <Text style={styles.secondaryText}>{savedBlocks ? "✓ Defterde" : "📇 Yapı taşlarını deftere ekle"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.primary}
-            onPress={() => {
-              const theme = THEMES.find((t) => t.id === set.themeId);
-              if (!theme) return;
-              Alert.alert(
-                "Yeni cümleler",
-                "Hikâye kaldığı yerden devam etsin mi? Aynı kalıpla, daha önce kurmadığın 7-8 yeni cümle gelir. Bu bir API isteği harcar.",
-                [
-                  { text: "Vazgeç", style: "cancel" },
-                  { text: "Evet, devam", onPress: () => void generate(theme, set.patternId) },
-                ]
-              );
-            }}
-          >
-            <Text style={styles.primaryText}>➕ Devam — yeni cümleler</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondary} onPress={() => start(set)}>
-            <Text style={styles.secondaryText}>↺ Aynı seti tekrar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondary} onPress={() => setPhase("home")}>
-            <Text style={styles.secondaryText}>Başka hikâye</Text>
-          </TouchableOpacity>
+          <View style={{ gap: 10 }}>
+            <Button
+              icon="plus"
+              label="Devam — yeni cümleler"
+              onPress={() => {
+                const theme = THEMES.find((t) => t.id === set.themeId);
+                if (!theme) return;
+                Alert.alert(
+                  "Yeni cümleler",
+                  "Hikâye kaldığı yerden devam etsin mi? Aynı kalıpla, daha önce kurmadığın 7-8 yeni cümle gelir. Bu bir API isteği harcar.",
+                  [
+                    { text: "Vazgeç", style: "cancel" },
+                    { text: "Evet, devam", onPress: () => void generate(theme, set.patternId) },
+                  ]
+                );
+              }}
+            />
+            <Button variant="secondary" size="md" icon="replay" label="Aynı seti tekrar" onPress={() => start(set)} />
+            <Button
+              variant="secondary"
+              size="md"
+              icon={savedBlocks ? "check" : "bookmark"}
+              label={savedBlocks ? "Defterde" : "Yapı taşlarını deftere ekle"}
+              disabled={savedBlocks}
+              onPress={() => void saveBlocks()}
+            />
+            <Button variant="ghost" size="md" label="Başka hikâye" onPress={() => setPhase("home")} />
+          </View>
         </ScrollView>
       </View>
     );
@@ -406,166 +481,253 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   if (phase === "preview") {
     return (
-      <View style={styles.container}>
-        <Header title="Cümle Kurma" subtitle={`cümle ${si + 1} / ${set.sentences.length}`} onBack={onBack} />
-        <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.trSentence}>{sentence.tr}</Text>
-          <Text style={styles.section}>Bu cümlede öğreneceklerin</Text>
+      <Screen
+        header={<Header title="Cümle Kurma" subtitle={`cümle ${si + 1} / ${set.sentences.length}`} onBack={onBack} />}
+        footer={<Button icon="arrowRight" label="Kurmaya başla" onPress={() => setPhase("drill")} />}
+      >
+        {sentenceBar}
+        <Txt variant="overline" color={colors.inkSoft} style={{ marginBottom: 6 }}>
+          TÜRKÇE CÜMLE
+        </Txt>
+        {trSentence()}
+        <SectionLabel title="Bu cümlede öğreneceklerin" style={{ marginTop: 22 }} />
+        <View style={{ gap: 10 }}>
           {sentence.blocks.map((b, i) => (
-            <View key={i} style={styles.blockCard}>
-              <Text style={[styles.blockTarget, rtl && styles.rtl]}>
-                {b.target} <Text style={styles.blockTr}>= {b.tr}</Text>
-              </Text>
-              {!!b.note && <Text style={styles.blockNote}>{b.note}</Text>}
-              {!!b.contrast && <Text style={styles.contrast}>⚠️ {b.contrast}</Text>}
-              {b.alts.length > 0 && <Text style={styles.alts}>Ayrıca: {b.alts.join(" · ")}</Text>}
-            </View>
+            <Surface key={i} style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <Txt variant="bodyStrong" color={colors.inkSoft} style={{ flex: 1 }}>{`= ${b.tr}`}</Txt>
+                <TargetText size={rtl ? 22 : 17}>{b.target}</TargetText>
+              </View>
+              {!!b.note && (
+                <Txt variant="callout" color={colors.inkSoft}>
+                  {ltrLine(b.note)}
+                </Txt>
+              )}
+              {!!b.contrast && (
+                <View style={styles.contrastBox}>
+                  <Icon name="alert" size={16} color={colors.gold} />
+                  <Txt variant="callout" color={colors.gold} style={{ flex: 1, fontWeight: "700" }}>
+                    {ltrLine(b.contrast)}
+                  </Txt>
+                </View>
+              )}
+              {b.alts.length > 0 && (
+                <Txt variant="caption" color={colors.inkSoft}>
+                  {ltrLine(`Ayrıca: ${b.alts.join(" · ")}`)}
+                </Txt>
+              )}
+            </Surface>
           ))}
-          <TouchableOpacity style={styles.primary} onPress={() => setPhase("drill")}>
-            <Text style={styles.primaryText}>Kurmaya başla ›</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
+        </View>
+      </Screen>
     );
   }
 
   if (phase === "blocks") {
+    const full = sentence.steps[sentence.steps.length - 1].target;
     return (
-      <View style={styles.container}>
-        <Header title="Cümle Kurma" subtitle={`cümle ${si + 1} / ${set.sentences.length}`} onBack={onBack} />
-        <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.trSentence}>{sentence.tr}</Text>
-          <TouchableOpacity onPress={() => speakTarget(sentence.steps[sentence.steps.length - 1].target)}>
-            <Text style={[styles.targetBig, rtl && styles.rtl]}>
-              🔊 {sentence.steps[sentence.steps.length - 1].target}
-            </Text>
-          </TouchableOpacity>
+      <Screen
+        header={<Header title="Cümle Kurma" subtitle={`cümle ${si + 1} / ${set.sentences.length}`} onBack={onBack} />}
+        footer={
+          <Button
+            icon="arrowRight"
+            label={si + 1 < set.sentences.length ? "Sıradaki cümle" : "Seti bitir"}
+            onPress={nextSentence}
+          />
+        }
+      >
+        {sentenceBar}
+        {trSentence()}
+        <Surface raised style={{ marginTop: 18, gap: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Icon name="check" size={18} color={colors.accentDark} strokeWidth={2.6} />
+            <Txt variant="overline" color={colors.accentDark}>
+              CÜMLE KURULDU
+            </Txt>
+          </View>
+          <Txt variant="title3" style={rtl ? styles.rtl : undefined}>
+            {full}
+          </Txt>
           {sentence.reorder ? (
-            <Text style={[styles.reorder, rtl && styles.rtl]}>ya da: {sentence.reorder}</Text>
+            <Txt variant="callout" color={colors.inkSoft} style={rtl ? styles.rtl : undefined}>
+              ya da: {sentence.reorder}
+            </Txt>
           ) : null}
+          <Button variant="secondary" size="sm" icon="volume" label="Dinle" onPress={() => speakTarget(full)} style={{ alignSelf: "flex-start" }} />
+        </Surface>
 
+        <SectionLabel title="Öğrendiğin yapı taşları" style={{ marginTop: 22 }} />
+        <ListGroup>
           {sentence.blocks.map((b, i) => (
-            <Text key={i} style={styles.recap}>
-              ✓ {b.target} = {b.tr}
-            </Text>
+            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12 }}>
+              <Icon name="check" size={16} color={colors.accentDark} strokeWidth={2.6} />
+              <Txt variant="bodyStrong" style={{ flex: 1 }}>{ltrLine(`${b.target} = ${b.tr}`)}</Txt>
+            </View>
           ))}
-
-          <TouchableOpacity style={styles.primary} onPress={nextSentence}>
-            <Text style={styles.primaryText}>
-              {si + 1 < set.sentences.length ? "Sıradaki cümle ›" : "Seti bitir ›"}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
+        </ListGroup>
+      </Screen>
     );
   }
 
   // ------------------------------------------------------------------ adım
   if (!step) return null;
   const totalSteps = sentence.steps.length + (extra ? 1 : 0);
+  const verdictTone = verdict === "dogru" ? colors.accentSoft : verdict === "yakin" ? colors.goldSoft : colors.dangerSoft;
+  const verdictInk = verdict === "dogru" ? colors.accentDark : verdict === "yakin" ? colors.gold : colors.danger;
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <View style={styles.container}>
-        <Header
-          title="Cümle Kurma"
-          subtitle={`cümle ${si + 1} / ${set.sentences.length} · adım ${sti + 1} / ${totalSteps}`}
-          onBack={onBack}
-        />
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={styles.trSentence}>{sentence.tr}</Text>
-
-          <View style={styles.stepCard}>
-            {isReorder ? (
-              <Text style={styles.stepHint}>Şimdi aynı cümleyi bağlacı ORTAYA alarak söyle.</Text>
+      <Screen
+        header={
+          <Header
+            title="Cümle Kurma"
+            subtitle={`cümle ${si + 1} / ${set.sentences.length} · adım ${sti + 1} / ${totalSteps}`}
+            onBack={onBack}
+          />
+        }
+        footer={
+          verdict ? (
+            verdict === "yanlis" ? (
+              <Button icon="replay" label="Bir daha söyle" onPress={retry} />
             ) : (
-              <>
-                {step.question ? (
-                  <Text style={styles.question}>{step.question}</Text>
-                ) : (
-                  <Text style={styles.stepHint}>Bu adımda ekle:</Text>
-                )}
-                <Text style={styles.trPiece}>{step.trPiece}</Text>
-                <Text style={styles.trSoFar}>→ {step.trSoFar}</Text>
-              </>
-            )}
-            {sti > 0 && !isReorder && (
-              <Text style={[styles.prev, rtl && styles.rtl]}>önceki: {sentence.steps[sti - 1].target}</Text>
-            )}
-          </View>
-
-          {verdict ? (
-            <View
-              style={[
-                styles.verdict,
-                verdict === "dogru" ? styles.ok : verdict === "yakin" ? styles.near : styles.bad,
-              ]}
-            >
-              <Text style={styles.verdictTitle}>
-                {revealed
-                  ? "Doğrusu:"
-                  : verdict === "dogru"
-                    ? "✓ Doğru"
-                    : verdict === "yakin"
-                      ? "≈ Çok yakın — doğrusu:"
-                      : "✗ Doğrusu:"}
-              </Text>
-              <TouchableOpacity onPress={() => speakTarget(step.target)}>
-                <Text style={[styles.targetBig, rtl && styles.rtl]}>🔊 {step.target}</Text>
-              </TouchableOpacity>
-              {!!step.translit && <Text style={styles.translit}>{step.translit}</Text>}
-              {step.alts.length > 0 && <Text style={styles.alts}>Ayrıca doğru: {step.alts.join(" · ")}</Text>}
-              {!!step.note && <Text style={styles.blockNote}>💡 {step.note}</Text>}
-              {verdict === "yanlis" ? (
-                <TouchableOpacity style={styles.primary} onPress={retry}>
-                  <Text style={styles.primaryText}>↺ Bir daha söyle</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={styles.primary} onPress={advance}>
-                  <Text style={styles.primaryText}>Devam ›</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+              <Button icon="arrowRight" label="Devam" onPress={advance} />
+            )
           ) : (
-            <>
-              <TouchableOpacity
-                style={[styles.mic, dictation.listening && styles.micOn]}
+            <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+              <IconButton
+                icon={dictation.listening ? "stop" : "mic"}
+                label="Basılı tut ve söyle"
+                variant={dictation.listening ? "deep" : "outline"}
+                size={56}
                 onPressIn={() => dictation.start()}
                 onPressOut={() => dictation.stop()}
-              >
-                <Text style={styles.micText}>
-                  {dictation.listening ? "● Dinliyorum — bırakınca biter" : "🎙️ Basılı tut ve cümlenin tamamını söyle"}
-                </Text>
-              </TouchableOpacity>
-              {dictation.listening && !!dictation.partial && (
-                <Text style={styles.partial}>{dictation.partial}</Text>
+              />
+              <Button variant="ghost" label="Bilmiyorum" onPress={reveal} style={{ paddingHorizontal: 14 }} />
+              <Button label="Kontrol et" disabled={!answer.trim()} onPress={() => void check(answer)} style={{ flex: 1 }} />
+            </View>
+          )
+        }
+      >
+        {sentenceBar}
+        <Txt variant="overline" color={colors.inkSoft} style={{ marginBottom: 6 }}>
+          TÜRKÇE CÜMLE
+        </Txt>
+        {trSentence(isReorder ? undefined : step.trPiece)}
+
+        <Surface raised style={{ marginTop: 18, gap: 12 }}>
+          {isReorder ? (
+            <View style={styles.questionChip}>
+              <Icon name="refresh" size={14} color={colors.accentDark} />
+              <Txt variant="caption" color={colors.accentDark} style={{ fontWeight: "800" }}>
+                Şimdi aynı cümleyi bağlacı ORTAYA alarak söyle.
+              </Txt>
+            </View>
+          ) : step.question ? (
+            <View style={styles.questionChip}>
+              <Txt variant="caption" color={colors.accentDark} style={{ fontWeight: "800" }}>
+                {step.question}
+              </Txt>
+            </View>
+          ) : (
+            <Txt variant="caption" color={colors.inkSoft}>
+              Bu adımda ekle:
+            </Txt>
+          )}
+          {!isReorder && (
+            <View style={{ gap: 2 }}>
+              <Txt variant="title3" color={colors.gold}>
+                {step.trPiece}
+              </Txt>
+              <Txt variant="caption" color={colors.inkSoft}>
+                → {step.trSoFar}
+              </Txt>
+            </View>
+          )}
+          {sti > 0 && !isReorder && (
+            <View style={{ gap: 2 }}>
+              <Txt variant="caption" color={colors.inkSoft}>
+                Şu ana kadar
+              </Txt>
+              <Txt variant="headline" style={rtl ? styles.rtl : undefined}>
+                {sentence.steps[sti - 1].target} …
+              </Txt>
+            </View>
+          )}
+
+          {!verdict && (
+            <>
+              {dictation.listening && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Wave active color={colors.accent} />
+                  <Txt variant="callout" color={colors.inkSoft} style={{ flex: 1, fontStyle: "italic" }}>
+                    {dictation.partial || "Dinliyorum — bırakınca biter"}
+                  </Txt>
+                </View>
               )}
-              {dictation.error && <Text style={styles.err}>{dictation.error}</Text>}
+              {dictation.error && (
+                <Txt variant="caption" color={colors.danger}>
+                  {dictation.error}
+                </Txt>
+              )}
               <TextInput
                 style={[styles.input, rtl && styles.rtl]}
                 value={answer}
                 onChangeText={setAnswer}
-                placeholder="…ya da yaz"
+                placeholder="Cümlenin tamamını söyle ya da yaz"
                 placeholderTextColor={colors.inkFaint}
                 autoCapitalize="sentences"
                 autoCorrect={false}
                 onSubmitEditing={() => void check(answer)}
               />
-              <View style={styles.row}>
-                <TouchableOpacity style={styles.ghost} onPress={reveal}>
-                  <Text style={styles.ghostText}>Bilmiyorum</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.checkBtn, !answer.trim() && { opacity: 0.5 }]}
-                  disabled={!answer.trim()}
-                  onPress={() => void check(answer)}
-                >
-                  <Text style={styles.primaryText}>Kontrol et</Text>
-                </TouchableOpacity>
-              </View>
             </>
           )}
-        </ScrollView>
-      </View>
+        </Surface>
+
+        {verdict && (
+          <View style={[styles.verdict, { backgroundColor: verdictTone }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Icon
+                name={revealed ? "bulb" : verdict === "dogru" ? "check" : verdict === "yakin" ? "target" : "close"}
+                size={18}
+                color={verdictInk}
+                strokeWidth={2.6}
+              />
+              <Txt variant="headline" color={verdictInk} style={{ fontSize: 15 }}>
+                {revealed
+                  ? "Doğrusu:"
+                  : verdict === "dogru"
+                    ? "Doğru"
+                    : verdict === "yakin"
+                      ? "Çok yakın — doğrusu:"
+                      : "Doğrusu:"}
+              </Txt>
+            </View>
+            <PressableScale onPress={() => speakTarget(step.target)} accessibilityLabel="Doğrusunu dinle" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Icon name="volume" size={20} color={colors.ink} />
+              <Txt variant="title3" style={[{ flex: 1 }, rtl && styles.rtl]}>
+                {step.target}
+              </Txt>
+            </PressableScale>
+            {!!step.translit && (
+              <Txt variant="caption" color={colors.inkSoft}>
+                {step.translit}
+              </Txt>
+            )}
+            {step.alts.length > 0 && (
+              <Txt variant="caption" color={colors.inkSoft}>
+                {ltrLine(`Ayrıca doğru: ${step.alts.join(" · ")}`)}
+              </Txt>
+            )}
+            {!!step.note && (
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Icon name="bulb" size={16} color={colors.gold} />
+                <Txt variant="callout" color={colors.ink} style={{ flex: 1 }}>
+                  {ltrLine(step.note)}
+                </Txt>
+              </View>
+            )}
+          </View>
+        )}
+      </Screen>
     </KeyboardAvoidingView>
   );
 }
@@ -573,63 +735,53 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
-    body: { padding: 18, paddingBottom: 40 },
-    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
-    muted: { fontSize: 14, color: colors.inkSoft, textAlign: "center" },
-    lead: { fontSize: 14, color: colors.inkSoft, lineHeight: 21, marginBottom: 14 },
-    focusCard: { backgroundColor: colors.deep, borderRadius: radius.xl, padding: 18, marginBottom: 12, ...shadowLift },
-    focusLabel: { color: colors.goldDeep, fontSize: 11, fontWeight: "800", letterSpacing: 0.6 },
-    focusTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 4 },
-    focusSub: { color: "rgba(255,255,255,0.8)", fontSize: 13.5, marginTop: 6, lineHeight: 20 },
-    focusProgress: { color: colors.goldDeep, fontSize: 12.5, fontWeight: "700", marginTop: 10 },
-    ladderRow: { flexDirection: "row", gap: 8, marginBottom: 18 },
-    ladderCell: { flex: 1, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingVertical: 8, alignItems: "center" },
-    ladderBand: { fontSize: 11, fontWeight: "800", color: colors.inkFaint },
-    ladderCount: { fontSize: 14, fontWeight: "800", color: colors.ink, marginTop: 2 },
-    section: { fontSize: 12, fontWeight: "800", color: colors.inkFaint, letterSpacing: 0.6, marginBottom: 10, marginTop: 6 },
-    themeCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 10, ...shadow },
-    themeEmoji: { fontSize: 24 },
-    themeTitle: { fontSize: 15, fontWeight: "700", color: colors.ink },
-    themeSub: { fontSize: 12, color: colors.inkSoft, marginTop: 2, lineHeight: 17 },
-    savedTag: { fontSize: 11, fontWeight: "800", color: colors.accentDark },
-    savedRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-    savedText: { fontSize: 13.5, color: colors.ink },
-    trSentence: { fontSize: 17, fontWeight: "700", color: colors.ink, lineHeight: 25, marginBottom: 12 },
-    stepCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 14, ...shadow },
-    stepHint: { fontSize: 12, color: colors.inkFaint, fontWeight: "700" },
-    trPiece: { fontSize: 20, fontWeight: "800", color: colors.accentDark, marginTop: 4 },
-    question: { fontSize: 15, fontWeight: "800", color: colors.gold },
-    recap: { fontSize: 14, color: colors.accentDark, marginTop: 6, fontWeight: "600" },
-    trSoFar: { fontSize: 14, color: colors.inkSoft, marginTop: 6 },
-    prev: { fontSize: 13, color: colors.inkFaint, marginTop: 10, fontStyle: "italic" },
-    verdict: { borderRadius: radius.lg, padding: 16, gap: 6 },
-    ok: { backgroundColor: colors.accentSoft },
-    near: { backgroundColor: colors.goldSoft },
-    bad: { backgroundColor: colors.dangerSoft },
-    verdictTitle: { fontSize: 13, fontWeight: "800", color: colors.ink },
-    targetBig: { fontSize: 19, color: colors.ink, fontWeight: "700", lineHeight: 28 },
-    translit: { fontSize: 13, color: colors.inkSoft },
-    alts: { fontSize: 12.5, color: colors.inkSoft },
-    reorder: { fontSize: 15, color: colors.inkSoft, marginTop: 4, marginBottom: 12 },
-    blockCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, marginTop: 10, ...shadow },
-    blockTarget: { fontSize: 17, fontWeight: "800", color: colors.ink },
-    blockTr: { fontSize: 14, fontWeight: "600", color: colors.inkSoft },
-    blockNote: { fontSize: 13, color: colors.inkSoft, marginTop: 4, lineHeight: 19 },
-    contrast: { fontSize: 13, color: colors.gold, marginTop: 6, lineHeight: 19, fontWeight: "600" },
-    mic: { backgroundColor: colors.accent, borderRadius: radius.xl, paddingVertical: 18, alignItems: "center", ...shadowLift },
-    micOn: { backgroundColor: colors.danger },
-    micText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800", textAlign: "center", paddingHorizontal: 12 },
-    partial: { fontSize: 15, color: colors.inkSoft, textAlign: "center", marginTop: 8, fontStyle: "italic" },
-    input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.card, padding: 14, fontSize: 16, color: colors.ink, marginTop: 12 },
-    row: { flexDirection: "row", gap: 10, marginTop: 10 },
-    ghost: { flex: 1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingVertical: 13, alignItems: "center" },
-    ghostText: { color: colors.inkSoft, fontSize: 14, fontWeight: "700" },
-    checkBtn: { flex: 2, backgroundColor: colors.accent, borderRadius: radius.lg, paddingVertical: 13, alignItems: "center" },
-    primary: { backgroundColor: colors.accent, borderRadius: radius.xl, paddingVertical: 14, alignItems: "center", marginTop: 12 },
-    primaryText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
-    secondary: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, alignItems: "center", marginTop: 10 },
-    secondaryText: { color: colors.ink, fontSize: 14, fontWeight: "700" },
-    err: { fontSize: 13, color: colors.danger, marginTop: 8, textAlign: "center" },
+    body: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 40 },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, padding: 24 },
+    focusCard: { backgroundColor: colors.deep, borderRadius: 26, padding: 20, marginBottom: 14, overflow: "hidden" },
+    ladderRow: { flexDirection: "row", gap: 8, marginBottom: 22 },
+    ladderCell: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 9,
+      alignItems: "center",
+      gap: 2,
+    },
+    segments: { flexDirection: "row", gap: 4, marginBottom: 18 },
+    segment: { flex: 1, height: 4, borderRadius: 2 },
+    questionChip: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.accentSoft,
+      borderRadius: 14,
+      paddingHorizontal: 11,
+      paddingVertical: 6,
+    },
+    contrastBox: {
+      flexDirection: "row",
+      gap: 8,
+      backgroundColor: colors.goldSoft,
+      borderRadius: 12,
+      padding: 10,
+      marginTop: 2,
+    },
+    input: {
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+      borderRadius: 14,
+      backgroundColor: colors.bg,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontFamily: "Manrope",
+      fontWeight: "600",
+      fontSize: 17,
+      color: colors.ink,
+    },
+    verdict: { borderRadius: 22, padding: 16, gap: 10, marginTop: 14 },
     rtl: { writingDirection: "rtl", textAlign: "right" },
   });
 }

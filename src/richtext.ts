@@ -99,3 +99,14 @@ export function isMostlyArabic(text: string): boolean {
   }
   return ar > 0 && ar / (ar + other) >= 0.6;
 }
+
+/**
+ * Türkçe ağırlıklı satırı soldan sağa sabitler. Android (ve web) paragraf
+ * yönünü İLK güçlü harften tahmin eder: "بَعْدَ = sonra" gibi Arapçayla
+ * başlayan bir Türkçe açıklama bütünüyle sağdan sola dönüyor, "-madan önce"
+ * "madan önce-" oluyordu. Başa görünmez soldan-sağa işareti (LRM) konur.
+ */
+export function ltrLine(text: string): string {
+  if (!text || !ARABIC_RE.test(text) || isMostlyArabic(text)) return text;
+  return text.startsWith("\u200E") ? text : "\u200E" + text;
+}

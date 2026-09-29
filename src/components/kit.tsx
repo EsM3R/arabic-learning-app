@@ -160,7 +160,6 @@ export function PressableScale({
       delete (inner as Record<string, unknown>)[k];
     }
   }
-  if (outer.flex !== undefined) inner.flex = 1;
   const to = (v: number) =>
     Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
   return (
@@ -243,7 +242,7 @@ export function Button({
         {
           height: h,
           borderRadius: size === "sm" ? 12 : 16,
-          paddingHorizontal: size === "sm" ? 12 : 18,
+          paddingHorizontal: size === "sm" ? 12 : size === "md" ? 14 : 18,
           backgroundColor: p.bg,
           borderWidth: p.border ? 1 : 0,
           borderColor: p.border,
@@ -263,8 +262,10 @@ export function Button({
           <Txt
             variant="button"
             color={p.fg}
-            style={size === "sm" ? { fontSize: 13 } : undefined}
+            style={[{ flexShrink: 1 }, size === "sm" ? { fontSize: 13 } : size === "md" ? { fontSize: 14.5 } : undefined]}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
           >
             {label}
           </Txt>

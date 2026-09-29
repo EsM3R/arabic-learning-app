@@ -88,7 +88,7 @@ async function openAndStart() {
     ok.onPress?.();
   });
   // Yapı taşları cümleden ÖNCE — videodaki hoca da önce anlatıp sonra çevirir.
-  await waitFor(() => expect(screen.getByText(/Bu cümlede öğreneceklerin/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/BU CÜMLEDE ÖĞRENECEKLERİN/)).toBeTruthy());
   fireEvent.press(screen.getByText(/Kurmaya başla/));
   await waitFor(() => expect(screen.getByText(/Bu adımda ekle/)).toBeTruthy());
 }
@@ -109,14 +109,14 @@ test("ekranı açmak istek harcamaz; yeni set ONAY ister", async () => {
 
 test("ilk adım ANA YÜKLEM: Türkçe parça gösterilir, cevap gizli", async () => {
   await openAndStart();
-  expect(screen.getByText("duş alırım")).toBeTruthy();
+  expect(screen.getAllByText("duş alırım").length).toBeGreaterThan(0);
   expect(screen.queryByText(/I take a shower/)).toBeNull();
 });
 
 test("doğru cevap kabul edilir, doğrusu SESLİ okunur, alternatif de doğrudur", async () => {
   await openAndStart();
   say("I have a shower"); // alternatif
-  await waitFor(() => expect(screen.getByText("✓ Doğru")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("Doğru")).toBeTruthy());
   expect(require("expo-speech").speak).toHaveBeenCalled();
   expect(screen.getByText(/Ayrıca doğru: I have a shower/)).toBeTruthy();
 });
@@ -124,10 +124,10 @@ test("doğru cevap kabul edilir, doğrusu SESLİ okunur, alternatif de doğrudur
 test("YANLIŞ cevapta adım atlanmaz — aynı adım bir daha söyletilir", async () => {
   await openAndStart();
   say("I shower take");
-  await waitFor(() => expect(screen.getByText(/✗ Doğrusu/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Doğrusu/)).toBeTruthy());
   expect(screen.queryByText(/Devam/)).toBeNull();
   fireEvent.press(screen.getByText(/Bir daha söyle/));
-  expect(screen.getByText("duş alırım")).toBeTruthy(); // hâlâ ilk adım
+  expect(screen.getAllByText("duş alırım").length).toBeGreaterThan(0); // hâlâ ilk adım
 });
 
 test("cümle adım adım BÜYÜR, bağlaç ortaya alınarak ek adım söyletilir", async () => {
@@ -137,7 +137,7 @@ test("cümle adım adım BÜYÜR, bağlaç ortaya alınarak ek adım söyletilir
   fireEvent.press(screen.getByText(/Devam/));
   expect(screen.getByText("kahvaltı yapmadan önce")).toBeTruthy();
   expect(screen.getByText("Ne zaman?")).toBeTruthy(); // videodaki gibi: soruyla büyüt
-  expect(screen.getByText(/önceki: I take a shower/)).toBeTruthy();
+  expect(screen.getByText(/I take a shower …/)).toBeTruthy();
 
   say("before I have breakfast, I take a shower");
   await waitFor(() => expect(screen.getByText(/Devam/)).toBeTruthy());
@@ -145,7 +145,7 @@ test("cümle adım adım BÜYÜR, bağlaç ortaya alınarak ek adım söyletilir
   expect(screen.getByText(/bağlacı ORTAYA alarak/)).toBeTruthy();
 
   say("I take a shower before I have breakfast");
-  await waitFor(() => expect(screen.getByText("✓ Doğru")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("Doğru")).toBeTruthy());
 });
 
 test("YAPI TAŞI ve KARIŞIKLIK notu cümleye BAŞLAMADAN gösterilir", async () => {
@@ -173,7 +173,7 @@ test("cümle bitince tam hâli, bağlacın öteki yeri ve özet gösterilir", as
     fireEvent.press(screen.getByText(/Devam/));
   }
   await waitFor(() => expect(screen.getByText(/ya da: I take a shower before/)).toBeTruthy());
-  expect(screen.getByText(/✓ before = -madan önce/)).toBeTruthy();
+  expect(screen.getByText(/before = -madan önce/)).toBeTruthy();
 });
 
 test("set SAKLANIR ve ikinci açılışta BEDAVA gelir", async () => {
@@ -259,15 +259,15 @@ test("SINIR YOK: set sonunda 'Devam' yeni cümleler ister, eskileri tekrarlatmaz
   ];
   for (const t of all[0]) {
     say(t);
-    await waitFor(() => expect(screen.getByText(/Devam ›/)).toBeTruthy());
-    fireEvent.press(screen.getByText(/Devam ›/));
+    await waitFor(() => expect(screen.getByText(/^Devam$/)).toBeTruthy());
+    fireEvent.press(screen.getByText(/^Devam$/));
   }
   fireEvent.press(screen.getByText(/Sıradaki cümle/));
   fireEvent.press(screen.getByText(/Kurmaya başla/));
   for (const t of ["I turn on the TV", "When I arrive at home, I turn on the TV."]) {
     say(t);
-    await waitFor(() => expect(screen.getByText(/Devam ›/)).toBeTruthy());
-    fireEvent.press(screen.getByText(/Devam ›/));
+    await waitFor(() => expect(screen.getByText(/^Devam$/)).toBeTruthy());
+    fireEvent.press(screen.getByText(/^Devam$/));
   }
   fireEvent.press(screen.getByText(/Seti bitir/));
   await waitFor(() => expect(screen.getByText(/Devam — yeni cümleler/)).toBeTruthy());

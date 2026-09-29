@@ -219,14 +219,14 @@ test("boş duyulan sıra tur harcamaz, sıra öğrencide kalır", async () => {
   hear("   ");
   await act(async () => {});
   expect(mockChat).toHaveBeenCalledTimes(1);
-  expect(screen.getByText(/🎙️ Konuş/)).toBeTruthy();
+  expect(screen.getByLabelText("Konuş")).toBeTruthy();
 });
 
 test("eller serbest KAPATILINCA mikrofon kendi açılmaz, düğme çıkar", async () => {
   await openRoom();
   await startScene(/ile sesli sohbet/);
   await waitFor(() => expect(dict().started).toBe(1));
-  fireEvent.press(screen.getByText(/eller serbest/));
+  fireEvent.press(screen.getByText(/eller serbest/i));
   hear("مرحبا"); // ikinci tur, artık düğmeli kipte
   await waitFor(() => expect(mockChat).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(screen.getByText(/Basılı tut ve konuş/)).toBeTruthy());
@@ -261,8 +261,8 @@ test("Bitir: değerlendirme ÇAĞRILIR, gösterilir, düzeltmeler hata defterine
   expect(turns.some((t) => t.role === "user")).toBe(true);
 
   await waitFor(() => expect(screen.getByText(/Hedefe ulaştın/)).toBeTruthy());
-  expect(screen.getByText(/✗ ana bidd kahwa/)).toBeTruthy();
-  expect(screen.getByText(/✓ أريد قهوة/)).toBeTruthy();
+  expect(screen.getByText(/ana bidd kahwa/)).toBeTruthy();
+  expect(screen.getByText(/أريد قهوة/)).toBeTruthy();
   expect(screen.getByText(/Selamlaşmayı doğru yaptın/)).toBeTruthy();
 
   await waitFor(async () => {
@@ -289,7 +289,7 @@ test("kalıplar tek dokunuşla deftere eklenir, mükerrer eklenmez", async () =>
     expect(cards[0].arabic).toBe("الحساب من فضلك");
     expect(cards[0].track).toBe("konusma");
   });
-  await waitFor(() => expect(screen.getByText(/✓ Defterde/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Defterde/)).toBeTruthy());
 });
 
 test("HİÇ konuşulmamış sahnede değerlendirme çağrılmaz — para harcanmaz", async () => {
@@ -298,7 +298,7 @@ test("HİÇ konuşulmamış sahnede değerlendirme çağrılmaz — para harcanm
   fireEvent.press(screen.getByText(/Bitir ve değerlendir/));
   await act(async () => {});
   expect(mockDebrief).not.toHaveBeenCalled();
-  await waitFor(() => expect(screen.getByText(/Rol sahneleri/)).toBeTruthy()); // seçime döndü
+  await waitFor(() => expect(screen.getByText(/ROL SAHNELER/)).toBeTruthy()); // seçime döndü
 });
 
 test("değerlendirme çökerse ekran kilitlenmez, tekrar denenebilir", async () => {

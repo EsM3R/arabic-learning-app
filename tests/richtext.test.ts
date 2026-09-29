@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classifyLine, isMostlyArabic, splitInline, splitScript } from "../src/richtext.ts";
+import { classifyLine, isMostlyArabic, ltrLine, splitInline, splitScript } from "../src/richtext.ts";
 
 test("boş satır 'blank' olur", () => {
   assert.equal(classifyLine("").type, "blank");
@@ -112,4 +112,11 @@ test("isMostlyArabic: Arapça ağırlıklı satır sağa, karışık açıklama 
   assert.equal(isMostlyArabic("Bu kelime كتاب demek, yani kitap anlamında"), false);
   assert.equal(isMostlyArabic("Merhaba"), false);
   assert.equal(isMostlyArabic("1. 2. —"), false);
+});
+
+test("ltrLine: Arapçayla başlayan Türkçe açıklama soldan sağa sabitlenir", () => {
+  assert.equal(ltrLine("بَعْدَ = sonra; karıştırma"), "\u200Eبَعْدَ = sonra; karıştırma");
+  assert.equal(ltrLine("sadece Türkçe"), "sadece Türkçe");
+  assert.equal(ltrLine("أَنَا طَالِبٌ"), "أَنَا طَالِبٌ");
+  assert.equal(ltrLine(ltrLine("بَعْدَ = sonra")), "\u200Eبَعْدَ = sonra");
 });

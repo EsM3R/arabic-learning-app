@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TextStyle, View } from "react-native";
-import { Block, classifyLine, InlineToken, isMostlyArabic, splitInline, splitScript } from "../richtext";
+import { Block, classifyLine, InlineToken, isMostlyArabic, ltrLine, splitInline, splitScript } from "../richtext";
 import { arabicText } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
@@ -120,7 +120,7 @@ export default function RichText({ content, style, scaleScript = false }: Props)
     }
     lastWasBlank = false;
 
-    const content = renderInline(styles, block.text, baseSize, scaleScript, key);
+    const content = renderInline(styles, scaleScript ? ltrLine(block.text) : block.text, baseSize, scaleScript, key);
     const rtl = scaleScript && isMostlyArabic(block.text) ? styles.rtl : null;
 
     if (block.type === "heading") {
