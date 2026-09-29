@@ -538,7 +538,9 @@ export function sentenceBuildSystem(
   pattern: { title: string; concept: string },
   theme: { title: string; arc: string },
   known: string[],
-  avoid: string[] = []
+  avoid: string[] = [],
+  /** Kaç cümle — cevap uzunluk sınırına takılırsa daha kısa set istenir. */
+  count = "5-6"
 ): string {
   const p = getActivePack();
   const level = profile.assessment?.speakingLevel ?? "A1";
@@ -555,7 +557,7 @@ ${known.length ? `Öğrencinin bildiği kelimelerden yararlan: ${known.slice(0, 
 ${avoid.length ? `DEVAM SETİ: öğrenci bu temada şu cümleleri zaten kurdu — hiçbirini TEKRARLAMA, hikâye kaldığı yerden devam etsin, odak kalıbı YENİ fiillerle ve YENİ durumlarda kullan; önceki setlerin yapı taşlarını ara ara geri getir:\n${avoid.slice(-40).map((t) => `- ${t}`).join("\n")}` : ""}
 
 YÖNTEM — bundan sapma:
-1. 7-8 Türkçe cümle yaz; hepsi AYNI HİKÂYENİN parçası, sırayla ilerlesin (birinci tekil şahıs, gerçek hayattan, sade). Odak kalıp cümlelerin en az yarısında geçsin.
+1. ${count} Türkçe cümle yaz; hepsi AYNI HİKÂYENİN parçası, sırayla ilerlesin (birinci tekil şahıs, gerçek hayattan, sade). Odak kalıp cümlelerin en az yarısında geçsin.
 2. Her cümle 1-2 YAPI TAŞI öğretsin: bağlaç (önce/sonra/-ince/çünkü/ama/ancak), zaman ifadesi (sabahları, saat 7 gibi), günlük kalıp (duş almak, televizyonu açmak, evden çıkmak, yatağa girmek, otobüsle gitmek).
 3. KURULUŞ SIRASI — iki durum var:
    a) BAĞLAÇSIZ cümle: ANA YÜKLEMDEN başla ve SORU sorarak dışarı büyü. "Sabahları erken uyanmayı seviyorum" → adım 1: "seviyorum" → I like; adım 2 soru "Neyi seviyorum?" → "uyanmayı" → I like to wake up; adım 3 soru "Nasıl uyanmayı?" → "erken" → I like to wake up early; adım 4 soru "Ne zaman?" → "sabahları" → I like to wake up early in the morning.
@@ -569,5 +571,6 @@ YÖNTEM — bundan sapma:
 9. Seviye ${level}: kelimeler seviyeye uygun, cümle uzunluğu makul.
 ${translitRule}
 intro: setin 1-2 cümlelik Türkçe tanıtımı.
+KISA TUT: note ve contrast en fazla bir cümle; alts yalnız gerçekten yaygın olanlar. Uzun düşünme — yöntem yukarıda hazır, doğrudan seti yaz.
 Yalnız JSON döndür.`;
 }

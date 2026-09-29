@@ -1,3 +1,4 @@
+import { TRUNCATED_TEXT } from "./providers/types";
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
 import { BudgetExceededError, budgetStatus, normalizeLimits } from "./budget";
 import { normalizePronunciationItems, sanitizeMinimalPairs } from "./hvpt";
@@ -565,13 +566,36 @@ export async function generateBuildSet(
 ): Promise<BuildSet> {
   await guardBudget(profile);
   const { provider, model, apiKey } = requireKey(profile);
-  const parsed = await provider.structured<unknown>({
-    system: sentenceBuildSystem(profile, pattern, theme, knownWords, avoid),
-    userMessage: "Cümle kurma setimi hazırla.",
-    schema: BUILD_SET_SCHEMA as unknown as Record<string, unknown>,
-    model,
-    apiKey,
-  });
+  /**
+   * Düşünen modeller (DeepSeek) düşünmeyi de cevap sınırından harcıyor:
+   * uzun bir set yarıda kesilebiliyor. Kesilirse KISA bir setle bir kez
+   * daha denenir — öğrenciye "tekrar dene" demek yerine işi uygulama yapar.
+   */
+  const ask = (count: string) =>
+    provider.structured<unknown>({
+      system: sentenceBuildSystem(profile, pattern, theme, knownWords, avoid, count),
+      userMessage: "Cümle kurma setimi hazırla.",
+      schema: BUILD_SET_SCHEMA as unknown as Record<string, unknown>,
+      model,
+      apiKey,
+    });
+  let parsed: unknown;
+  try {
+    parsed = await ask("5-6");
+  } catch (e) {
+    if (!(e instanceof Error) || e.message !== TRUNCATED_TEXT) throw e;
+    await guardBudget(profile);
+    try {
+      parsed = await ask("3-4");
+    } catch (e2) {
+      if (e2 instanceof Error && e2.message === TRUNCATED_TEXT) {
+        throw new Error(
+          "Model iki denemede de cevabı bitiremedi (kısaltılmış setle bile). Ayarlar'dan başka bir modele geçmeyi ya da biraz sonra tekrar denemeyi dene."
+        );
+      }
+      throw e2;
+    }
+  }
   const set = normalizeBuildSet(parsed, pattern.id, theme.id);
   if (set.sentences.length < 3) {
     throw new Error("Set beklenenden kısa geldi (modelin cevabı şemaya uymamış). Tekrar denemek genelde çözer.");

@@ -143,7 +143,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     }
     Alert.alert(
       "Yeni set",
-      `"${theme.title}" temasında, "${focus.title}" kalıbına odaklı 7-8 cümle hazırlansın mı? Bu bir API isteği harcar; set saklanır, sonra bedava tekrar çalışılır.`,
+      `"${theme.title}" temasında, "${focus.title}" kalıbına odaklı 5-6 cümle hazırlansın mı? Bu bir API isteği harcar; set saklanır, sonra bedava tekrar çalışılır.`,
       [
         { text: "Vazgeç", style: "cancel" },
         { text: "Evet, hazırla", onPress: () => void generate(theme) },
@@ -445,7 +445,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
                 if (!theme) return;
                 Alert.alert(
                   "Yeni cümleler",
-                  "Hikâye kaldığı yerden devam etsin mi? Aynı kalıpla, daha önce kurmadığın 7-8 yeni cümle gelir. Bu bir API isteği harcar.",
+                  "Hikâye kaldığı yerden devam etsin mi? Aynı kalıpla, daha önce kurmadığın 5-6 yeni cümle gelir. Bu bir API isteği harcar.",
                   [
                     { text: "Vazgeç", style: "cancel" },
                     { text: "Evet, devam", onPress: () => void generate(theme, set.patternId) },
