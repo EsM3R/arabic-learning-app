@@ -10,16 +10,7 @@
  * dolayısıyla karanlık modu bedava desteklerler.
  */
 import React, { useEffect, useRef } from "react";
-import {
-  Animated,
-  Easing,
-  StyleProp,
-  StyleSheet,
-  Text,
-  TextStyle,
-  View,
-  ViewStyle,
-} from "react-native";
+import { Animated, Easing, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { radius, shadow, spacing } from "../theme";
 import { useTheme } from "../useTheme";

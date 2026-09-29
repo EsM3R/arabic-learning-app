@@ -1,15 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -21,6 +11,8 @@ import {
   summarizeBackup,
 } from "../backup";
 import Header from "../components/Header";
+import Icon from "../components/Icon";
+import { Badge, Button, Chip, ListGroup, PressableScale, SectionLabel, StarPattern, Surface, Txt } from "../components/kit";
 import { isLanguageId, LANGUAGE_PACKS } from "../languages";
 import { isProviderId, keyFor, modelFor, PROVIDER_LIST, ProviderId } from "../providers";
 import { latestSnapshotUri, listSnapshots } from "../snapshots";
@@ -34,7 +26,6 @@ import {
   restoreFromBackup,
   saveLastExportAt,
 } from "../storage";
-import { colors, radius, shadow, shadowLift } from "../theme";
 import type { Palette } from "../theme";
 import { useTheme } from "../useTheme";
 import { Profile } from "../types";
@@ -294,6 +285,15 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
     }
   };
 
+  const warn = (text: string, blocked = false) => (
+    <View style={[styles.warnBox, blocked && { backgroundColor: colors.dangerSoft }]}>
+      <Icon name="alert" size={16} color={blocked ? colors.danger : colors.gold} />
+      <Txt variant="caption" color={colors.ink} style={{ flex: 1, lineHeight: 18 }}>
+        {text}
+      </Txt>
+    </View>
+  );
+
   return (
     // Edge-to-edge modda Android pencereyi klavye için küçültmediğinden
     // behavior her iki platformda da verilmeli.
@@ -301,131 +301,132 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
       <View style={styles.container}>
         <Header
           title="Ayarlar"
-          subtitle={`Aktif: ${
-            PROVIDER_LIST.find((p) => p.meta.id === initial)?.meta.label ?? "—"
-          }`}
+          subtitle={`Aktif: ${PROVIDER_LIST.find((p) => p.meta.id === initial)?.meta.label ?? "—"}`}
           onBack={onBack}
         />
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {usage && (
             <View style={styles.usageCard}>
-              <Text style={styles.usageTitle}>TAHMİNİ HARCAMA</Text>
+              <StarPattern width="100%" height="100%" color={colors.goldDeep} opacity={0.08} />
+              <Txt variant="overline" color={colors.goldDeep}>
+                TAHMİNİ HARCAMA
+              </Txt>
               <View style={styles.usageRow}>
                 <View>
-                  <Text style={styles.usageBig}>{formatTry(usage.todayUsd)}</Text>
-                  <Text style={styles.usageSmall}>bugün · {usage.todayCalls} istek</Text>
+                  <Txt variant="title2" color={colors.onDeep}>
+                    {formatTry(usage.todayUsd)}
+                  </Txt>
+                  <Txt variant="caption" color={colors.onDeepSoft}>
+                    bugün · {usage.todayCalls} istek
+                  </Txt>
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
-                  <Text style={styles.usageBig}>{formatTry(usage.monthUsd)}</Text>
-                  <Text style={styles.usageSmall}>bu ay · {usage.monthCalls} istek</Text>
+                  <Txt variant="title2" color={colors.onDeep}>
+                    {formatTry(usage.monthUsd)}
+                  </Txt>
+                  <Txt variant="caption" color={colors.onDeepSoft}>
+                    bu ay · {usage.monthCalls} istek
+                  </Txt>
                 </View>
               </View>
-              <Text style={styles.usageNote}>
-                Token sayılarından hesaplanan tahmindir; kesin tutar sağlayıcının
-                faturasıdır. {buildLabel()}
-              </Text>
+              <Txt variant="caption" color={colors.onDeepSoft} style={{ fontSize: 11, lineHeight: 15 }}>
+                Token sayılarından hesaplanan tahmindir; kesin tutar sağlayıcının faturasıdır. {buildLabel()}
+              </Txt>
             </View>
           )}
 
           {/* Sert tavan: göstermek koruma değil, DURDURMAK korumadır. */}
-          <Text style={styles.label}>Harcama tavanı</Text>
-          <Text style={styles.hint}>
-            Tavan dolunca uygulama yeni istek göndermez — ders, okuma metni, telaffuz
-            seti, hepsi durur. 0 yazarsan o sınır kapanır (önerilmez). Rakamlar
-            tahmindir; kesin tutar sağlayıcının faturasıdır.
-          </Text>
-          <View style={styles.budgetRow}>
-            <View style={styles.budgetField}>
-              <Text style={styles.budgetLabel}>Günlük (TL)</Text>
-              <TextInput
-                style={styles.input}
-                value={daily}
-                onChangeText={setDaily}
-                keyboardType="number-pad"
-                placeholder={String(DEFAULT_BUDGET.dailyTry)}
-                placeholderTextColor={colors.inkFaint}
-              />
+          <SectionLabel title="Harcama tavanı" style={styles.section} />
+          <Surface style={{ gap: 10 }}>
+            <Txt variant="caption" color={colors.inkSoft}>
+              Tavan dolunca uygulama yeni istek göndermez — ders, okuma metni, telaffuz seti, hepsi durur. 0
+              yazarsan o sınır kapanır (önerilmez). Rakamlar tahmindir; kesin tutar sağlayıcının faturasıdır.
+            </Txt>
+            <View style={styles.budgetRow}>
+              <View style={styles.budgetField}>
+                <Txt variant="caption" color={colors.inkSoft} style={{ marginBottom: 6 }}>
+                  Günlük (TL)
+                </Txt>
+                <TextInput
+                  style={styles.input}
+                  value={daily}
+                  onChangeText={setDaily}
+                  keyboardType="number-pad"
+                  placeholder={String(DEFAULT_BUDGET.dailyTry)}
+                  placeholderTextColor={colors.inkFaint}
+                />
+              </View>
+              <View style={styles.budgetField}>
+                <Txt variant="caption" color={colors.inkSoft} style={{ marginBottom: 6 }}>
+                  Aylık (TL)
+                </Txt>
+                <TextInput
+                  style={styles.input}
+                  value={monthly}
+                  onChangeText={setMonthly}
+                  keyboardType="number-pad"
+                  placeholder={String(DEFAULT_BUDGET.monthlyTry)}
+                  placeholderTextColor={colors.inkFaint}
+                />
+              </View>
             </View>
-            <View style={styles.budgetField}>
-              <Text style={styles.budgetLabel}>Aylık (TL)</Text>
-              <TextInput
-                style={styles.input}
-                value={monthly}
-                onChangeText={setMonthly}
-                keyboardType="number-pad"
-                placeholder={String(DEFAULT_BUDGET.monthlyTry)}
-                placeholderTextColor={colors.inkFaint}
-              />
-            </View>
-          </View>
-          {budget && budget.state !== "ok" && (
-            <View style={[styles.warnBox, budget.state === "blocked" && styles.blockBox]}>
-              <Text style={styles.warnText}>{budget.message}</Text>
-            </View>
-          )}
+            {budget && budget.state !== "ok" && warn(budget.message ?? "", budget.state === "blocked")}
+          </Surface>
 
-          <Text style={styles.label}>Sağlayıcı</Text>
-          {PROVIDER_LIST.map((p) => {
-            const active = p.meta.id === selected;
-            const hasKey = (keys[p.meta.id] ?? "").trim().length > 0;
-            return (
-              <TouchableOpacity
-                key={p.meta.id}
-                style={[styles.row, active && styles.rowActive]}
-                onPress={() => setSelected(p.meta.id)}
-                activeOpacity={0.85}
-              >
-                <View style={[styles.radio, active && styles.radioOn]}>
-                  {active && <View style={styles.radioDot} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.rowTitleLine}>
-                    <Text style={styles.rowTitle}>{p.meta.label}</Text>
-                    {p.meta.experimental && (
-                      <Text style={styles.betaTag}>DENENMEDİ</Text>
-                    )}
+          <SectionLabel title="Sağlayıcı" style={styles.section} />
+          <ListGroup>
+            {PROVIDER_LIST.map((p) => {
+              const active = p.meta.id === selected;
+              const hasKey = (keys[p.meta.id] ?? "").trim().length > 0;
+              return (
+                <PressableScale key={p.meta.id} onPress={() => setSelected(p.meta.id)} scaleTo={0.985} accessibilityLabel={p.meta.label}>
+                  <View style={[styles.providerRow, active && { backgroundColor: colors.accentSoft }]}>
+                    <View style={[styles.radio, active && styles.radioOn]}>{active && <View style={styles.radioDot} />}</View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                        <Txt variant="bodyStrong">{p.meta.label}</Txt>
+                        {p.meta.experimental && <Badge text="DENENMEDİ" tone="gold" />}
+                      </View>
+                      <Txt variant="caption" color={colors.inkSoft}>
+                        {p.meta.costNote}
+                      </Txt>
+                    </View>
+                    {hasKey && <Icon name="key" size={18} color={colors.accentDark} />}
                   </View>
-                  <Text style={styles.rowMeta}>{p.meta.costNote}</Text>
-                </View>
-                {hasKey && <Text style={styles.keyOk}>✓ anahtar</Text>}
-              </TouchableOpacity>
-            );
-          })}
+                </PressableScale>
+              );
+            })}
+          </ListGroup>
 
-          {meta.experimental && (
-            <View style={styles.warnBox}>
-              <Text style={styles.warnText}>
-                Bu sağlayıcı canlı API'ye karşı denenmedi. Aşağıdaki düğmeyle kendin
-                sınayabilirsin; çalışmazsa Anthropic'e geri dön — dersin, kelime
-                defterin ve ilerlemen etkilenmez.
-              </Text>
-            </View>
-          )}
+          {meta.experimental &&
+            warn(
+              "Bu sağlayıcı canlı API'ye karşı denenmedi. Aşağıdaki düğmeyle kendin sınayabilirsin; çalışmazsa Anthropic'e geri dön — dersin, kelime defterin ve ilerlemen etkilenmez."
+            )}
 
           {/* Bağlantı sınaması: denenmemiş kod yolunun hatası ders ortasında
-              değil BURADA çıksın. Ders açıp uzun bir bekleyişin sonunda
-              patlamak en pahalı hata bildirim biçimidir. */}
-          <TouchableOpacity
-            style={[styles.testButton, busy === "test" && styles.testButtonOff]}
+              değil BURADA çıksın. */}
+          <Button
+            variant="secondary"
+            size="md"
+            icon="zap"
+            label={busy === "test" ? "Sınanıyor…" : "Bağlantıyı sına"}
             disabled={busy === "test"}
             onPress={() => void runConnectionTest()}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.testButtonText}>
-              {busy === "test" ? "Sınanıyor…" : "🔌 Bağlantıyı sına"}
-            </Text>
-          </TouchableOpacity>
+            style={{ marginTop: 12 }}
+          />
           {test && (
-            <View style={[styles.testResult, test.ok ? styles.testOk : styles.testBad]}>
-              <Text style={styles.testTitle}>
-                {test.ok ? "✓ " : "✕ "}
-                {test.title}
-              </Text>
-              <Text style={styles.testDetail}>{test.detail}</Text>
+            <View style={[styles.testResult, { backgroundColor: test.ok ? colors.accentSoft : colors.dangerSoft }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Icon name={test.ok ? "check" : "close"} size={16} color={test.ok ? colors.accentDark : colors.danger} strokeWidth={2.6} />
+                <Txt variant="bodyStrong">{test.title}</Txt>
+              </View>
+              <Txt variant="caption" color={colors.inkSoft}>
+                {test.detail}
+              </Txt>
             </View>
           )}
 
-          <Text style={[styles.label, { marginTop: 20 }]}>Model</Text>
+          <SectionLabel title="Model" style={styles.section} />
           <TextInput
             style={styles.input}
             value={models[selected] ?? ""}
@@ -437,21 +438,15 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
           />
           <View style={styles.chips}>
             {meta.models.map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={styles.chip}
-                onPress={() => setModels({ ...models, [selected]: m })}
-              >
-                <Text style={styles.chipText}>{m}</Text>
-              </TouchableOpacity>
+              <Chip key={m} label={m} selected={(models[selected] ?? "") === m} onPress={() => setModels({ ...models, [selected]: m })} />
             ))}
           </View>
-          <Text style={styles.hint}>
-            Model adları sağlayıcı tarafında değişebilir; çalışmazsa güncel adı
-            sağlayıcının belgelerinden alıp buraya yazabilirsin.
-          </Text>
+          <Txt variant="caption" color={colors.inkSoft} style={styles.hint}>
+            Model adları sağlayıcı tarafında değişebilir; çalışmazsa güncel adı sağlayıcının belgelerinden alıp
+            buraya yazabilirsin.
+          </Txt>
 
-          <Text style={[styles.label, { marginTop: 16 }]}>API Anahtarı</Text>
+          <SectionLabel title="API anahtarı" style={styles.section} />
           <TextInput
             style={styles.input}
             value={keys[selected] ?? ""}
@@ -462,343 +457,192 @@ export default function SettingsScreen({ profile, onSave, onRestored, onBack }: 
             autoCorrect={false}
             secureTextEntry
           />
-          <Text style={styles.hint}>
+          <Txt variant="caption" color={colors.inkSoft} style={styles.hint}>
             {meta.keyHint}
-            {"\n"}Anahtarlar yalnızca bu cihazda saklanır; istekler doğrudan
-            cihazından sağlayıcıya gider.
-          </Text>
+            {"\n"}Anahtarlar yalnızca bu cihazda saklanır; istekler doğrudan cihazından sağlayıcıya gider.
+          </Txt>
 
-          {/* SES: "ChatGPT akıcı konuşuyor, bizimki robot" şikâyetinin cevabı.
-              Onlarda ses sunucudaki ses modelinden gelir; burada aynı modele
-              gidiliyor. Telefon sesi yedek olarak duruyor. */}
-          <Text style={[styles.label, { marginTop: 20 }]}>Konuşma Odası beyni</Text>
-          <Text style={styles.hint}>
-            Konuşmada pahalı olan beyin değil ses. Beyni DeepSeek'ten almak oturumu
-            ≈ 8 TL'ye indirir; ders ekranları yine yukarıdaki sağlayıcıyı kullanır.
-          </Text>
+          {/* SES: "ChatGPT akıcı konuşuyor, bizimki robot" şikâyetinin cevabı. */}
+          <SectionLabel title="Konuşma Odası beyni" style={styles.section} />
+          <Txt variant="caption" color={colors.inkSoft}>
+            Konuşmada pahalı olan beyin değil ses. Beyni DeepSeek'ten almak oturumu ≈ 8 TL'ye indirir; ders
+            ekranları yine yukarıdaki sağlayıcıyı kullanır.
+          </Txt>
           <View style={styles.chips}>
             {(["deepseek", "active"] as const).map((b) => (
-              <TouchableOpacity
+              <Chip
                 key={b}
-                style={[styles.chip, voice.brain === b && styles.chipOn]}
+                icon={b === "deepseek" ? "wallet" : "sparkles"}
+                label={b === "deepseek" ? "DeepSeek (ucuz)" : `Aktif · ${meta.label}`}
+                selected={voice.brain === b}
                 onPress={() => setVoice({ ...voice, brain: b })}
-              >
-                <Text style={[styles.chipText, voice.brain === b && styles.chipTextOn]}>
-                  {b === "deepseek" ? "🪙 DeepSeek (ucuz)" : `🧠 ${meta.label}`}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </View>
-          {voice.brain === "deepseek" && !(keys.deepseek ?? "").trim() && (
-            <View style={styles.warnBox}>
-              <Text style={styles.warnText}>
-                DeepSeek anahtarı yok — oda şimdilik {meta.label} ile konuşur. Anahtar için
-                yukarıdan DeepSeek'i seçip yapıştır, sonra sağlayıcını geri al.
-              </Text>
-            </View>
-          )}
+          {voice.brain === "deepseek" &&
+            !(keys.deepseek ?? "").trim() &&
+            warn(
+              `DeepSeek anahtarı yok — oda şimdilik ${meta.label} ile konuşur. Anahtar için yukarıdan DeepSeek'i seçip yapıştır, sonra sağlayıcını geri al.`
+            )}
 
-          <Text style={[styles.label, { marginTop: 20 }]}>Hocanın sesi</Text>
-          <View style={styles.chips}>
+          <SectionLabel title="Hocanın sesi" style={styles.section} />
+          <View style={[styles.chips, { marginTop: 0 }]}>
             {(["gemini", "openai", "device"] as VoiceProvider[]).map((prov) => (
-              <TouchableOpacity
+              <Chip
                 key={prov}
-                style={[styles.chip, voice.provider === prov && styles.chipOn]}
-                onPress={() =>
-                  setVoice(normalizeVoice({ ...voice, provider: prov, voiceId: undefined }))
-                }
-              >
-                <Text style={[styles.chipText, voice.provider === prov && styles.chipTextOn]}>
-                  {prov === "device"
-                    ? "📱 Telefon sesi"
-                    : prov === "gemini"
-                      ? "✨ Gemini (ücretsiz kota)"
-                      : "✨ OpenAI"}
-                </Text>
-              </TouchableOpacity>
+                icon={prov === "device" ? "volume" : "sparkles"}
+                label={prov === "device" ? "Telefon sesi" : prov === "gemini" ? "Gemini (ücretsiz kota)" : "OpenAI"}
+                selected={voice.provider === prov}
+                onPress={() => setVoice(normalizeVoice({ ...voice, provider: prov, voiceId: undefined }))}
+              />
             ))}
           </View>
           {voice.provider !== "device" && (
             <>
-              {!voiceReady && (
-                <View style={styles.warnBox}>
-                  <Text style={styles.warnText}>
-                    Ses modeli için {voiceProviderLabel} anahtarı gerekir (sohbet için başka
-                    sağlayıcı kullanmaya devam edebilirsin; anahtar yalnız ses için). Yukarıdan{" "}
-                    {voiceProviderLabel}'ı seçip anahtarı yapıştır, sonra sağlayıcını geri
-                    değiştir. Anahtar girilene kadar telefon sesi kullanılır.
-                  </Text>
-                </View>
-              )}
+              {!voiceReady &&
+                warn(
+                  `Ses modeli için ${voiceProviderLabel} anahtarı gerekir (sohbet için başka sağlayıcı kullanmaya devam edebilirsin; anahtar yalnız ses için). Yukarıdan ${voiceProviderLabel}'ı seçip anahtarı yapıştır, sonra sağlayıcını geri değiştir. Anahtar girilene kadar telefon sesi kullanılır.`
+                )}
               <View style={styles.chips}>
                 {voicesFor(voice.provider).map((v) => (
-                  <TouchableOpacity
-                    key={v.id}
-                    style={[styles.chip, voice.voiceId === v.id && styles.chipOn]}
-                    onPress={() => setVoice({ ...voice, voiceId: v.id })}
-                  >
-                    <Text style={[styles.chipText, voice.voiceId === v.id && styles.chipTextOn]}>
-                      {v.label} · {v.note}
-                    </Text>
-                  </TouchableOpacity>
+                  <Chip key={v.id} label={`${v.label} · ${v.note}`} selected={voice.voiceId === v.id} onPress={() => setVoice({ ...voice, voiceId: v.id })} />
                 ))}
               </View>
-              <TouchableOpacity
-                style={[styles.row, voice.transcribe && styles.rowActive]}
-                onPress={() => setVoice({ ...voice, transcribe: !voice.transcribe })}
-                activeOpacity={0.85}
-              >
-                <View style={[styles.radio, voice.transcribe && styles.radioOn]}>
-                  {voice.transcribe && <View style={styles.radioDot} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>Senin sesini de ses modeli çözsün</Text>
-                  <Text style={styles.rowMeta}>
-                    Arapça ve Farsçada telefonun tanımasından çok daha iyi. Konuşma Odası'nda
-                    canlı ara metin yerine sustuğunda çözülür.
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.testButton, (!voiceReady || previewing) && styles.testButtonOff]}
+              <ListGroup style={{ marginTop: 12 }}>
+                <PressableScale
+                  onPress={() => setVoice({ ...voice, transcribe: !voice.transcribe })}
+                  scaleTo={0.985}
+                  accessibilityLabel="Senin sesini de ses modeli çözsün"
+                >
+                  <View style={styles.providerRow}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Txt variant="bodyStrong">Senin sesini de ses modeli çözsün</Txt>
+                      <Txt variant="caption" color={colors.inkSoft}>
+                        Arapça ve Farsçada telefonun tanımasından çok daha iyi. Konuşma Odası'nda canlı ara metin
+                        yerine sustuğunda çözülür.
+                      </Txt>
+                    </View>
+                    <View style={[styles.toggle, voice.transcribe && styles.toggleOn]}>
+                      <View style={[styles.knob, voice.transcribe && styles.knobOn]} />
+                    </View>
+                  </View>
+                </PressableScale>
+              </ListGroup>
+              <Button
+                variant="secondary"
+                size="md"
+                icon="volume"
+                label={previewing ? "Sentezleniyor…" : "Sesi dene"}
                 disabled={!voiceReady || previewing}
                 onPress={() => void tryVoice()}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.testButtonText}>
-                  {previewing ? "Sentezleniyor…" : "🔊 Sesi dene"}
-                </Text>
-              </TouchableOpacity>
-              <Text style={styles.hint}>
+                style={{ marginTop: 12 }}
+              />
+              <Txt variant="caption" color={colors.inkSoft} style={styles.hint}>
                 {voice.provider === "gemini"
                   ? "Gemini'nin ücretsiz kotasında ses için ödeme yok (kota aşılırsa istekler reddedilir, telefon sesi devreye girer). Sayaç yine de ücretli tarifeye göre tahmin yazar — tavan ihtiyatlı kalsın diye."
                   : "Hoca ≈ 0,75 TL/dk konuşma, tanıma ≈ 0,15 TL/dk. Harcama tavanına dahildir."}
-              </Text>
+              </Txt>
             </>
           )}
 
-          <TouchableOpacity style={styles.saveButton} onPress={save} activeOpacity={0.85}>
-            <Text style={styles.saveText}>Kaydet</Text>
-          </TouchableOpacity>
+          <Button label="Kaydet" icon="check" onPress={save} style={{ marginTop: 26 }} />
 
-          <View style={styles.backupCard}>
-            <Text style={styles.backupTitle}>💾 Yedek</Text>
-            <Text style={styles.backupText}>
-              Kelime defterin, hata defterin, hocanın notları, müfredatın, sohbetlerin
-              ve okuma metinlerin tek dosyaya çıkar. Dosyayı Drive'a, WhatsApp'ta kendine
-              ya da e-postana at; yeni telefonda "Yedekten dön" ile hoca seni bıraktığın
-              yerden tanır. API anahtarın yedeğe girmez.
-            </Text>
-            <View style={styles.backupRow}>
-              <TouchableOpacity
-                style={[styles.backupButton, busy && styles.backupButtonOff]}
+          <SectionLabel title="Yedek" style={styles.section} />
+          <Surface style={{ gap: 12 }}>
+            <Txt variant="caption" color={colors.inkSoft} style={{ lineHeight: 18 }}>
+              Kelime defterin, hata defterin, hocanın notları, müfredatın, sohbetlerin ve okuma metinlerin tek
+              dosyaya çıkar. Dosyayı Drive'a, WhatsApp'ta kendine ya da e-postana at; yeni telefonda "Yedekten
+              dön" ile hoca seni bıraktığın yerden tanır. API anahtarın yedeğe girmez.
+            </Txt>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button
+                variant="gold"
+                size="md"
+                icon="download"
+                label={busy === "export" ? "Hazırlanıyor…" : "Yedek al"}
                 onPress={() => void exportBackup()}
                 disabled={busy !== null}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.backupButtonText}>
-                  {busy === "export" ? "Hazırlanıyor…" : "Yedek al"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.backupButton, styles.backupButtonAlt, busy && styles.backupButtonOff]}
+                style={{ flex: 1 }}
+              />
+              <Button
+                variant="secondary"
+                size="md"
+                icon="upload"
+                label={busy === "import" ? "Okunuyor…" : "Yedekten dön"}
                 onPress={() => void importBackup()}
                 disabled={busy !== null}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.backupButtonText, styles.backupButtonAltText]}>
-                  {busy === "import" ? "Okunuyor…" : "Yedekten dön"}
-                </Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
             </View>
 
-            {/* Otomatik anlık görüntü: uygulama kendi verisini bozarsa geri
-                dönülecek nokta. Telefon kaybolursa BUNLAR DA GİDER — durum
-                metni bunu açıkça söylüyor, yanlış güven vermesin. */}
+            {/* Otomatik anlık görüntü: telefon kaybolursa BUNLAR DA GİDER. */}
             {!!snapInfo && (
               <View style={styles.snapBox}>
-                <Text style={styles.snapText}>{snapInfo}</Text>
-                <TouchableOpacity onPress={() => void shareSnapshot()} activeOpacity={0.85}>
-                  <Text style={styles.snapLink}>Son anlık görüntüyü dışarı al ›</Text>
-                </TouchableOpacity>
+                <Txt variant="caption" color={colors.inkFaint}>
+                  {snapInfo}
+                </Txt>
+                <PressableScale onPress={() => void shareSnapshot()} accessibilityLabel="Son anlık görüntüyü dışarı al" haptic={false}>
+                  <Txt variant="caption" color={colors.accentDark} style={{ fontWeight: "800", marginTop: 8 }}>
+                    Son anlık görüntüyü dışarı al ›
+                  </Txt>
+                </PressableScale>
               </View>
             )}
-          </View>
+          </Surface>
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-/**
- * Stiller paletin FONKSİYONU: karanlık modda renkler değişir ama yapı
- * (ölçü, yerleşim, yazı tipi) aynı kalır. Parametre adı bilinçli olarak
- * `colors` — gövdedeki bütün jetonlar olduğu gibi çalışsın diye.
- */
 function makeStyles(colors: Palette) {
   return StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.bg },
-  body: { padding: 18, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: "800", color: colors.ink, marginBottom: 8 },
-  usageCard: {
-    backgroundColor: colors.deep,
-    borderRadius: radius.lg,
-    padding: 16,
-    marginBottom: 20,
-    ...shadow,
-  },
-  usageTitle: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: colors.goldDeep,
-    letterSpacing: 1,
-    marginBottom: 10,
-  },
-  usageRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
-  usageBig: { fontSize: 22, fontWeight: "800", color: colors.onDeep },
-  usageSmall: { fontSize: 11.5, color: colors.onDeepSoft, marginTop: 1 },
-  usageNote: {
-    fontSize: 10.5,
-    color: colors.onDeepSoft,
-    lineHeight: 15,
-    marginTop: 12,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 13,
-    marginBottom: 9,
-    ...shadow,
-  },
-  rowActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.inkFaint,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioOn: { borderColor: colors.accent },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.accent,
-  },
-  rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 7 },
-  rowTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
-  betaTag: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: colors.gold,
-    backgroundColor: colors.goldSoft,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  rowMeta: { fontSize: 11.5, color: colors.inkSoft, marginTop: 2 },
-  keyOk: { fontSize: 11, fontWeight: "800", color: colors.accent },
-  snapBox: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  snapText: { fontSize: 12, lineHeight: 18, color: colors.inkFaint },
-  snapLink: { fontSize: 13, fontWeight: "800", color: colors.accent, marginTop: 8 },
-  testButton: {
-    marginTop: 14,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  testButtonOff: { opacity: 0.5 },
-  testButtonText: { color: colors.accent, fontWeight: "800", fontSize: 14 },
-  testResult: { marginTop: 10, padding: 12, borderRadius: radius.md, borderWidth: 1 },
-  testOk: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  testBad: { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
-  testTitle: { fontWeight: "800", fontSize: 14, color: colors.ink },
-  testDetail: { fontSize: 13, lineHeight: 19, color: colors.inkSoft, marginTop: 4 },
-  warnBox: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 4,
-  },
-  warnText: { fontSize: 12.5, color: colors.ink, lineHeight: 19 },
-  /** Tavan DOLDUĞUNDA uyarı sarısı yetmez: bu bir engel, uyarı değil. */
-  blockBox: { backgroundColor: colors.dangerSoft },
-  chipOn: { backgroundColor: colors.accentSoft, borderColor: "transparent" },
-  chipTextOn: { color: colors.accentDark, fontWeight: "800" },
-  budgetRow: { flexDirection: "row", gap: 12, marginTop: 8 },
-  budgetField: { flex: 1 },
-  budgetLabel: { fontSize: 11.5, color: colors.inkSoft, fontWeight: "700", marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    paddingHorizontal: 15,
-    paddingVertical: 13,
-    fontSize: 15,
-    color: colors.ink,
-  },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 9 },
-  chip: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-  },
-  chipText: { fontSize: 12, color: colors.accentDark, fontWeight: "700" },
-  hint: { fontSize: 12, color: colors.inkSoft, lineHeight: 18, marginTop: 8 },
-  saveButton: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 26,
-    ...shadowLift,
-  },
-  saveText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
-  backupCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginTop: 28,
-    ...shadow,
-  },
-  backupTitle: { fontSize: 15, fontWeight: "800", color: colors.ink, marginBottom: 6 },
-  backupText: { fontSize: 12.5, color: colors.inkSoft, lineHeight: 18 },
-  backupRow: { flexDirection: "row", gap: 10, marginTop: 14 },
-  backupButton: {
-    flex: 1,
-    backgroundColor: colors.goldSoft,
-    borderRadius: 999,
-    paddingVertical: 11,
-    alignItems: "center",
-  },
-  backupButtonAlt: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  backupButtonOff: { opacity: 0.5 },
-  backupButtonText: { color: colors.gold, fontSize: 13, fontWeight: "800" },
-  backupButtonAltText: { color: colors.accentDark },
-});
+    flex: { flex: 1 },
+    container: { flex: 1, backgroundColor: colors.bg },
+    body: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 48 },
+    section: { marginTop: 24 },
+    usageCard: { backgroundColor: colors.deep, borderRadius: 24, padding: 18, gap: 10, overflow: "hidden" },
+    usageRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
+    providerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
+    radio: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: colors.inkFaint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    radioOn: { borderColor: colors.accent },
+    radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
+    toggle: { width: 46, height: 28, borderRadius: 14, backgroundColor: colors.line, padding: 3 },
+    toggleOn: { backgroundColor: colors.accent },
+    knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#FFFFFF" },
+    knobOn: { transform: [{ translateX: 18 }] },
+    snapBox: { paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.line },
+    testResult: { marginTop: 10, padding: 12, borderRadius: 14, gap: 4 },
+    warnBox: {
+      flexDirection: "row",
+      gap: 8,
+      backgroundColor: colors.goldSoft,
+      borderRadius: 14,
+      padding: 12,
+      marginTop: 10,
+    },
+    budgetRow: { flexDirection: "row", gap: 12 },
+    budgetField: { flex: 1 },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      backgroundColor: colors.card,
+      paddingHorizontal: 15,
+      paddingVertical: 13,
+      fontFamily: "Manrope",
+      fontSize: 15,
+      color: colors.ink,
+    },
+    chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+    hint: { marginTop: 8, lineHeight: 18 },
+  });
 }

@@ -1,15 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Easing,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AgentContext } from "../agent";
 import { StatusBar } from "expo-status-bar";
 import Header from "../components/Header";

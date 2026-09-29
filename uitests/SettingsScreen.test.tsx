@@ -114,7 +114,7 @@ async function open(p: Profile = profile()) {
       onBack={() => {}}
     />
   );
-  await waitFor(() => expect(screen.getByText("Sağlayıcı")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("SAĞLAYICI")).toBeTruthy());
 }
 
 // --- anahtarlar -------------------------------------------------------------
@@ -289,10 +289,10 @@ test("dosya seçimi İPTAL edilirse hiçbir uyarı çıkmaz, ekran kilitlenmez",
 
 test("ses tercihi KAYDEDİLİR", async () => {
   await open();
-  fireEvent.press(screen.getByText(/✨ OpenAI/));
+  fireEvent.press(screen.getByText("OpenAI"));
   fireEvent.press(screen.getByText(/Nova ·/));
   fireEvent.press(screen.getByText(/Senin sesini de ses modeli çözsün/)); // varsayılan açık → kapat
-  fireEvent.press(screen.getByText(/🧠 Anthropic/)); // odanın beyni: aktif sağlayıcı
+  fireEvent.press(screen.getByText(/Aktif · Anthropic/)); // odanın beyni: aktif sağlayıcı
   fireEvent.press(screen.getByText("Kaydet"));
   await waitFor(() => expect(saved).toHaveLength(1));
   expect(saved[0].voice).toEqual({ provider: "openai", voiceId: "nova", transcribe: false, brain: "active" });
@@ -327,7 +327,7 @@ test("varsayılan ses GEMİNİ — ücretsiz kota; ses listesi Gemini sesleri", 
 test("sağlayıcı değişince ses listesi ve varsayılan ses DEĞİŞİR", async () => {
   // Gemini'de "Kore", OpenAI'da "ash"; eski sesin adı öbür sağlayıcıya sızmasın.
   await open();
-  fireEvent.press(screen.getByText(/✨ OpenAI/));
+  fireEvent.press(screen.getByText("OpenAI"));
   expect(screen.getByText(/Nova ·/)).toBeTruthy();
   expect(screen.queryByText(/Kore ·/)).toBeNull();
   fireEvent.press(screen.getByText("Kaydet"));

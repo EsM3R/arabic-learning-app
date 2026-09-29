@@ -13,14 +13,7 @@
  * API çağrısı YOKTUR — konular öğrencinin kendi verisinden gelir.
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import Header from "../components/Header";
 import { Button, ListGroup, ListRow, Ring, SectionLabel, StarPattern, Surface, Txt, Wave } from "../components/kit";
 import { feedback } from "../feedback";

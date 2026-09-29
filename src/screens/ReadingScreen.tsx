@@ -213,7 +213,7 @@ export default function ReadingScreen({ profile, onBack }: Props) {
     void touchLastActivity();
     stopListening();
     Alert.alert(
-      "Tebrikler! 🏁",
+      "Tebrikler!",
       `Metni bitirdin. Anlama: ${quizCorrect}/${current.questions.length} doğru.`,
       [{ text: "Kütüphaneye dön", onPress: () => setView("list") }]
     );

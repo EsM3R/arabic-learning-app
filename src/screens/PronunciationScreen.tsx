@@ -6,15 +6,7 @@ import {
   useAudioRecorder,
 } from "expo-audio";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { generatePronunciationSet } from "../claude";
 import Header from "../components/Header";
 import Icon from "../components/Icon";
@@ -247,7 +239,9 @@ export default function PronunciationScreen({ profile, onBack }: Props) {
               : phase === "ozet"
                 ? "kulak turu bitti"
                 : `kayıt turu ${index + 1} / ${set.items.length}`
-            : "hazırlanıyor…"
+            : loading
+              ? "hazırlanıyor…"
+              : "dinle · ayırt et · söyle"
         }
         onBack={onBack}
         right={<Button size="sm" variant="secondary" icon="sparkles" label="Yeni Set" onPress={newSet} disabled={loading} />}

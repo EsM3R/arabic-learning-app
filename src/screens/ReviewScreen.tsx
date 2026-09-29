@@ -339,11 +339,7 @@ export default function ReviewScreen({ onBack }: Props) {
                       onChangeText={setAnswer}
                       autoCorrect={false}
                       autoCapitalize="none"
-                      placeholder={
-                        needsTranslit(pack.script)
-                          ? `${pack.targetAccusative} yaz (okunuşuyla da olur)…`
-                          : `${pack.targetAccusative} yaz…`
-                      }
+                      placeholder={`${pack.targetAccusative} yaz…`}
                       placeholderTextColor={colors.inkFaint}
                       onSubmitEditing={() => void checkAnswer()}
                       returnKeyType="done"

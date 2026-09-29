@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { AgentContext } from "../agent";
 import ChatView from "../components/ChatView";
 import { Badge, IconButton, PressableScale, TeacherAvatar, Txt } from "../components/kit";
