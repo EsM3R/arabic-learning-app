@@ -499,7 +499,12 @@ test("günümü anlat: her cümle tek seferde, yardımsız kanıt olarak yazıl�
   await next(/Bitir/);
   await waitFor(() => expect(screen.getByText(/cümle kurdun/)).toBeTruthy());
   const p = (await progress()).olmak;
-  expect(p.proof.filter((e) => e.k === "retell")).toHaveLength(2);
+  // İkinci cümle sıralamada zaten yardımsız kanıtlanmıştı: aynı cümleyi yeniden
+  // söylemek farklı cümle sayılmaz, kanıt listesine ikinci kez girmez (CM-9).
+  expect(p.proof.filter((e) => e.k === "retell")).toHaveLength(1);
+  expect([...p.proofKeys].sort()).toEqual(["before i have breakfast i take a shower", "i like to wake up early in the morning"]);
+  // Anlatım bitince 1 gün sonra "Tekrar zamanı"nda yeniden gelir.
+  expect(Object.keys((await loadBuildUi()).retells ?? {})).toHaveLength(1);
 });
 
 test("eş cümle cihazda kurulur ve aktarım sayılır; 'Kendi cümlen' yalnız pratik; 'Başka örnek' yeni cümle getirir", async () => {

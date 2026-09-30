@@ -1252,7 +1252,7 @@ export interface NormalizeStores {
   /** BuildUi.connSeen: bağlaç hedefinin anahtarı → kaç cümlede görüldü. */
   connSeen?: Record<string, number>;
   acceptDialect?: boolean;
-  /** Odak kalıbın durumu (proving/verify/mastered → önce tek seferde). */
+  /** Odak kalıbın durumu (proving/verify/mastered/slipping → önce tek seferde: yardımsız kanıt aranıyor). */
   patternStatus?: string;
   /** Karşıtlığı daha önce gösterilmiş tuzaklar. */
   shownTrapIds?: string[];
@@ -1764,7 +1764,7 @@ export function normalizeSentence(
     sp.role === "synthesis" ||
     b >= bandIndex("B2") ||
     (stores.band === "B1" && sp.role === "extension") ||
-    ["proving", "verify", "mastered"].includes(stores.patternStatus ?? "") ||
+    ["proving", "verify", "mastered", "slipping"].includes(stores.patternStatus ?? "") ||
     !!stores.review;
 
   const knownKeys = new Set<string>([...built.slice(0, k).flatMap((s) => s.blocks.map((x) => x.key)), ...Object.keys(stores.blocks ?? {})]);

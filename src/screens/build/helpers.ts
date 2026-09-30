@@ -9,7 +9,7 @@
 import { addedTokens, applySwap, canonicalTokens, expandSwaps, locateTrPiece } from "../../buildcheck";
 import { methodFor, trapById } from "../../buildmethod";
 import type { LanguageId } from "../../languages";
-import type { BlockProgress, PatternProgress } from "../../buildmastery";
+import type { MasteryCheck } from "../../buildmastery";
 import type {
   BuildBlock,
   BuildSentence,
@@ -391,32 +391,5 @@ export function readHeading(role: Role, index: number): string {
   return index === 0 ? "Birinci cümle: bu cümleyi çevirelim" : "Bu cümleyi çevirelim";
 }
 
-/** Tek satırlık oturma durumu (ayrıntılı ölçütler tekrar sisteminde). */
-export interface CheckItem {
-  label: string;
-  ok: boolean;
-}
-
-/**
- * Ana ekranın küçük kontrol listesi: farklı cümle, iki tema, aktarım,
- * ertesi gün. Yardımsız cümleler sayılır; rehberli adımlar sayılmaz.
- */
-export function quickChecklist(p: PatternProgress | undefined, need = 12): CheckItem[] {
-  const keys = p?.proofKeys.length ?? 0;
-  const first = p?.firstProofAt ? Date.parse(p.firstProofAt) : NaN;
-  const delayed =
-    !!p && !Number.isNaN(first) && p.proof.some((e) => e.ok > 0 && Date.parse(e.at) - first >= 20 * 3_600_000);
-  return [
-    { label: `${Math.min(keys, need)}/${need} farklı cümle`, ok: keys >= need },
-    { label: "2 tema", ok: (p?.themes.length ?? 0) >= 2 },
-    { label: "aktarım", ok: (p?.transferOk ?? 0) >= 1 },
-    { label: "ertesi gün", ok: delayed },
-  ];
-}
-
-/** Taş oturmuş mu (solma için): 3 farklı cümle, 2 set, bir geri dönüş. */
-export function masteredBlockKeys(blocks: Record<string, BlockProgress>): string[] {
-  return Object.entries(blocks)
-    .filter(([, b]) => b && b.producedOk >= 3 && b.sets.length >= 2 && b.recycledOkKeys.length >= 1 && b.trapMiss === 0)
-    .map(([k]) => k);
-}
+/** Kontrol listesinin bir satırı (buildmastery.masteryChecklist'ten). */
+export type CheckItem = Pick<MasteryCheck, "label" | "ok">;

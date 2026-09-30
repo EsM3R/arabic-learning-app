@@ -5,24 +5,56 @@ import { Button, Chip, IconButton, Screen } from "../components/kit";
 import { isBudgetError } from "../budget";
 import { checkAnswer } from "../buildcheck";
 import type { CheckCtx, CheckResult } from "../buildcheck";
-import { DEFAULT_BUILD_UI, historyKey, patternIdsOf } from "../buildmastery";
-import type { BlockProgress, BuildHistory, BuildUi, ProgressMap2, SentenceMemory } from "../buildmastery";
+import {
+  advanceRetell,
+  applyNewStepProbe,
+  applyPlacement,
+  applyTestOut,
+  DEFAULT_BUILD_UI,
+  historyKey,
+  isMemoryDue,
+  karmaId,
+  knownWords,
+  masteredBlockKeys,
+  masteryChecklist,
+  nextFocus,
+  nextPlacementBatch,
+  patternIdsOf,
+  pendingNewPatterns,
+  recordEvent,
+  recycleCandidates,
+  reviewMemory,
+  reviewQueue,
+  scheduleRetell,
+  shouldOfferPlacement,
+} from "../buildmastery";
+import type {
+  BlockProgress,
+  BuildHistory,
+  BuildUi,
+  MasteryEvent,
+  ProbeOutcome,
+  ProgressMap2,
+  RecordCtx,
+  SentenceMemory,
+} from "../buildmastery";
 import { methodFor, systemById } from "../buildmethod";
 import { continueSet, isGenerating, resumePending, startSet } from "../buildpipeline";
 import type { PipelineHooks } from "../buildpipeline";
-import { generateMoreTransfer } from "../claude";
+import { generateMoreTransfer, generateProbe } from "../claude";
 import { getActivePack } from "../languages";
 import { isRtl } from "../scripts";
 import {
+  bandIndex,
   BANDS,
+  blockKey,
   compileSentence,
-  LEGACY_PATTERN_IDS,
   PATTERN_LADDER,
   patternById,
   rankThemes,
   themeById,
   themeFits,
-  THEMES,
+  toBand,
 } from "../sentencebuilding";
 import type { BuildBlock, BuildSet, Card, Pattern, Swap, Theme } from "../sentencebuilding";
 import { speakTargetWith, stopSpeaking, warmTargetSpeech } from "../speech";
@@ -56,10 +88,8 @@ import {
   blocksAt,
   canSplit,
   learnerVariant,
-  masteredBlockKeys,
   openOk,
   pairPrompt,
-  quickChecklist,
   recycledAt,
   retrievalBlockKeys,
   splitRetell,
@@ -67,6 +97,7 @@ import {
   stripHarakat,
 } from "./build/helpers";
 import KurusReplay from "./build/KurusReplay";
+import LadderPicker from "./build/LadderPicker";
 import OneShotCard from "./build/OneShotCard";
 import PracticeCard from "./build/PracticeCard";
 import type { PracticeKind } from "./build/PracticeCard";
@@ -82,12 +113,15 @@ import {
   applyRecycledCredit,
   ensureBlocks,
   markConnSeen,
+  recordCtx,
   upsertSentenceBlocks,
 } from "./build/record";
 import type { BuildEvent } from "./build/record";
 import ReorderCard from "./build/ReorderCard";
 import RetellView from "./build/RetellView";
 import RetrievalCard from "./build/RetrievalCard";
+import ReviewSession from "./build/ReviewSession";
+import type { SessionAnswer, SessionItem } from "./build/ReviewSession";
 import SetIntro from "./build/SetIntro";
 import StepCard from "./build/StepCard";
 import SystemLessonCard from "./build/SystemLessonCard";
@@ -101,7 +135,7 @@ interface Props {
   onBack: () => void;
 }
 
-type Phase = "home" | "loading" | "intro" | "card" | "preparing" | "retell" | "done";
+type Phase = "home" | "loading" | "intro" | "card" | "preparing" | "retell" | "done" | "session" | "ladder";
 /** learn: sayılır · review: tek seferde (yalnız vadesi gelmişse sayılır) · practice: sayılmaz. */
 type Mode = "learn" | "review" | "practice";
 
@@ -120,6 +154,27 @@ interface Pending {
    * deneme hakkı geri gelmez (CM-8); tek seferin ve seçilen varyantın izi de silinir.
    */
   undo?: { firstDone: boolean; missed: boolean; oneshotOk: boolean | null; choices: Swap[] };
+  /** "Tek seferde tekrar" vadesi gelmiş cümlede: cümle tekrarının takvimi de yürür. */
+  memory?: { key: string; ok: boolean };
+}
+
+/**
+ * Tek seferlik oturumun türü: tekrar (kayıtlı cümleler + yoklama + eski
+ * hikâye), yerleştirme, "Sına ve geç" ya da yeni basamak yoklaması.
+ */
+type SessionMode = "review" | "placement" | "testout" | "newsteps";
+
+interface SessionState {
+  mode: SessionMode;
+  title: string;
+  intro?: string;
+  items: SessionItem[];
+  /** Oturumu bir kez başlatınca artar: aynı bileşen yeni oturumda sıfırlansın. */
+  run: number;
+  /** Anlatılan eski set (bitince anlatım takvimi ilerler). */
+  retellSetId?: string;
+  /** Sına ve geç: hangi kalıp. */
+  patternId?: string;
 }
 
 interface PracticeState {
@@ -147,28 +202,6 @@ const EMPTY_TALLY: SessionTally = { ok: 0, total: 0, unscaffolded: 0, transfer: 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
- * Sıradaki kalıp (tekrar sistemi gelene kadar yerel kural): öğrencinin
- * seçtiği kalıp; yoksa merdivende oturmamış ilk kalıp. v2'de eklenen
- * basamaklar, oturmuş en üst kalıbın altında kalıyorsa dayatılmaz.
- */
-function pickFocus(progress: ProgressMap2, ui: BuildUi): Pattern {
-  const over = ui.focusOverride ? patternById(ui.focusOverride) : undefined;
-  if (over) return over;
-  const done = (id: string) => {
-    const s = progress[id]?.status;
-    return s === "mastered" || s === "verify";
-  };
-  let highest = -1;
-  PATTERN_LADDER.forEach((p, i) => {
-    if (done(p.id)) highest = i;
-  });
-  const legacy = new Set(LEGACY_PATTERN_IDS);
-  return (
-    PATTERN_LADDER.find((p, i) => !done(p.id) && (legacy.has(p.id) || i > highest)) ?? PATTERN_LADDER[PATTERN_LADDER.length - 1]
-  );
-}
-
-/**
  * CÜMLE KURMA — Türkçe cümleyi hedef dile hocanın yöntemiyle kurmak.
  *
  * Ekran bir KART SIRASI denetleyicisidir: her cümle compileSentence ile
@@ -187,6 +220,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   const pack = getActivePack();
   const lang = pack.id;
   const rtl = isRtl(pack.script);
+  /** Öğrencinin konuşma seviyesi: sıradaki kalıp ve yerleştirme buna göre. */
+  const band = toBand(profile.assessment?.speakingLevel);
 
   // ------------------------------------------------------------------ depolar
   const [sets, setSets] = useState<BuildSet[]>([]);
@@ -233,6 +268,12 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   const [practice, setPractice] = useState<PracticeState | null>(null);
   const [retell, setRetell] = useState<RetellState | null>(null);
   const [savedSentences, setSavedSentences] = useState<number[]>([]);
+  const [session, setSession] = useState<SessionState | null>(null);
+  const [loadingText, setLoadingText] = useState<string | null>(null);
+  /** Oturumun duyulanı: ekranın tek mikrofonu oturum kartına yollar. */
+  const sessionHeard = useRef<((given: string[], spoken: boolean) => void) | null>(null);
+  /** Yoklama cevapları (kalıp → ilk denemeler), oturum bitince uygulanır. */
+  const outcomes = useRef<Record<string, ProbeOutcome>>({});
   const [savedAll, setSavedAll] = useState(false);
   const counted = useRef<{ conn: Set<number>; reorder: Set<number>; finished: Set<number> }>({
     conn: new Set(),
@@ -306,7 +347,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     [rtl, harakat]
   );
   const vt = (t: string) => (sentence ? learnerVariant(t, sentence.swaps, lang, choices) : t);
-  const focus = useMemo(() => pickFocus(progress, ui), [progress, ui]);
+  const focus = useMemo(() => nextFocus(progress, band, new Date(), ui.focusOverride), [progress, band, ui.focusOverride]);
+  const focusMain = focus.patterns[0];
 
   const isDue = (key: string) => memory.some((m) => m.key === key && Date.parse(m.dueAt) <= Date.now());
   /** Bu oturumun olayları ilerlemeye yazılır mı: öğrenmede evet, tekrarda yalnız vadesi gelmişse. */
@@ -347,6 +389,12 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     pending.current = null;
     if (!pd) return;
     commitEvents(pd.events.filter((e) => e.k !== "copy"));
+    if (pd.memory) {
+      const m = reviewMemory(stores.current.memory, pd.memory.key, pd.memory.ok);
+      stores.current = { ...stores.current, memory: m };
+      setMemory(m);
+      void saveBuildMemory(m);
+    }
     if (pd.score.total) setScore((sc) => ({ ok: sc.ok + pd.score.ok, total: sc.total + pd.score.total }));
     const td = pd.tally;
     if (Object.keys(td).length) {
@@ -534,6 +582,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
         {
           text: "Evet, hazırla",
           onPress: () => {
+            setLoadingText(null);
             setPhase("loading");
             resolve(true);
           },
@@ -550,8 +599,11 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
         theme,
         hooks,
         confirm: askBudget,
-        patternStatus: progress[focusList[0]?.id ?? ""]?.status,
-        known: vocab.map((v) => v.arabic).slice(-40),
+        // Karma yalnız oturmuş kalıplardan: cümleler önce tek seferde.
+        patternStatus: focusList.length > 1 ? "mastered" : progress[focusList[0]?.id ?? ""]?.status,
+        // ÖĞRENİLMİŞ TAŞLAR bütün temalardan, önce zayıflar (CM-14); bildiği kelimeler: zorlandıkları + en yeniler.
+        recycle: recycleCandidates(stores.current.blocks),
+        known: knownWords(vocab),
       });
       if (!alive.current) return;
       if (!made) {
@@ -570,9 +622,11 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   const openTheme = (t: Theme) => {
     // Aynı kalıp+temada kayıtlı set varsa bedava açılır; yoksa yeni set (tek bütçe onayı).
-    const saved = sets.find((s) => s.patternId === focus.id && s.themeId === t.id);
+    // Karma odakta kimlik "karma:a+b": bütün kalıplar kredi alır (CM-16).
+    const id = karmaId(focus.patterns);
+    const saved = sets.find((s) => s.patternId === id && s.themeId === t.id);
     if (saved) begin(saved, "learn");
-    else void startNew([focus], t);
+    else void startNew(focus.patterns, t);
   };
 
   const focusOf = (s: BuildSet): Pattern[] =>
@@ -592,6 +646,289 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   };
 
   const nextEpisode = (s: BuildSet) => (history[historyKey(s.patternId, s.themeId)]?.episode ?? s.episode) + 1;
+
+  // ------------------------------------------------------------------ tek seferlik oturumlar
+  /** Oturumu açar: aynı bileşen yeni oturumda baştan başlasın diye run artar. */
+  const openSession = (st: Omit<SessionState, "run">) => {
+    clearTimers();
+    stopSpeaking();
+    setAnswer("");
+    setSession((prev) => ({ ...st, run: (prev?.run ?? 0) + 1 }));
+    setPhase("session");
+  };
+
+  const titleOf = (id: string) => patternById(id)?.title ?? id;
+
+  /** Yoklama cümleleri (tek istek; en fazla 8 kalıp). */
+  const probeItems = async (patterns: Pattern[], per: number): Promise<SessionItem[]> => {
+    const list = await generateProbe(profile, patterns, { lang, band: BANDS[Math.max(bandIndex(band), ...patterns.map((p) => bandIndex(p.band)))], perPattern: per });
+    return list.map((x, i) => ({
+      id: `probe-${x.pid}-${i}`,
+      kind: "probe" as const,
+      tr: x.tr,
+      cue: titleOf(x.pid),
+      target: x.target,
+      swaps: x.swaps,
+      counted: true,
+      pid: x.pid,
+      tense: patternById(x.pid)?.tense,
+    }));
+  };
+
+  const confirmRequest = (title: string, note: string) =>
+    new Promise<boolean>((resolve) => {
+      Alert.alert(title, note, [
+        { text: "Vazgeç", style: "cancel", onPress: () => resolve(false) },
+        { text: "Evet", onPress: () => resolve(true) },
+      ]);
+    });
+
+  /**
+   * "Tekrar zamanı" (§6.3–6.4): vadesi gelmiş kayıtlı cümleler tek seferde;
+   * vadeli kalıbın kayıtlı cümlesi yetmezse yoklama tamamlar (tek istek,
+   * onayla); sonda bir eski hikâye anlatımı. onlyPattern: merdivenden ya
+   * da "Doğrula" düğmesinden tek kalıbın tekrarı.
+   */
+  const startReview = async (onlyPattern?: string) => {
+    const now = new Date();
+    const plan = reviewQueue(stores.current.progress, stores.current.memory, now, {
+      ui: stores.current.ui,
+      setIds: sets.map((x) => x.id),
+      lastSetId: sets[0]?.id ?? null,
+      onlyPattern,
+    });
+    const byKey = new Map(stores.current.memory.map((m) => [m.key, m]));
+    const items: SessionItem[] = [];
+    for (const it of plan.items) {
+      const m = byKey.get(it.key);
+      if (!m) continue;
+      // Eski kayıtta eşdeğerler ve zaman yok: set hâlâ duruyorsa oradan alınır,
+      // yoksa v1'de kabul edilmiş bir söyleyiş tekrarda yanlış sayılırdı.
+      const src = m.alts && m.tense ? undefined : sets.find((x) => x.id === m.setId);
+      const srcSen = src?.sentences.find((x) => x.key === m.key);
+      items.push({
+        id: `mem-${m.key}`,
+        kind: "memory",
+        tr: m.tr,
+        cue: m.patternIds.map(titleOf).join(" + "),
+        target: m.target,
+        swaps: m.swaps,
+        alts: m.alts ?? srcSen?.steps[srcSen.steps.length - 1]?.alts ?? [],
+        tense: m.tense ?? src?.tense,
+        translit: m.translit,
+        steps: m.steps.map((x) => ({ question: x.question, trPiece: x.trPiece, trSoFar: x.trSoFar, target: x.target, note: x.note })),
+        counted: it.counted,
+      });
+    }
+    if (plan.probe.length) {
+      const pats = plan.probe.map((id) => patternById(id)).filter((p): p is Pattern => !!p).slice(0, 8);
+      const go = await confirmRequest(
+        "Tekrar için yeni cümle",
+        `${pats.map((p) => p.title).join(", ")} için kayıtlı cümle yetmiyor. İkişer yeni cümle hazırlansın mı? Bu 1 API isteği harcar.`
+      );
+      if (go) {
+        setLoadingText("Tekrar cümleleri hazırlanıyor…");
+        setPhase("loading");
+        try {
+          items.push(...(await probeItems(pats, 2)));
+        } catch (e) {
+          if (!alive.current) return;
+          Alert.alert(isBudgetError(e) ? "Harcama tavanı doldu" : "Cümleler gelmedi", errText(e));
+        }
+        if (!alive.current) return;
+      }
+    }
+    const old = plan.retellSetId ? sets.find((x) => x.id === plan.retellSetId) : undefined;
+    if (old) {
+      const th = themeById(old.themeId);
+      const stages = th?.stages ?? [];
+      const ready = old.sentences.map((x, i) => (x.status === "ready" ? i : -1)).filter((i) => i >= 0);
+      const showTr = bandIndex(old.level) < bandIndex("B2");
+      for (const i of ready) {
+        const x = old.sentences[i];
+        const stage = stages.length ? stages[stageIndex(i, old.sentences.length, stages.length)] : `${i + 1}. sahne`;
+        items.push({
+          id: `retell-${old.id}-${i}`,
+          kind: "retell",
+          // B2+ yalnız sahne: cümleyi hikâyeden kendisi kurar.
+          tr: showTr ? x.tr : stage,
+          cue: `Eski hikâye: ${th?.title ?? old.themeId} · ${stage}`,
+          target: x.target,
+          swaps: x.swaps,
+          alts: x.steps[x.steps.length - 1]?.alts ?? [],
+          tense: old.tense,
+          counted: true,
+          setId: old.id,
+          si: i,
+        });
+      }
+    }
+    if (!items.length) {
+      setPhase("home");
+      Alert.alert("Tekrar yok", "Şu an vadesi gelmiş bir cümle yok. Yeni cümleler kurdukça aralıklı tekrara girer.");
+      return;
+    }
+    outcomes.current = {};
+    openSession({
+      mode: "review",
+      title: onlyPattern ? `Tekrar: ${titleOf(onlyPattern)}` : "Tekrar zamanı",
+      intro: "Kurduğun cümleler geri geliyor: tek seferde söyle. Olmazsa hocanın adımlarıyla birlikte kurarız (sayılmaz).",
+      items,
+      retellSetId: old?.id,
+    });
+  };
+
+  /** Yoklama oturumu: yerleştirme, "Sına ve geç" ya da yeni basamaklar. */
+  const startProbe = async (mode: Exclude<SessionMode, "review">, patterns: Pattern[], per: number, ask = true) => {
+    if (!patterns.length) return;
+    if (ask) {
+      const what =
+        mode === "placement"
+          ? `Yerleştirme: her kalıptan ${per} cümle, tek seferde. Geçtiğin parti bitince sıradaki parti gelir; her parti 1 API isteği.`
+          : mode === "testout"
+            ? `"${patterns[0].title}" için ${per} tek seferlik cümle. ${per - 1}'i ilk seferde doğru ve tuzaksızsa kalıbı geçersin. Bu 1 API isteği harcar.`
+            : `${patterns.length} yeni basamaktan ikişer cümle. Bu 1 API isteği harcar.`;
+      if (!(await confirmRequest(mode === "placement" ? "Yerleştirme" : mode === "testout" ? "Sına ve geç" : "Yeni basamaklar", what))) return;
+    }
+    setLoadingText(`${pack.teacherName} yoklama cümlelerini hazırlıyor…`);
+    setPhase("loading");
+    try {
+      const items = await probeItems(patterns, per);
+      if (!alive.current) return;
+      if (mode !== "placement") outcomes.current = {};
+      openSession({
+        mode,
+        title: mode === "placement" ? "Yerleştirme" : mode === "testout" ? "Sına ve geç" : "Yeni basamaklar",
+        intro:
+          mode === "testout"
+            ? "Her cümleyi tek seferde söyle; yalnız ilk deneme sayılır."
+            : "Bildiğin kalıpları geçmek için: her cümleyi tek seferde söyle. Bilmiyorsan \"Bilmiyorum\" de, oradan başlarız.",
+        items,
+        patternId: mode === "testout" ? patterns[0].id : undefined,
+      });
+    } catch (e) {
+      if (!alive.current) return;
+      setPhase("home");
+      Alert.alert(isBudgetError(e) ? "Harcama tavanı doldu" : "Yoklama hazırlanamadı", errText(e));
+    }
+  };
+
+  const startPlacement = () => {
+    outcomes.current = {};
+    void startProbe("placement", nextPlacementBatch(band, {}), 2);
+  };
+
+  /** Oturumdaki ilk deneme: kanıt, cümle tekrarı ve yoklama sonucu (§4.5). */
+  const onSessionAnswer = (a: SessionAnswer) => {
+    const it = a.item;
+    const now = new Date();
+    let st = { progress: stores.current.progress, blocks: stores.current.blocks };
+    let mem = stores.current.memory;
+    const ev = (k: MasteryEvent["k"], sk: string, blockKeys?: string[]): MasteryEvent => {
+      const e: MasteryEvent = { k, ok: a.ok, first: true, spoken: a.spoken, sk };
+      if (a.trap) e.trap = a.trap;
+      if (blockKeys?.length) e.blockKeys = blockKeys;
+      return e;
+    };
+    if (it.kind === "memory") {
+      const key = it.id.slice(4);
+      const m = mem.find((x) => x.key === key);
+      if (m && it.counted) {
+        // Vadesi gelmişse takvim yürür; kalıp için çekilen erken cümle yalnız günlük tavana yazılır.
+        mem = isMemoryDue(m, now)
+          ? reviewMemory(mem, key, a.ok > 0, now)
+          : mem.map((x) => (x.key === key ? { ...x, lastAt: now.toISOString() } : x));
+        const ctx: RecordCtx = { patternIds: m.patternIds, themeId: m.themeId, setId: m.setId, usesFocus: m.focus !== false };
+        st = recordEvent(st, ctx, ev("review", m.key, m.blockKeys), now);
+      }
+    } else if (it.kind === "probe" && it.pid) {
+      const ctx: RecordCtx = { patternIds: [it.pid], themeId: "", setId: "", usesFocus: true };
+      st = recordEvent(st, ctx, ev("probe", blockKey(it.target, lang)), now);
+      const o = outcomes.current[it.pid] ?? { oks: [], trap: false };
+      outcomes.current[it.pid] = { oks: [...o.oks, a.ok], trap: o.trap || !!a.trap };
+    } else if (it.kind === "retell" && it.setId !== undefined && it.si !== undefined) {
+      const old = sets.find((x) => x.id === it.setId);
+      const sen = old?.sentences[it.si];
+      if (old && sen) {
+        // Taşlar da yazılır: eski hikâyeyi anlatmak taşların son kullanımı ve tuzağıdır.
+        const keys = sen.blocks.map((b) => b.key || blockKey(b.target, old.lang)).filter(Boolean);
+        st = recordEvent(st, recordCtx(old, it.si), ev("retell", sen.key, keys), now);
+      }
+    }
+    stores.current = { ...stores.current, progress: st.progress, blocks: st.blocks, memory: mem };
+    setProgress(st.progress);
+    setBlocks(st.blocks);
+    setMemory(mem);
+    void saveBuildProgress2(st.progress);
+    void saveBuildBlocks(st.blocks);
+    if (mem !== memory) void saveBuildMemory(mem);
+    const stats: StatEvent[] = a.spoken ? ["spoken"] : [];
+    if (a.ok > 0 && it.counted) stats.push("produced", "sentenceBuilt");
+    if (stats.length) void recordStats(stats);
+    void touchLastActivity();
+  };
+
+  /**
+   * Oturumdan yarıda çıkış: verilen cevaplar kanıt olarak yazıldı ama
+   * yoklama sonucu uygulanmaz (yarım yoklama bir kalıbı geçirmemeli).
+   */
+  const exitSession = () => {
+    stopSpeaking();
+    outcomes.current = {};
+    setSession(null);
+    setPhase("home");
+  };
+
+  /** Oturum bitti: yoklama sonuçları uygulanır, anlatım takvimi ilerler. */
+  const onSessionDone = () => {
+    const sess = session;
+    setSession(null);
+    setPhase("home");
+    if (!sess) return;
+    const now = new Date();
+    const save = (p: ProgressMap2) => {
+      stores.current = { ...stores.current, progress: p };
+      setProgress(p);
+      void saveBuildProgress2(p);
+    };
+    if (sess.mode === "review") {
+      if (sess.retellSetId) saveUi(advanceRetell(stores.current.ui, sess.retellSetId, now));
+      return;
+    }
+    if (sess.mode === "testout" && sess.patternId) {
+      const id = sess.patternId;
+      const r = applyTestOut(stores.current.progress, id, outcomes.current[id] ?? { oks: [], trap: false }, now);
+      save(r.progress);
+      if (r.passed) {
+        if (stores.current.ui.focusOverride === id) saveUi({ ...stores.current.ui, focusOverride: undefined });
+        Alert.alert("Geçtin", `"${titleOf(id)}" atlandı. Birkaç gün sonra bir tekrarla doğrulanacak.`);
+      } else {
+        Alert.alert("Henüz değil", `"${titleOf(id)}" için 4 cümleden en az 3'ü ilk seferde ve tuzaksız doğru olmalı.`, [
+          { text: "Tamam", style: "cancel" },
+          { text: "Bunu çalış", onPress: () => saveUi({ ...stores.current.ui, focusOverride: id }) },
+        ]);
+      }
+      return;
+    }
+    if (sess.mode === "newsteps") {
+      save(applyNewStepProbe(stores.current.progress, outcomes.current, now));
+      return;
+    }
+    // Yerleştirme: parti yanlışsız bittiyse merdivende yürümeye devam.
+    const more = nextPlacementBatch(band, outcomes.current);
+    if (more.length) {
+      void startProbe("placement", more, 2, false);
+      return;
+    }
+    const r = applyPlacement(stores.current.progress, band, outcomes.current, now);
+    save(r.progress);
+    saveUi({ ...stores.current.ui, placementDone: true });
+    const passed = Object.values(r.progress).filter((p) => p.status === "verify").length;
+    Alert.alert(
+      "Yerleştirme bitti",
+      `${passed} kalıp geçildi; birkaç gün içinde tekrarla doğrulanacak.${r.focus ? ` Sıradaki: ${titleOf(r.focus)}.` : ""}`
+    );
+  };
 
   // ------------------------------------------------------------------ bekleyen cümle
   useEffect(() => {
@@ -783,6 +1120,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
         pd.score = { ok: ok ? 1 : 0, total: 1 };
         const rec = s.blocks.filter((b) => b.recycled).map((b) => b.key);
         if (cred) pd.events.push(ev(mode === "review" ? "review" : "oneshot", { blockKeys: s.blocks.map((b) => b.key), rec: rec.length > 0, recKeys: rec }));
+        // Vadesi gelmiş cümlenin "tek seferde tekrar"ı cümle tekrarının takvimini de yürütür.
+        if (cred && mode === "review") pd.memory = { key: s.key, ok };
         if (ok) {
           pd.tally.unscaffolded = 1;
           if (cred) pd.stats.push("produced", "sentenceBuilt");
@@ -985,6 +1324,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     }
     const resume = retell.resume;
     setRetell(null);
+    // Set sonu anlatımı yapıldı ya da geçildi: 1, 4 ve 10 gün sonra "Tekrar zamanı"nda yeniden gelir.
+    if (resume === null && mode === "learn") saveUi(scheduleRetell(stores.current.ui, set.id));
     // Yedek anlatım setin son cümlesinin yerine geçtiyse set biter; set sonu anlatımı yeniden açılmaz.
     if (resume !== null && set.sentences.slice(resume).some((x) => x.status !== "failed")) enterSentence(set, resume);
     else setPhase("done");
@@ -994,7 +1335,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   const onHeard = (text: string, alts: string[]) => {
     setAnswer(text);
     const list = alts.length ? alts : [text];
-    if (phase === "retell") submitRetell(list, true);
+    if (phase === "session") sessionHeard.current?.(list, true);
+    else if (phase === "retell") submitRetell(list, true);
     else submit(list, true);
   };
   const onHeardRef = useRef(onHeard);
@@ -1004,7 +1346,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   const typed = () => {
     if (!answer.trim()) return;
-    if (phase === "retell") submitRetell([answer], false);
+    if (phase === "session") sessionHeard.current?.([answer], false);
+    else if (phase === "retell") submitRetell([answer], false);
     else submit([answer], false);
   };
 
@@ -1094,34 +1437,92 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   };
 
   if (phase === "home") {
-    const ranked = rankThemes(focus);
-    const summary = BANDS.map((band) => {
-      const ps = PATTERN_LADDER.filter((p) => p.band === band);
+    const now = new Date();
+    const ranked = rankThemes(focusMain);
+    const summary = BANDS.map((b) => {
+      const ps = PATTERN_LADDER.filter((p) => p.band === b);
       const done = ps.filter((p) => progress[p.id]?.status === "mastered" || progress[p.id]?.status === "verify").length;
-      return { band, done, total: ps.length };
+      return { band: b, done, total: ps.length };
     });
+    const fid = karmaId(focus.patterns);
+    const fp = focus.kind === "karma" ? undefined : progress[focusMain.id];
+    const due = reviewQueue(progress, memory, now, { ui, setIds: sets.map((x) => x.id), lastSetId: sets[0]?.id ?? null }).total;
+    const pending = pendingNewPatterns(progress);
+    // Ölçüt (b): kalıp tek temada kanıtlandıysa en uygun öteki tema tek dokunuşla.
+    const other =
+      fp && fp.proofKeys.length > 0 && fp.themes.length === 1 ? ranked.find((t) => !fp.themes.includes(t.id)) ?? null : null;
     return provide(
       <View style={{ flex: 1, backgroundColor: c.bg }}>
         {header("Türkçeden parça parça, sesli")}
         <BuildHome
           focus={focus}
-          progress={progress[focus.id]}
-          checklist={quickChecklist(progress[focus.id])}
+          progress={fp}
+          checklist={focus.kind === "karma" ? [] : masteryChecklist(fp, now)}
           ladder={summary}
           themes={ranked.map((t) => ({
             theme: t,
-            fit: themeFits(focus, t) >= 3,
-            saved: sets.some((x) => x.patternId === focus.id && x.themeId === t.id),
+            fit: themeFits(focusMain, t) >= 3,
+            saved: sets.some((x) => x.patternId === fid && x.themeId === t.id),
           }))}
           sets={sets}
           nextEpisode={nextEpisode}
           fastFlow={ui.fastFlow}
-          reviewDue={0}
+          reviewDue={due}
+          onReview={() => void startReview()}
           onToggleFast={() => saveUi({ ...stores.current.ui, fastFlow: !ui.fastFlow })}
           onTheme={openTheme}
           onSet={onSetAction}
+          placement={
+            shouldOfferPlacement(progress, ui, band)
+              ? { band, onStart: startPlacement, onSkip: () => saveUi({ ...stores.current.ui, placementDone: true }) }
+              : null
+          }
+          newSteps={pending.length ? { count: pending.length, onStart: () => void startProbe("newsteps", pending.slice(0, 8), 2) } : null}
+          otherTheme={other ? { title: other.title, onPress: () => openTheme(other) } : null}
+          onLadder={() => setPhase("ladder")}
+          onClearOverride={focus.kind === "override" ? () => saveUi({ ...stores.current.ui, focusOverride: undefined }) : undefined}
+          onVerify={focus.kind === "verify" ? () => void startReview(focusMain.id) : undefined}
         />
       </View>
+    );
+  }
+
+  if (phase === "ladder") {
+    return provide(
+      <Screen header={<Header title="Kalıp merdiveni" subtitle="A1 → C2" onBack={() => setPhase("home")} />}>
+        <LadderPicker
+          progress={progress}
+          focusId={focus.kind === "karma" ? undefined : focusMain.id}
+          initialBand={focus.kind === "karma" ? band : focusMain.band}
+          onStudy={(p) => {
+            saveUi({ ...stores.current.ui, focusOverride: p.id });
+            setPhase("home");
+          }}
+          onTestOut={(p) => void startProbe("testout", [p], 4)}
+          onReview={(p) => void startReview(p.id)}
+        />
+      </Screen>
+    );
+  }
+
+  if (phase === "session" && session) {
+    return provide(
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <ReviewSession
+          key={session.run}
+          items={session.items}
+          header={<Header title={session.title} subtitle="tek seferde" onBack={exitSession} right={headerRight} />}
+          lang={lang}
+          script={pack.script}
+          view={view}
+          footerBase={footerBase}
+          heardRef={sessionHeard}
+          onClearAnswer={() => setAnswer("")}
+          onAnswer={onSessionAnswer}
+          onDone={onSessionDone}
+          intro={session.intro}
+        />
+      </KeyboardAvoidingView>
     );
   }
 
@@ -1130,8 +1531,12 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
       <Screen header={header("set hazırlanıyor…")}>
         <PreparingCard
           view={view}
-          title={`${pack.teacherName} hikâyeyi planlıyor…`}
-          note="Önce hikâyenin planı, sonra ilk cümle hazırlanır; ilk cümle gelince başlarsın, gerisi sen çalışırken hazırlanır."
+          title={loadingText ?? `${pack.teacherName} hikâyeyi planlıyor…`}
+          note={
+            loadingText
+              ? "Her kalıptan kısa cümleler geliyor; hepsini tek seferde söyleyeceksin."
+              : "Önce hikâyenin planı, sonra ilk cümle hazırlanır; ilk cümle gelince başlarsın, gerisi sen çalışırken hazırlanır."
+          }
         />
       </Screen>
     );
@@ -1161,7 +1566,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           sentences={ready.length}
           tally={{ ...tally, ok: score.ok, total: score.total }}
           mode={mode}
-          checklist={quickChecklist(progress[focusOf(set)[0]?.id ?? set.patternId])}
+          checklist={focusOf(set).length === 1 ? masteryChecklist(progress[focusOf(set)[0].id]) : []}
           patternTitle={patternTitle}
           savedBlocks={savedAll}
           nextEpisode={nextEpisode(set)}

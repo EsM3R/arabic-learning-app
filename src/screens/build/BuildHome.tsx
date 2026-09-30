@@ -1,7 +1,8 @@
 /**
- * Cümle Kurma ANA EKRANI: sıradaki kalıp (kısa kontrol listesiyle),
- * uygunluğa göre sıralı hikâyeler, kayıtlı setler (devam / tek seferde /
- * pratik) ve — tekrar sistemi hazır olduğunda — "Tekrar zamanı".
+ * Cümle Kurma ANA EKRANI (tasarım §3 Home): "Tekrar zamanı (n)",
+ * yerleştirme teklifi, sıradaki kalıp (öğren / doğrula / karma) ve oturma
+ * kontrol listesi, kalıp merdiveni, uygunluğa göre sıralı hikâyeler ve
+ * kayıtlı setler (devam / tek seferde / pratik).
  */
 import React from "react";
 import { ScrollView, View } from "react-native";
@@ -16,15 +17,33 @@ import {
   PressableScale,
   SectionLabel,
   StarPattern,
+  Surface,
   Txt,
 } from "../../components/kit";
-import type { PatternProgress } from "../../buildmastery";
-import type { Band, BuildSet, Pattern, Theme } from "../../sentencebuilding";
+import type { Focus, PatternProgress } from "../../buildmastery";
+import type { Band, BuildSet, Theme } from "../../sentencebuilding";
 import { patternById, themeById } from "../../sentencebuilding";
 import type { CheckItem } from "./helpers";
 import { useBuildStyles } from "./ui";
 
 export type SetAction = "open" | "next" | "oneshot" | "practice";
+
+/** Odak türüne göre kartın üst satırı. */
+function focusOverline(f: Focus): string {
+  const band = f.patterns[0]?.band ?? "";
+  switch (f.kind) {
+    case "verify":
+      return `TEKRAR DOĞRULA · ${band}`;
+    case "slipping":
+      return `SOLUYOR · ${band}`;
+    case "override":
+      return `SEÇTİĞİN KALIP · ${band}`;
+    case "karma":
+      return "MERDİVEN BİTTİ · KARMA";
+    default:
+      return `SIRADAKİ KALIP · ${band}`;
+  }
+}
 
 export default function BuildHome({
   focus,
@@ -40,8 +59,14 @@ export default function BuildHome({
   onToggleFast,
   onTheme,
   onSet,
+  placement,
+  newSteps,
+  otherTheme,
+  onLadder,
+  onClearOverride,
+  onVerify,
 }: {
-  focus: Pattern;
+  focus: Focus;
   progress?: PatternProgress;
   checklist: CheckItem[];
   ladder: { band: Band; done: number; total: number }[];
@@ -56,8 +81,20 @@ export default function BuildHome({
   onToggleFast: () => void;
   onTheme: (t: Theme) => void;
   onSet: (s: BuildSet, a: SetAction) => void;
+  /** Konuşma seviyesi A2+ ve ilerleme yok: yerleştirme teklifi. */
+  placement?: { band: Band; onStart: () => void; onSkip: () => void } | null;
+  /** Geçilmiş kalıpların altına eklenen yeni basamaklar: kısa yoklama. */
+  newSteps?: { count: number; onStart: () => void } | null;
+  /** Ölçüt (b): kalıbı başka bir temada dene (tek dokunuş). */
+  otherTheme?: { title: string; onPress: () => void } | null;
+  onLadder: () => void;
+  onClearOverride?: () => void;
+  /** Doğrulanacak kalıp: kayıtlı cümlelerinden tek seferde tekrar. */
+  onVerify?: () => void;
 }) {
   const { s, c } = useBuildStyles();
+  const main = focus.patterns[0];
+  const karma = focus.kind === "karma";
   const keys = progress?.proofKeys.length ?? 0;
   const learn = progress?.learn;
   const acc = learn && learn.attempts >= 5 ? Math.round((learn.firstTryOk / learn.attempts) * 100) : null;
@@ -78,19 +115,44 @@ export default function BuildHome({
         </View>
       )}
 
+      {placement && (
+        <Surface raised style={{ marginBottom: 14, gap: 8 }}>
+          <Txt variant="overline" color={c.gold}>
+            {`YERLEŞTİRME · ${placement.band}`}
+          </Txt>
+          <Txt variant="headline">Bildiğin kalıpları baştan çalışma</Txt>
+          <Txt variant="callout" color={c.inkSoft}>
+            Konuşma seviyen {placement.band}. Merdivenin kalıplarından ikişer kısa cümle, her biri tek seferde: geçtiklerin
+            atlanır ve birkaç gün sonra bir tekrarla doğrulanır; ilk takıldığın kalıptan başlarsın.
+          </Txt>
+          <View style={[s.row, { marginTop: 6, flexWrap: "wrap" }]}>
+            <Button size="sm" icon="target" label="Yerleştirmeyi başlat" onPress={placement.onStart} />
+            <Button size="sm" variant="ghost" label="Baştan başlayacağım" onPress={placement.onSkip} />
+          </View>
+        </Surface>
+      )}
+
       <View style={[s.deepCard, { marginBottom: 14 }]}>
         <StarPattern width="100%" height="100%" color={c.goldDeep} opacity={0.09} />
         <Txt variant="overline" color={c.goldDeep}>
-          {`SIRADAKİ KALIP · ${focus.band}`}
+          {focusOverline(focus)}
         </Txt>
         <Txt variant="title2" color={c.onDeep} style={{ marginTop: 6 }}>
-          {focus.title}
+          {karma ? focus.patterns.map((p) => p.title).join(" + ") : main.title}
         </Txt>
         <Txt variant="callout" color={c.onDeepSoft} style={{ marginTop: 6 }}>
-          {focus.trigger ? `"${focus.trigger}"${focus.question ? ` · hocanın sorusu: ${focus.question}` : ""}` : focus.concept}
+          {karma
+            ? "Oturmuş kalıpların tek hikâyede buluşuyor: her cümle en az ikisini bir bağlaçla birleştirir."
+            : focus.kind === "verify"
+              ? "Bu kalıbı geçtin; kalıcı olduğunu bir tekrarla doğrulayalım (tek seferde)."
+              : focus.kind === "slipping"
+                ? "Son tekrarda takıldın: bu kalıbı tek seferde yeniden kanıtla."
+                : main.trigger
+                  ? `"${main.trigger}"${main.question ? ` · hocanın sorusu: ${main.question}` : ""}`
+                  : main.concept}
         </Txt>
-        <Bar progress={keys / 12} color={c.goldDeep} track={c.onDeepTrack} style={{ marginTop: 16 }} />
-        <View style={[s.wrap, { marginTop: 12, gap: 6 }]}>
+        {!karma && <Bar progress={Math.min(1, keys / 12)} color={c.goldDeep} track={c.onDeepTrack} style={{ marginTop: 16 }} />}
+        <View style={[s.wrap, { marginTop: 12, gap: 6 }]} accessibilityLabel={`Oturma: ${checklist.map((it) => `${it.label} ${it.ok ? "tamam" : "eksik"}`).join(", ")}`}>
           {checklist.map((it) => (
             <View key={it.label} style={[s.row, { gap: 4, marginRight: 8 }]}>
               <Icon name={it.ok ? "check" : "close"} size={13} color={it.ok ? c.goldDeep : c.onDeepSoft} strokeWidth={2.6} />
@@ -103,9 +165,32 @@ export default function BuildHome({
         <Txt variant="caption" color={c.onDeepSoft} style={{ marginTop: 8 }}>
           {`Yardımsız söylediğin farklı cümleler sayılır${acc !== null ? ` · öğrenme isabeti %${acc}` : ""} · oturması için %85`}
         </Txt>
+        {(onVerify || otherTheme || onClearOverride) && (
+          <View style={[s.row, { marginTop: 14, flexWrap: "wrap" }]}>
+            {onVerify ? <Button size="sm" variant="gold" icon="target" label="Doğrula (tek seferde)" onPress={onVerify} /> : null}
+            {otherTheme ? (
+              <Button size="sm" variant="secondary" icon="bookOpen" label={`Başka bir temada dene: ${otherTheme.title}`} onPress={otherTheme.onPress} />
+            ) : null}
+            {onClearOverride ? <Button size="sm" variant="ghost" label="Merdivene dön" onPress={onClearOverride} /> : null}
+          </View>
+        )}
       </View>
 
-      <View style={{ flexDirection: "row", gap: 6, marginBottom: 14 }}>
+      {newSteps && newSteps.count > 0 && (
+        <View style={{ marginBottom: 14 }}>
+          <ListGroup>
+            <ListRow
+              icon="sparkles"
+              tone="info"
+              title={`Yeni basamaklar (${newSteps.count})`}
+              subtitle="Geçtiğin kalıpların arasına eklendi: ikişer cümleyle yokla, bildiklerini geç"
+              onPress={newSteps.onStart}
+            />
+          </ListGroup>
+        </View>
+      )}
+
+      <PressableScale onPress={onLadder} accessibilityLabel="Kalıp merdiveni" style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
         {ladder.map((b) => (
           <View
             key={b.band}
@@ -119,7 +204,8 @@ export default function BuildHome({
             </Txt>
           </View>
         ))}
-      </View>
+      </PressableScale>
+      <Button size="sm" variant="ghost" icon="chart" label="Kalıp merdiveni: istediğini seç ya da sına ve geç" onPress={onLadder} style={{ marginBottom: 14, alignSelf: "flex-start" }} />
 
       <PressableScale onPress={onToggleFast} accessibilityLabel="Hızlı akış" haptic={false} style={{ marginBottom: 22 }}>
         <View style={[s.row, { paddingVertical: 4 }]}>
