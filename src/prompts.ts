@@ -1,6 +1,7 @@
 // Uzantılı importlar: bu dosyanın hafıza/tekrar özeti mantığı node altında
 // test edilebilsin diye (tests/prompts.test.ts). Bkz. tsconfig yorumu.
-import { getActivePack } from "./languages.ts";
+import { getActivePack, LANGUAGE_PACKS } from "./languages.ts";
+import type { LanguageId } from "./languages.ts";
 import { feignPolicy, kitBrief, repairCoverage } from "./negotiation.ts";
 import { LENGTH_SPECS } from "./reading.ts";
 import type { ReadingRequest } from "./reading.ts";
@@ -17,6 +18,9 @@ import type {
 } from "./types.ts";
 import { conversationRules, sceneRules, transcriptForDebrief, turkishPolicy } from "./conversation.ts";
 import type { Scenario } from "./conversation.ts";
+import { methodFor, promptSystemIds } from "./buildmethod.ts";
+import { bandIndex, connSeq } from "./sentencebuilding.ts";
+import type { Band, BuildSet, ConnSlot, Pattern, SetPlan, TenseFrame, Theme } from "./sentencebuilding.ts";
 
 /**
  * Tüm öğretmen kişiliğinin temeli. Dil paketi (persona, içerik biçimi,
@@ -532,6 +536,10 @@ Değerlendirmeyi hazırla.`;
  * src/sentencebuilding.ts başlığı). Model hedef dildeki cümleleri ve parça
  * parça adımları üretir; denetim cihazda yapılır, bu yüzden adımların
  * TUTARLI olması (her adım bir öncekini içermesi) şart.
+ *
+ * @deprecated v1 tek çağrılık set promptu. Yalnız ekran kart sırasına
+ * geçene kadar (faz 4) eski yol için duruyor; yeni üretim sentencePlanSystem
+ * + sentenceStepSystem ile (src/buildpipeline.ts).
  */
 export function sentenceBuildSystem(
   profile: Profile,
@@ -573,4 +581,369 @@ ${translitRule}
 intro: setin 1-2 cümlelik Türkçe tanıtımı.
 KISA TUT: note ve contrast en fazla bir cümle; alts yalnız gerçekten yaygın olanlar. Uzun düşünme — yöntem yukarıda hazır, doğrudan seti yaz.
 Yalnız JSON döndür.`;
+}
+
+// ---------------------------------------------------------------------------
+// CÜMLE KURMA v3 — önce PLAN, sonra cümle cümle (tasarım §2.2–§2.3)
+// ---------------------------------------------------------------------------
+//
+// Neden iki aşama? Tek çağrıda 6-8 cümlelik set, düşünen modellerde cevap
+// sınırına takılıp yarıda kesiliyordu ve öğrenci ilk cümleye ancak hepsi
+// bitince başlayabiliyordu. Plan kısa (hikâye + roller + taşlar); cümleler
+// tek tek istenir, öğrenci 1. cümleyle çalışırken 2. hazırlanır.
+
+/** Planın zaman çerçevesi satırı — öğrencinin ekranında da aynı etiket. */
+export const TENSE_LABELS: Record<TenseFrame, string> = {
+  habit: "Geniş zaman: her gün yaptıklarımız",
+  now: "Şimdiki zaman: şu an olanlar",
+  past: "Geçmiş zaman: yaşanmış bir olay",
+  future: "Gelecek: planlar ve niyetler",
+  mixed: "Karışık: anlatının gerektirdiği zaman",
+};
+
+export interface PlanPromptInput {
+  lang: LanguageId;
+  name: string;
+  band: Band;
+  /** Odak kalıp(lar); birden çoksa KARMA set. */
+  focus: Pattern[];
+  theme: Theme;
+  /** Setin zaman çerçevesi (varsayılan: temanın). */
+  tense?: TenseFrame;
+  n: number;
+  /** Aynı kalıp+temadaki bölüm numarası (1'den). */
+  episode?: number;
+  /** Önceki bölümün tek satırlık özeti. */
+  ozet?: string;
+  /** Önceki bölümlerin Türkçe cümleleri — tekrarlanmasın. */
+  lastTr?: string[];
+  /** Önceki setlerden geri getirilecek taşlar (hedef dilde). */
+  recycle?: string[];
+  known?: string[];
+}
+
+/** Bir yuvanın plan promptundaki Türkçe satırı ("4. zirve: ama ile iki kısım, 5-6 yeni taş"). */
+function roleLine(s: ConnSlot, i: number, hasSys: boolean): string {
+  const no = `${i + 1}.`;
+  switch (s.role) {
+    case "open":
+      return `${no} açılış: bağlaçsız, 3-4 yeni taş, kolay giriş`;
+    case "build":
+      return s.kind === "sub" && s.tr
+        ? `${no} kurma: "${s.tr}" ile yan cümle (sub)${s.mirror ? ", bir önceki kurmanın aynası" : ""}`
+        : `${no} kurma: bağlaçsız; fiile yeni bir hâl sorusu (Neyi? Nereye? Nasıl?)`;
+    case "peak":
+      return `${no} zirve: ${s.tr ? `"${s.tr}" ile ` : ""}iki kısım (coord), en yüklü cümle, 5-6 yeni taş`;
+    case "dip":
+      return `${no} çukur: kısa, bağlaçsız, 2-3 yeni taş ve önceki bir taş${hasSys ? "; sistem dersi (sys) varsa burada" : ""}`;
+    case "extension":
+      return `${no} uzatma: bir önceki cümleye "${s.tr || "çünkü"}" ile bağlanır (${s.kind === "none" ? "causal" : s.kind}); tr'ye YALNIZ yeni kısmı yaz, 2 yeni taş`;
+    case "synthesis":
+      return `${no} sentez: yeni bağlaç ve yeni kural yok; öğrenilen taşları birleştirir, en fazla 2 hafif yeni taş`;
+  }
+}
+
+/**
+ * PLAN promptu (tasarım §2.2). Yalnız hikâyeyi, rolleri, bağlaçları ve
+ * taşları ister — cümlelerin kuruluşunu değil. Kısa tutulur ki plan
+ * çağrısı hızlı dönsün ve öğrenci ilk cümleye çabuk başlasın.
+ */
+/**
+ * Plan ve cümle kurallarındaki örnekler (before, by bus, ", but" → ". However,",
+ * "-mayı ekini to ile veririz") yöntemin kaynağından, İngilizce derslerden
+ * gelir ve bütün dillerde aynı kalır. Hedef dil İngilizce değilse model bu
+ * örnekleri kalıp sanıp İngilizce taş ya da not yazmasın diye tek satır
+ * uyarı eklenir. Dil set boyunca sabit: sistem promptu yine bayt bayt aynı.
+ */
+function exampleLangNote(lang: LanguageId): string | null {
+  if (lang === "en") return null;
+  const label = LANGUAGE_PACKS[lang].label;
+  return `ÖRNEKLER: kurallardaki İngilizce örnekler yalnız YÖNTEMİ gösterir. Bütün hedef biçimleri (t, new, rec, a, pair, x, sw) ve notlardaki hedef karşılıkları ${label} yaz; İngilizce yazma.`;
+}
+
+export function sentencePlanSystem(inp: PlanPromptInput): string {
+  const label = LANGUAGE_PACKS[inp.lang].label;
+  const m = methodFor(inp.lang);
+  const tense = inp.tense ?? inp.theme.tense;
+  const episode = inp.episode ?? 1;
+  const recycle = inp.recycle ?? [];
+  const known = inp.known ?? [];
+  const lastTr = inp.lastTr ?? [];
+  const dialogue = inp.focus.some((f) => f.placement === "dialogue");
+  const karma = inp.focus.length > 1;
+  const slots = connSeq(inp.band, inp.n, inp.focus);
+  const sysIds = promptSystemIds(m, inp.band).join(", ");
+  const focusLine = inp.focus
+    .map((f) => {
+      const map = f.map?.[inp.lang];
+      return `${f.title} — tetikleyici "${f.trigger}", hocanın sorusu "${f.question || "—"}"${map ? `, hedefte ${map}` : ""}`;
+    })
+    .join("; ");
+  const roleLines = slots.map((s, i) => roleLine(s, i, !!sysIds)).join("\n");
+  const connLine = slots
+    .map((s) => (s.role === "synthesis" ? "sentez (sette öğretilmiş bir bağlaç geri gelebilir)" : s.tr || "—"))
+    .join(" · ");
+  const lines: (string | null)[] = [
+    `Sen Türk öğrencilere ${label} öğreten bir hocasın ve Furkan Çetin'in cümle kurma yöntemini BİREBİR uyguluyorsun. Şimdi yalnız SET PLANINI yaz; cümlelerin kuruluşunu sonra tek tek yazacağız.`,
+    "",
+    `Öğrenci: ${inp.name}, konuşma seviyesi ${inp.band}.`,
+    `ODAK KALIP: ${focusLine}`,
+    dialogue
+      ? "YERLEŞİM: odak kalıp, hikâyenin içinde öğrencinin birine DOĞRUDAN söylediği bir replik olsun (garsona, arkadaşa, iş arkadaşına); aktarma yapma. Anlatı birinci şahıs ve olay sırasında kalsın."
+      : null,
+    karma ? "KARMA SET: her cümle bu kalıplardan en az ikisini bir bağlaçla birleştirsin — tıpkı hocanın son cümlesi gibi." : null,
+    `HİKÂYE: ${inp.theme.title}. Sahneler sırayla: ${inp.theme.stages.join(" → ")}.`,
+    `ZAMAN ÇERÇEVESİ: ${TENSE_LABELS[tense]}. Bütün set bu zamanda kalır; alışkanlık bildiren "-iyor" da bu çerçevededir. Odak kalıp başka bir zaman istiyorsa hikâyeyi ona göre çerçevele (ör. "o tatilde yapmayı planladıklarım").`,
+    episode > 1
+      ? `BÖLÜM ${episode}. Önceki bölümün özeti: ${inp.ozet || "—"}. Yeni sahnelerle devam et. Şu Türkçe cümleleri TEKRARLAMA:\n${lastTr
+          .slice(-20)
+          .map((t) => "- " + t)
+          .join("\n")}`
+      : null,
+    recycle.length ? `ÖĞRENİLMİŞ TAŞLAR (2-4 tanesini YENİ bir dolguyla geri getir; yeniden öğretme): ${recycle.join(" · ")}` : null,
+    known.length ? `Bildiği kelimeler: ${known.join(", ")}` : null,
+    "",
+    `${inp.n} CÜMLE, bu ROLLERLE ve bu sırayla:`,
+    roleLines,
+    `Bağlaçlar sırayla (cümle başına EN FAZLA BİR bağlaç): ${connLine}`,
+    "",
+    "KURALLAR:",
+    "1. Birinci tekil şahıs, TEK hikâye, olayların oluş sırası. Türkçe DOĞAL olsun: bir Türk gerçekten böyle söyler, çeviri kokmasın.",
+    '2. open: bağlaçsız, 3-4 yeni taş. build: bir yan cümle bağlacı (sub); yan yana gelen iki build birbirinin aynası olsun (önce ↔ sonra). peak: ama/ancak ile iki kısım, en yüklü cümle (5-6 yeni taş). dip: zirveden hemen sonra, kısa, bağlaçsız, 2-3 yeni taş ve önceki bir taş; sistem dersi (sys) varsa burada. extension: sondan bir önceki; bir önceki cümleye "çünkü" ile bağlanır; tr alanına YALNIZ yeni kısmı yaz ("çünkü haber izlemeyi seviyorum"); 2 yeni taş. synthesis: son cümle; YENİ bağlaç ve YENİ kural yok (sette öğretilmiş bir bağlaç geri gelebilir), en fazla 2 hafif yeni taş (kalıp ya da zarf), taşların çoğu önceki cümlelerden; sabah yapılan bir işi akşama taşıyarak hikâyeyi kapat; iki kısa cümle olabilir.',
+    '3. new: bu cümlede İLK kez öğretilen taşların HEDEF DİLDEKİ kısa biçimi ("before", "by bus", "in the morning"). Bir taş setin YALNIZ bir cümlesinde new olur.',
+    "4. rec: daha önce öğretilmiş (bu sette ya da ÖĞRENİLMİŞ TAŞLAR'da) ve burada geri gelen taşlar. Geri gelen taş 2-5 cümle sonra dönsün; aynı kalıba YENİ dolgu koy (leave home → leave work, go to work → go to bed).",
+    "5. Odak kalıp: bir cümlede new olarak girer (yalnız bir kez); sonra en az 2 cümlede (sentez dahil) rec olarak yeni dolguyla geri gelir. focus: kalıbın geçtiği HER cümlede true; fn: yalnız girdiği cümlede true. Zorla her cümleye sokma.",
+    "6. Cümle başına en fazla BİR yeni tetikleyici (ek ya da yapı); zirvede sözcük taşları buna dahil değil.",
+    '7. conn: k = sub | coord | causal; tr = Türkçe bağlaç ya da ek ("-madan önce"); t = hedef dildeki karşılığı; p1, p2 = iki kısım MASTAR hâlinde ("kahvaltı yapmak", "duş almak").',
+    `8. sys: setin EN FAZLA bir sistem dersi, yalnız dip cümlesinde; yalnız şu kimliklerden: ${sysIds || "yok"}.`,
+    "9. intro: 1-2 cümlelik Türkçe tanıtım. ozet: bu bölümün tek satırlık özeti; sonraki bölüm buradan devam edecek.",
+    exampleLangNote(inp.lang),
+    "Boş alanı HİÇ yazma. Uzun düşünme — plan yukarıda hazır. Yalnız JSON döndür.",
+  ];
+  // Koşulu tutmayan satır (null) hiç yazılmaz; "" bilerek bırakılan bölüm ayracıdır.
+  return lines.filter((l): l is string => l !== null).join("\n");
+}
+
+/**
+ * Plan isteğinin kullanıcı mesajı. Yeniden denemede "KISA DÜŞÜN" buraya
+ * girer: aynı n ile, ama modelin düşünmeyi kısa kesmesi istenir — setin
+ * yükünü azaltmak (cümle atmak) ancak ikinci başarısızlıktan sonra.
+ */
+export function sentencePlanUser(opts: { short?: boolean; avoidTr?: string[] } = {}): string {
+  const parts = ["Set planımı hazırla."];
+  if (opts.avoidTr?.length) {
+    parts.push(
+      `Şu Türkçe cümleler daha önce kuruldu; bunların yerine YENİ cümleler yaz:\n${opts.avoidTr
+        .slice(-20)
+        .map((t) => "- " + t)
+        .join("\n")}`
+    );
+  }
+  if (opts.short) parts.push("KISA DÜŞÜN: roller ve kurallar hazır; düşünmeyi kısa tut, planı doğrudan yaz.");
+  return parts.join("\n\n");
+}
+
+export interface SentencePromptCtx {
+  lang: LanguageId;
+  band: Band;
+  plan: SetPlan;
+  /** Video sırası ayarı (ara hâl adımı). */
+  videoOrder?: boolean;
+}
+
+/** Bant başına adım aralığı (tasarım §2.3). */
+export function stepRange(band: Band): string {
+  const b = bandIndex(band);
+  if (b <= bandIndex("A2")) return "2-6; zirve 8'e kadar";
+  if (b === bandIndex("B1")) return "2-5; zirve 7";
+  return "2-4";
+}
+
+/** Planın cümle promptuna giden sıkıştırılmış hâli: boş alan yazılmaz. */
+export function planCompact(plan: SetPlan): Record<string, unknown> {
+  return {
+    tense: plan.tense,
+    s: plan.sentences.map((sp) => {
+      const o: Record<string, unknown> = { tr: sp.tr, r: sp.role };
+      if (sp.conn) o.conn = { k: sp.conn.k, tr: sp.conn.tr, t: sp.conn.t };
+      if (sp.new.length) o.new = sp.new;
+      if (sp.rec.length) o.rec = sp.rec;
+      if (sp.focus) o.focus = true;
+      if (sp.focusNew) o.fn = true;
+      if (sp.sys) o.sys = sp.sys;
+      return o;
+    }),
+  };
+}
+
+/**
+ * CÜMLE sistem promptu (tasarım §2.3). BİR SETİN BÜTÜN CÜMLELERİNDE BAYT
+ * BAYT AYNIDIR: yöntem + dil bloğu + plan. Cümleye özgü hiçbir şey (sıra
+ * numarası, önceki hedefler, KISA MOD) buraya girmez — DeepSeek'in ön-ek
+ * önbelleği ancak böyle tutar ve 8 cümlelik set neredeyse tek plan
+ * fiyatına üretilir. Değişen kısım yalnız kullanıcı mesajıdır.
+ */
+export function sentenceStepSystem(ctx: SentencePromptCtx): string {
+  const label = LANGUAGE_PACKS[ctx.lang].label;
+  const script = LANGUAGE_PACKS[ctx.lang].script;
+  const c1 = bandIndex(ctx.band) >= bandIndex("C1");
+  const translitRule = needsTranslit(script)
+    ? "tw: son hâlin kelime kelime Türkçe okunuşu (dizi; kelime sayısı son hâlle aynı). Bir adımda bir kelimenin biçimi son hâlden farklıysa o adıma tx yaz (o adımın tam okunuşu). rtl: reorder'ın okunuşu. Okunuşu notlarda tekrarlama."
+    : "tw, tx, rtl YAZMA.";
+  return `Sen Türk öğrencilere ${label} öğreten bir hocasın ve Furkan Çetin'in cümle kurma yöntemini BİREBİR uyguluyorsun. Aşağıda bir hikâye planı var; her istekte YALNIZ BİR cümlenin kuruluşunu yazacaksın. Öğrenci her adımda o ana kadarki cümlenin TAMAMINI sesli söyleyecek; denetim cihazda yapılır.
+
+YÖNTEM — sapma yok:
+A. PARAFRAZ: Türkçe yüzey yanıltıyorsa o adımın notu önce anlamını verir: "tercih ediyorum = tercih ederim anlamında", "gibi = civarında anlamında", "çıkmak = ayrılmak, terk etmek anlamında". İlk seferde tam, sonra yalnız parafraz.
+B. KURULUŞ SIRASI (planın conn alanına göre):
+   sub    → BAĞLAÇLA BAŞLA: 1. adım yalnız bağlaç, q "". Sonra "Kim …?" sorusuyla yan cümlenin öznesi ve fiili ("Kim kahvaltı yapacak?"), sonra yan cümlenin geri kalanı. Yan cümleyi bitiren adıma e:1. Sonra ana cümle KENDİ yükleminden.
+   coord  → Önce 1. kısmı yüklemden kur ve bitir (e:1). Sonraki adım 1. kısım + bağlaç. Sonra 2. kısım KENDİ yükleminden. reorder YAZMA.
+   causal → Önceki cümleyi cihaz söyletir; sen yazma. t alanları YALNIZ yeni kısmı içerir: önce bağlaç ("because"), sonra sebep cümlesi kendi yükleminden ("because I like", …). reorder YAZMA.
+   yok    → doğrudan C.
+C. ÇEKİRDEK: her kısım Türkçenin SONUNDAKİ yüklemden başlar: özne + (sıklık zarfı) + fiil. Özne Türkçe kişi ekinden gelir ("Kim?"). Hafif fiil birleşiği tek parçadır (kahvaltı yapmak = tek parça). Sıklık/kesinlik zarfı (bazen, sıklıkla, mutlaka) çekirdekle BİRLİKTE, dil bloğundaki yerine gelir. Öğrencinin zaten bildiği parça notsuz geçer.
+D. SORULAR: fiile Türkçe sorular sorarak büyüt. q = soru kelimesi + Türkçenin o ana kadarki hâli ("Nasıl uyanmayı seviyorum?"). Soruları HEDEF DİLİN YUVA SIRASIYLA sor (dil bloğu), Türkçe kelime sırasıyla DEĞİL.
+E. p = bu adımda eklenen Türkçe parça; tr içinde BİREBİR geçen alt dize (aynı harfler; ek adı değil, kelimenin kendisi: "yapmadan önce", "uyanmayı").
+F. Yeni parça sona ya da önceki kelimelerin ARASINA girebilir (often, always); önceki kelimeler aynı sırada kalır, yalnız hedef dilin zorladığı ek/hareke değişebilir. HER adım dilbilgisi bakımından tam bir cümle olmalı. Bir Türkçe ek hedefte bir yapıya dönüşüyorsa bu yapı, o ekin sorusunu cevaplayan adımda gelir ve not şöyle olur: "'uyanmayı'daki -mayı ekini to ile veririz".${ctx.videoOrder ? " (VİDEO SIRASI: sözcükleri önce kur, eki sonra ayrı bir adımda ekle; eksik ara adımın notu 'ara hâl, henüz eksik'.)" : ""}
+G. KALIP tek adımda bütün gelir, kelime kelime kurulmaz; not "kalıp: …, hep böyle". Saat, dil bloğundaki sırayla kurulur.
+H. Son adım cümlenin tam hâlidir (toparla).
+I. NOT KURALI: n YALNIZ şu durumlarda yazılır: Türkçe–hedef uyuşmazlığı, ekin zorladığı yapı, kalıp, parafraz, yer kuralı. Artikel, iyelik, uyum ve geniş zamanın kendisi için not YAZMA. En fazla bir kısa cümle.
+J. blocks: YALNIZ planın new listesindeki taşlar (en fazla 6). k: connector|suffix|caseSplit|chunk|rule|complement|adverb|lexical|paraphrase. s: öğretildiği adımın sırası (0'dan). n: kısa kural (gerekmiyorsa yazma). c: Türkün düşeceği yanlış aday + gerçek anlamı + mini örnek, tek cümle; YALNIZ dil bloğundaki kayıtlı tuzaklarda YOKSA ve kullanıcı mesajındaki "karşıtlığı verilmiş" listesinde yoksa. a: en fazla 2 eşdeğer, PARÇA olarak (take a shower → have a shower); cümlede birebir geçen parçanın yerine konabilmeli${c1 ? "; her birine üslup etiketi: [biçim, resmî|günlük|edebî]" : ""}. pair: bir zıt/eş {t, tr} (early → late). x: en fazla 1 aktarım {t, tr}, yalnız çok kullanılan fiillerde (leave → the hospital). Geri gelen (rec) taşları blocks'a YAZMA.
+K. sw: blokta olmayan cümle geneli eşdeğerler [kanonik parça, alternatif${c1 ? ", etiket" : ""}], en fazla 2 (ör. ", but" → ". However,"). Kanonik biçim t'de kalır.
+L. reorder: YALNIZ conn = sub ise — iki kısmın yeri değişmiş TAM cümle; kelimeler aynı, yalnız sıra (ve dilin gerektirdiği fiil yeri) değişir.
+M. sd: plan bu cümleye sistem dersi verdiyse, dersin gerektiği adımın sırası.
+N. ret: kayıtlı tuzak ya da sistem dışında, önceki cümlelerde öğretilmiş bir AYRIM burada geri geliyorsa iki seçenekli soru {s, q, o:[a,b], a, w: hikâyeden kısa gerekçe}. Sette en fazla 1; gerekmiyorsa yazma.
+O. ${translitRule}
+P. Adım sayısı: ${stepRange(ctx.band)}. KISA MOD'da en fazla 5 adım; pair/x/ret yazma; notlar en fazla 8 kelime.${exampleLangNote(ctx.lang) ? `\n${exampleLangNote(ctx.lang)}` : ""}
+Boş alanı HİÇ yazma. Uzun düşünme — yöntem hazır. Yalnız JSON döndür.
+
+${methodFor(ctx.lang).promptBlock(ctx.band)}
+
+PLAN:
+${JSON.stringify(planCompact(ctx.plan))}`;
+}
+
+export interface SentenceUserInput {
+  k: number;
+  plan: SetPlan;
+  /** Önceki cümlelerin son hedefleri (hazır olmayanlar ""). */
+  builtTargets: string[];
+  /** Planın new listesine eklenen taşlar (üretilemeyen cümleden taşınanlar). */
+  carry?: string[];
+  /** Karşıtlığı daha önce gösterilmiş taş/bağlaçlar. */
+  contrastShown?: string[];
+  short?: boolean;
+}
+
+/**
+ * Cümle isteğinin kullanıcı mesajı — isteğin DEĞİŞEN tek parçası (tasarım
+ * §2.3). Taşınan taşlar geri gelenlerden çıkarılıp yeni sayılır: hiç
+ * öğretilmemiş bir taşa "Bunu öğrendik" demek öğrenciyi yanıltırdı.
+ */
+export function sentenceStepUser(inp: SentenceUserInput): string {
+  const sp = inp.plan.sentences[inp.k];
+  const n = inp.plan.sentences.length;
+  const carry = inp.carry ?? [];
+  const low = (s: string) => s.trim().toLowerCase();
+  const carried = new Set(carry.map(low));
+  const newBlocks = [...sp.new, ...carry.filter((c) => !sp.new.some((x) => low(x) === low(c)))];
+  const rec = sp.rec.filter((r) => !carried.has(low(r)));
+  const conn = sp.conn;
+  const lines = [
+    `Cümle ${inp.k + 1}/${n} — rol: ${sp.role}${conn ? `, bağlaç: ${conn.k} (${conn.tr} → ${conn.t})` : ""}`,
+    `Türkçe: "${sp.tr}"`,
+    `Yeni taşlar: ${newBlocks.join(" · ") || "—"}`,
+    `Geri gelen (Bunu öğrendik — yeniden öğretme): ${rec.join(" · ") || "—"}`,
+    "Önceki cümlelerin hedef hâlleri:",
+    inp.builtTargets.length ? inp.builtTargets.map((t, i) => `${i + 1}) ${t || "—"}`).join("\n") : "—",
+    `Karşıtlığı verilmiş: ${(inp.contrastShown ?? []).join(", ") || "—"}`,
+  ];
+  if (sp.sys) lines.push(`Sistem dersi (${sp.sys}) bu cümlede; sd alanına gerektiği adımı yaz.`);
+  if (inp.short) lines.push("KISA MOD.");
+  return lines.join("\n");
+}
+
+/**
+ * Bir setin k. cümlesinin isteği: sistem (set boyunca sabit) + kullanıcı
+ * mesajı. Tek giriş noktası — sistemin k'ye bağlı olmadığı imzadan da belli.
+ */
+export function buildSentencePrompt(
+  set: Pick<BuildSet, "lang" | "level" | "plan" | "sentences">,
+  k: number,
+  extras: { carry?: string[]; contrastShown?: string[]; videoOrder?: boolean; short?: boolean } = {}
+): { system: string; userMessage: string } {
+  return {
+    system: sentenceStepSystem({ lang: set.lang, band: set.level, plan: set.plan, videoOrder: extras.videoOrder }),
+    userMessage: sentenceStepUser({
+      k,
+      plan: set.plan,
+      builtTargets: set.sentences.slice(0, k).map((s) => (s.status === "ready" ? s.target : "")),
+      carry: extras.carry,
+      contrastShown: extras.contrastShown,
+      short: extras.short,
+    }),
+  };
+}
+
+export interface ProbePromptInput {
+  lang: LanguageId;
+  band: Band;
+  patterns: Pattern[];
+  /** Kalıp başına cümle sayısı (2-4). */
+  perPattern?: number;
+}
+
+/**
+ * Yerleştirme yoklaması (tasarım §6.5): kalıp başına 2-4 kısa cümle,
+ * TEK SEFERDE söylenecek. Rehberli kuruluş yok — yoklamanın amacı öğrencinin
+ * zaten bildiği basamakları hızla geçmesi.
+ */
+export function probeSystem(inp: ProbePromptInput): string {
+  const label = LANGUAGE_PACKS[inp.lang].label;
+  const per = Math.max(2, Math.min(4, inp.perPattern ?? 2));
+  const list = inp.patterns
+    .slice(0, 8)
+    .map((p) => {
+      const map = p.map?.[inp.lang];
+      return `- ${p.id} — ${p.title} — tetikleyici "${p.trigger}"${map ? ` — hedefte ${map}` : ""}`;
+    })
+    .join("\n");
+  return `Sen Türk öğrencilere ${label} öğreten bir hocasın. Şimdi bir YERLEŞTİRME YOKLAMASI hazırlıyorsun: öğrenci her cümleyi TEK SEFERDE, yardımsız söyleyecek; denetim cihazda yapılır.
+Öğrencinin konuşma seviyesi: ${inp.band}.
+
+KALIPLAR (kimlik — başlık — tetikleyici):
+${list}
+
+Her kalıp için ${per} kısa (4-9 kelime), günlük, birinci tekil şahıs Türkçe cümle yaz (tr) ve hedef dildeki kanonik karşılığını (t). Cümle kalıbı DOĞAL biçimde içersin; bir cümle bir kalıp, bağlaç zinciri kurma. Kalıp dışında seviyenin temel kelimelerini kullan.
+pid: kalıbın kimliği, aynen. sw: en fazla 2 gerçekten yaygın eşdeğer [kanonik parça, alternatif]; yoksa yazma.
+
+${methodFor(inp.lang).promptBlock(inp.band)}
+
+Boş alanı HİÇ yazma. Uzun düşünme. Yalnız JSON döndür.`;
+}
+
+export interface MoreTransferInput {
+  lang: LanguageId;
+  band: Band;
+  block: { target: string; tr: string; note?: string };
+  /** Daha önce verilmiş örnekler — tekrarlanmasın. */
+  avoid?: string[];
+}
+
+/**
+ * "Başka örnek" (tasarım §2.1, §6.6): öğrenilen taş YENİ dolguyla, hocanın
+ * "leave home → leave work, leave the hospital" aktarımı gibi. Örnek sınırı
+ * yok ama her istek yalnız 3 kısa cümle — set ağırlaşmaz.
+ */
+export function moreTransferSystem(inp: MoreTransferInput): string {
+  const label = LANGUAGE_PACKS[inp.lang].label;
+  const script = LANGUAGE_PACKS[inp.lang].script;
+  const avoid = inp.avoid ?? [];
+  const scriptRule =
+    script === "arabic"
+      ? bandIndex(inp.band) <= bandIndex("B1")
+        ? "Hedef metin TAM harekeli."
+        : "Hareke: öğretilen ve anlamı ayıran kelimelerde."
+      : "";
+  return `Sen Türk öğrencilere ${label} öğreten bir hocasın. Öğrenci şu taşı öğrendi: "${inp.block.target}" (${inp.block.tr})${inp.block.note ? ` — ${inp.block.note}` : ""}. "Başka örnek" istedi.
+Bu taşı AYNI biçimde ama YENİ bir dolguyla kullanan 3 kısa cümle yaz: x = [[hedef cümle, Türkçesi], …]. Birinci tekil şahıs, günlük hayattan, seviye ${inp.band}, 3-8 kelime. Taş cümlede birebir geçsin.${scriptRule ? ` ${scriptRule}` : ""}
+${avoid.length ? `Şunları TEKRARLAMA: ${avoid.slice(-12).join(" · ")}\n` : ""}Boş alanı HİÇ yazma. Uzun düşünme. Yalnız JSON döndür.`;
 }

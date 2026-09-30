@@ -78,6 +78,13 @@ export interface StructuredRequest {
   userMessage: string;
   /** JSON Schema — üç sağlayıcı da destekliyor. */
   schema: Record<string, unknown>;
+  /**
+   * Şemanın kısa metin hâli ("{steps:[{q?,p,t}]}"). Yalnız şemayı UYGULAMAYAN
+   * sağlayıcı (DeepSeek) kullanır: orada şema sistem promptuna metin olarak
+   * eklenir ve tam JSON Schema her istekte boşuna bin küsur karakter yer.
+   * Şemayı gerçekten uygulayan sağlayıcılar bunu yok sayar.
+   */
+  schemaHint?: string;
   model: string;
   apiKey: string;
 }

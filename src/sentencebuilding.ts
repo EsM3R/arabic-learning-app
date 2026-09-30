@@ -742,6 +742,12 @@ export interface BuildSentence {
   /** Önce tek seferde denenir (sentez, B2+, kanıtlama aşaması). */
   tryFirst: boolean;
   status: "ready" | "pending" | "failed";
+  /**
+   * Üretilemeyen SENTEZ cümlesinin yerine: son iki hazır cümlenin tek
+   * seferde yeniden anlatımı (cümle sıraları). Sentez hikâyeyi kapatır;
+   * boş kalmasın diye öğrenilenleri yine birleştirtir.
+   */
+  retellOf?: number[];
 }
 
 export interface BuildSet {

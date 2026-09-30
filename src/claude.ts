@@ -1,4 +1,4 @@
-import { TRUNCATED_TEXT } from "./providers/types";
+import { EMPTY_TEXT, REFUSAL_TEXT, TRUNCATED_TEXT } from "./providers/types";
 import { AgentContext, executeTool, TEACHER_TOOLS } from "./agent";
 import { BudgetExceededError, budgetStatus, normalizeLimits } from "./budget";
 import { normalizePronunciationItems, sanitizeMinimalPairs } from "./hvpt";
@@ -22,17 +22,35 @@ import {
 } from "./connectiontest";
 import type { TestResult } from "./connectiontest";
 import {
+  buildSentencePrompt,
   curriculumSystem,
   debriefSystem,
   debriefUserMessage,
+  moreTransferSystem,
+  probeSystem,
   pronunciationSystem,
   readingTextSystem,
   sentenceBuildSystem,
+  sentencePlanSystem,
+  sentencePlanUser,
   readingTextUserMessage,
 } from "./prompts";
+import type { PlanPromptInput } from "./prompts";
 import { normalizeDebrief } from "./conversation";
-import { normalizeBuildSet } from "./sentencebuilding";
-import type { BuildSetV1 as BuildSet, Pattern, Theme } from "./sentencebuilding";
+import { deriveSwaps } from "./buildcheck";
+import { normalizeBuildSet, normalizeSentence, validatePlan } from "./sentencebuilding";
+import type {
+  Band,
+  BuildSentence,
+  BuildSet as BuildSetV2,
+  BuildSetV1 as BuildSet,
+  NormalizeStores,
+  Pattern,
+  Swap,
+  Theme,
+  ValidatedPlan,
+} from "./sentencebuilding";
+import type { LanguageId } from "./languages";
 import type { Debrief, Scenario } from "./conversation";
 import {
   buildReadingRequest,
@@ -98,7 +116,7 @@ const MAX_TOOL_ROUNDS = 12;
  * bulmanın tek yolu. Tavan dolduğunda teşhis aracını da kapatmak, kullanıcıyı
  * karanlıkta bırakırdı.
  */
-async function guardBudget(profile: Profile): Promise<void> {
+export async function guardBudget(profile: Profile): Promise<void> {
   let spent;
   try {
     spent = await usageSummary();
@@ -516,6 +534,7 @@ const STEP_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** @deprecated v1 tek çağrılık set şeması (generateBuildSet ile birlikte gider). */
 const BUILD_SET_SCHEMA = {
   type: "object",
   properties: {
@@ -556,6 +575,10 @@ const BUILD_SET_SCHEMA = {
 /**
  * Cümle kurma seti — tek yapılandırılmış çağrı. Set cihazda saklanır ve
  * tekrar tekrar çalışılır; her açılışta yeniden üretilmez.
+ *
+ * @deprecated v1 yolu: ekran kart sırasına geçene kadar (faz 4) duruyor.
+ * Yeni üretim plan + cümle cümle: generateBuildPlan / generateBuildSentence,
+ * düzenleyen src/buildpipeline.ts.
  */
 export async function generateBuildSet(
   profile: Profile,
@@ -601,4 +624,373 @@ export async function generateBuildSet(
     throw new Error("Set beklenenden kısa geldi (modelin cevabı şemaya uymamış). Tekrar denemek genelde çözer.");
   }
   return set;
+}
+
+// ---------------------------------------------------------------------------
+// CÜMLE KURMA v3 — plan + cümle cümle üretim (tasarım §2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Şemalar sağlayıcıya olduğu gibi gider (Anthropic/OpenAI/Gemini şemayı
+ * uygular). DeepSeek şema uygulamaz, şemayı sistem promptuna metin olarak
+ * ekler — tam JSON Schema orada her istekte ~1-2 bin karakter yer ve hiçbir
+ * işe yaramaz; onun yerine aşağıdaki kısa ipuçları (schemaHint) gider.
+ * Her nesnede `additionalProperties: false` şart: Anthropic yapılandırılmış
+ * çıktısı onsuz şemayı 400 ile geri çevirir; bu hata model hatası sayılmadığı
+ * için denenmez ve cümle sonsuza dek "pending" kalırdı.
+ */
+export const PLAN_SCHEMA = {
+  type: "object",
+  required: ["intro", "s"],
+  properties: {
+    intro: { type: "string" },
+    ozet: { type: "string" },
+    tense: { type: "string", enum: ["habit", "now", "past", "future", "mixed"] },
+    s: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["tr", "r", "new"],
+        properties: {
+          tr: { type: "string" },
+          r: { type: "string", enum: ["open", "build", "peak", "dip", "extension", "synthesis"] },
+          conn: {
+            type: "object",
+            required: ["k", "tr", "t"],
+            properties: {
+              k: { type: "string", enum: ["sub", "coord", "causal"] },
+              tr: { type: "string" },
+              t: { type: "string" },
+              p1: { type: "string" },
+              p2: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          new: { type: "array", items: { type: "string" } },
+          rec: { type: "array", items: { type: "string" } },
+          focus: { type: "boolean" },
+          fn: { type: "boolean" },
+          sys: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+export const PLAN_SCHEMA_HINT =
+  "{intro,ozet?,tense?,s:[{tr,r,conn?{k,tr,t,p1,p2},new[],rec?[],focus?,fn?,sys?}]}";
+
+const PAIR_SCHEMA = {
+  type: "object",
+  properties: { t: { type: "string" }, tr: { type: "string" } },
+  additionalProperties: false,
+} as const;
+
+export const SENTENCE_SCHEMA = {
+  type: "object",
+  required: ["steps"],
+  properties: {
+    steps: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["p", "t"],
+        properties: {
+          q: { type: "string" },
+          p: { type: "string" },
+          t: { type: "string" },
+          n: { type: "string" },
+          e: { type: "integer" },
+          tx: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+    },
+    blocks: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["t", "tr", "k", "s"],
+        properties: {
+          t: { type: "string" },
+          tr: { type: "string" },
+          k: { type: "string" },
+          s: { type: "integer" },
+          n: { type: "string" },
+          c: { type: "string" },
+          a: { type: "array", items: { type: "string" } },
+          pair: PAIR_SCHEMA,
+          x: PAIR_SCHEMA,
+        },
+        additionalProperties: false,
+      },
+    },
+    sw: { type: "array", items: { type: "array", items: { type: "string" } } },
+    cc: { type: "string" },
+    reorder: { type: "string" },
+    tw: { type: "array", items: { type: "string" } },
+    rtl: { type: "string" },
+    sd: { type: "integer" },
+    ret: {
+      type: "object",
+      properties: {
+        s: { type: "integer" },
+        q: { type: "string" },
+        o: { type: "array", items: { type: "string" } },
+        a: { type: "integer" },
+        w: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+export const SENTENCE_SCHEMA_HINT =
+  "{steps:[{q?,p,t,n?,e?,tx?}],blocks?[{t,tr,k,s,n?,c?,a?,pair?{t,tr},x?{t,tr}}],sw?,cc?,reorder?,tw?,rtl?,sd?,ret?{s,q,o[2],a,w}}";
+
+export const PROBE_SCHEMA = {
+  type: "object",
+  required: ["items"],
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["pid", "tr", "t"],
+        properties: {
+          pid: { type: "string" },
+          tr: { type: "string" },
+          t: { type: "string" },
+          sw: { type: "array", items: { type: "array", items: { type: "string" } } },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+export const PROBE_SCHEMA_HINT = "{items:[{pid,tr,t,sw?[[kanonik,alternatif]]}]}";
+
+export const MORE_TRANSFER_SCHEMA = {
+  type: "object",
+  required: ["x"],
+  properties: { x: { type: "array", items: { type: "array", items: { type: "string" } } } },
+  additionalProperties: false,
+} as const;
+
+export const MORE_TRANSFER_SCHEMA_HINT = "{x:[[t,tr]]}";
+
+/** Setin en küçük boyu: açılış, kurma, zirve, çukur, uzatma ve sentez. */
+export const MIN_SET_SIZE = 6;
+
+const PLAN_INVALID_PREFIX = "Set planı eksik geldi";
+
+/**
+ * Model çıktısının kendisinden doğan hata mı (kesildi, boş, bozuk JSON,
+ * geri çevrildi)? Bunlar KISA MOD / KISA DÜŞÜN ile bir kez daha denenir,
+ * olmazsa cümle "failed" olur; ağ, anahtar ve harcama tavanı hataları
+ * denenmez — cümle bekler, bağlantı gelince kaldığı yerden sürer.
+ */
+export function isModelOutputError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  return (
+    e.message === TRUNCATED_TEXT ||
+    e.message === EMPTY_TEXT ||
+    e.message === REFUSAL_TEXT ||
+    e.message.startsWith("Model geçerli JSON döndürmedi") ||
+    e.message.startsWith(PLAN_INVALID_PREFIX)
+  );
+}
+
+export interface BuildPlanResult extends ValidatedPlan {
+  /** Planın gerçekten istendiği cümle sayısı (ikinci başarısızlıkta n-1). */
+  n: number;
+}
+
+/**
+ * Set PLANI (tasarım §2.1). Kesilir ya da eksik gelirse önce AYNI n ile
+ * "KISA DÜŞÜN" denenir — setin yükünü düşürmek son çare; ancak ikinci
+ * başarısızlıkta bir cümle eksiltilir (en az 6: çukur, uzatma ve sentez her
+ * sette kalsın). Roller zaten konumdan yeniden hesaplanır (arcRoles).
+ * Tarihçedeki cümlelerden birden fazlası tekrar gelirse o listeyle BİR kez
+ * yeniden istenir.
+ */
+export async function generateBuildPlan(
+  profile: Profile,
+  input: PlanPromptInput & { trKeys?: string[] }
+): Promise<BuildPlanResult> {
+  const { provider, model, apiKey } = requireKey(profile);
+  const attempts: { n: number; short: boolean }[] = [
+    { n: input.n, short: false },
+    { n: input.n, short: true },
+    { n: Math.max(MIN_SET_SIZE, input.n - 1), short: true },
+  ];
+  const minOk = Math.min(MIN_SET_SIZE, input.n);
+  const ask = async (n: number, short: boolean, avoidTr?: string[]) => {
+    await guardBudget(profile);
+    const raw = await provider.structured<unknown>({
+      system: sentencePlanSystem({ ...input, n }),
+      userMessage: sentencePlanUser({ short, avoidTr }),
+      schema: PLAN_SCHEMA as unknown as Record<string, unknown>,
+      schemaHint: PLAN_SCHEMA_HINT,
+      model,
+      apiKey,
+    });
+    return validatePlan(raw, n, { lang: input.lang, band: input.band, tense: input.tense ?? input.theme.tense, trKeys: input.trKeys });
+  };
+  let replanned = false;
+  let last: unknown = null;
+  for (const at of attempts) {
+    try {
+      let v = await ask(at.n, at.short);
+      if (v.replan && !replanned) {
+        replanned = true;
+        v = await ask(at.n, at.short, v.dropped);
+      }
+      if (v.plan.sentences.length >= Math.min(minOk, at.n)) return { ...v, n: at.n };
+      last = new Error(`${PLAN_INVALID_PREFIX} (${v.plan.sentences.length}/${at.n} cümle).`);
+    } catch (e) {
+      if (!isModelOutputError(e)) throw e;
+      last = e;
+    }
+  }
+  const why = last instanceof Error && last.message === TRUNCATED_TEXT ? "cevabı bitiremedi" : "düzgün bir plan vermedi";
+  throw new Error(
+    `Model üç denemede de set planını hazırlayamadı (${why}). Ayarlar'dan başka bir modele geçmeyi ya da biraz sonra tekrar denemeyi dene.`
+  );
+}
+
+export interface BuildSentenceInput {
+  set: BuildSetV2;
+  k: number;
+  stores: NormalizeStores;
+  /** Üretilemeyen cümleden bu cümleye taşınan yeni taşlar. */
+  carry?: string[];
+  contrastShown?: string[];
+  videoOrder?: boolean;
+}
+
+/**
+ * Setin k. cümlesi — TEK istek, cihazda toparlanmış hâliyle döner. Sistem
+ * promptu set boyunca sabittir (önbellek); KISA MOD kullanıcı mesajına
+ * girer. Kesilme hatası olduğu gibi fırlatılır; kaç kez deneneceğine
+ * üretim hattı (src/buildpipeline.ts) karar verir. 2'den az kullanılabilir
+ * adım gelirse cümle "failed" döner — o da hattın yeniden deneme işaretidir.
+ */
+export async function generateBuildSentence(
+  profile: Profile,
+  input: BuildSentenceInput,
+  short = false,
+  budgetChecked = false
+): Promise<BuildSentence> {
+  // Tavan set başına BİR kez bakılır (tasarım §2.1): hat, çalıştırma başında
+  // bakıp budgetChecked verir. Cümle başına bakılsaydı tavan set ortasında
+  // dolduğunda öğrenci parası ödenmiş yarım bir setle kalırdı.
+  if (!budgetChecked) await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const { system, userMessage } = buildSentencePrompt(input.set, input.k, {
+    carry: input.carry,
+    contrastShown: input.contrastShown,
+    videoOrder: input.videoOrder,
+    short,
+  });
+  const raw = await provider.structured<unknown>({
+    system,
+    userMessage,
+    schema: SENTENCE_SCHEMA as unknown as Record<string, unknown>,
+    schemaHint: SENTENCE_SCHEMA_HINT,
+    model,
+    apiKey,
+  });
+  return normalizeSentence(raw, input.set.plan, input.k, input.set.sentences, input.set.lang, input.stores);
+}
+
+export interface ProbeItem {
+  pid: string;
+  tr: string;
+  target: string;
+  swaps: Swap[];
+}
+
+/**
+ * Yerleştirme yoklaması: en fazla 8 kalıp × 2-4 cümle, tek istek. Kalıp
+ * kimliği tanınmayan ya da boş gelen öğe atılır; hiç öğe kalmazsa hata.
+ */
+export async function generateProbe(
+  profile: Profile,
+  patterns: Pattern[],
+  opts: { lang: LanguageId; band: Band; perPattern?: number }
+): Promise<ProbeItem[]> {
+  await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const list = patterns.slice(0, 8);
+  const per = Math.max(2, Math.min(4, opts.perPattern ?? 2));
+  const raw = await provider.structured<{ items?: unknown }>({
+    system: probeSystem({ lang: opts.lang, band: opts.band, patterns: list, perPattern: per }),
+    userMessage: "Yoklamamı hazırla.",
+    schema: PROBE_SCHEMA as unknown as Record<string, unknown>,
+    schemaHint: PROBE_SCHEMA_HINT,
+    model,
+    apiKey,
+  });
+  const ids = new Set(list.map((p) => p.id));
+  const count: Record<string, number> = {};
+  const items: ProbeItem[] = [];
+  for (const x of Array.isArray(raw?.items) ? raw.items : []) {
+    if (!x || typeof x !== "object") continue;
+    const o = x as Record<string, unknown>;
+    const pid = typeof o.pid === "string" ? o.pid.trim() : "";
+    const tr = typeof o.tr === "string" ? o.tr.trim() : "";
+    const target = typeof o.t === "string" ? o.t.trim() : "";
+    if (!ids.has(pid) || !tr || !target) continue;
+    if ((count[pid] ?? 0) >= 4) continue;
+    count[pid] = (count[pid] ?? 0) + 1;
+    const sw = (Array.isArray(o.sw) ? o.sw : []).filter(
+      (p): p is string[] => Array.isArray(p) && p.length >= 2 && p.every((y) => typeof y === "string")
+    );
+    items.push({ pid, tr, target, swaps: deriveSwaps(target, { sw: sw.map((p) => [p[0], p[1]] as [string, string]) }, opts.lang) });
+  }
+  if (items.length === 0) {
+    throw new Error("Yoklama boş geldi (modelin cevabı şemaya uymamış). Tekrar denemek genelde çözer.");
+  }
+  return items;
+}
+
+/**
+ * "Başka örnek": öğrenilmiş bir taşı yeni dolguyla kullanan 3 kısa cümle.
+ * Örnek sınırı yok (her basışta yeni istek) ama set ağırlaşmaz.
+ */
+export async function generateMoreTransfer(
+  profile: Profile,
+  block: { target: string; tr: string; note?: string },
+  opts: { lang: LanguageId; band: Band; avoid?: string[] }
+): Promise<{ target: string; tr: string }[]> {
+  await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const raw = await provider.structured<{ x?: unknown }>({
+    system: moreTransferSystem({ lang: opts.lang, band: opts.band, block, avoid: opts.avoid }),
+    userMessage: "Başka örnek ver.",
+    schema: MORE_TRANSFER_SCHEMA as unknown as Record<string, unknown>,
+    schemaHint: MORE_TRANSFER_SCHEMA_HINT,
+    model,
+    apiKey,
+  });
+  const avoid = new Set((opts.avoid ?? []).map((a) => a.trim().toLowerCase()));
+  const out: { target: string; tr: string }[] = [];
+  for (const x of Array.isArray(raw?.x) ? raw.x : []) {
+    if (!Array.isArray(x) || typeof x[0] !== "string" || typeof x[1] !== "string") continue;
+    const target = x[0].trim();
+    const tr = x[1].trim();
+    if (!target || !tr || avoid.has(target.toLowerCase())) continue;
+    out.push({ target, tr });
+    if (out.length >= 3) break;
+  }
+  if (out.length === 0) {
+    throw new Error("Yeni örnek gelmedi (modelin cevabı şemaya uymamış). Tekrar denemek genelde çözer.");
+  }
+  return out;
 }

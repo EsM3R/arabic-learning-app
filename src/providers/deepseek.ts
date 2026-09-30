@@ -200,16 +200,26 @@ async function chat(req: AgenticRequest): Promise<AgenticReply> {
   return { text: textParts.join("\n\n").trim() || BUDGET_EXHAUSTED_TEXT, actions };
 }
 
+/**
+ * Yapılandırılmış isteğin sistem mesajı. Kısa şema ipucu varsa tam şema
+ * yerine o gider. Sistem mesajı isteğe özgü hiçbir şey İÇERMEZ (değişen
+ * kısım kullanıcı mesajında): cümle kurma setinin bütün cümle istekleri
+ * aynı ön-eki paylaşır ve DeepSeek'in bağlam önbelleğinden okunur.
+ */
+export function structuredSystem(req: Pick<StructuredRequest, "system" | "schema" | "schemaHint">): string {
+  const shape = req.schemaHint?.trim()
+    ? `Cevabını SADECE şu biçimde geçerli bir JSON olarak ver (? = isteğe bağlı alan; boş alanı yazma), başka hiçbir metin ekleme:\n${req.schemaHint.trim()}`
+    : `Cevabını SADECE şu JSON şemasına uyan geçerli bir JSON olarak ver, başka hiçbir metin ekleme:\n${JSON.stringify(req.schema)}`;
+  return `${req.system}\n\n${shape}`;
+}
+
 async function structured<T>(req: StructuredRequest): Promise<T> {
   // AKIŞLA alınır: akışsız istek telefonda dakikalarca tek bayt almadan
   // bekler ve mobil ağda bu sessiz bağlantı kopar (bkz. anthropic.ts).
   const stream = await client(req.apiKey).chat.completions.create({
     model: req.model,
     messages: [
-      {
-        role: "system",
-        content: `${req.system}\n\nCevabını SADECE şu JSON şemasına uyan geçerli bir JSON olarak ver, başka hiçbir metin ekleme:\n${JSON.stringify(req.schema)}`,
-      },
+      { role: "system", content: structuredSystem(req) },
       { role: "user", content: req.userMessage },
     ],
     response_format: { type: "json_object" },
@@ -226,10 +236,14 @@ async function structured<T>(req: StructuredRequest): Promise<T> {
     if (choice?.finish_reason) finish = choice.finish_reason;
     if (choice?.delta?.content) content += choice.delta.content;
   }
+  // Önbellekten okunan kısım ayrıca kaydedilir: cümle kurma setinde sistem
+  // ön-eki her cümlede aynı olduğu için maliyetin asıl belirleyicisi bu.
+  const su = usage as (OpenAI.CompletionUsage & { prompt_cache_hit_tokens?: number }) | undefined;
   void recordUsage({
     model: req.model,
-    input: usage?.prompt_tokens ?? 0,
-    output: usage?.completion_tokens ?? 0,
+    input: su?.prompt_tokens ?? 0,
+    output: su?.completion_tokens ?? 0,
+    cacheRead: su?.prompt_cache_hit_tokens ?? 0,
   });
   if (finish === "length") throw new Error(TRUNCATED_TEXT);
   const text = content.trim();
