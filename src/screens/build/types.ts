@@ -15,6 +15,14 @@ export interface Attempt {
   spoken: boolean;
   /** Tuzak kelimeye düşüldü mü (kimliği). */
   trapId?: string;
+  /**
+   * Hocaya danışma: denetleyici "olmadı" dediğinde söyleyiş hocaya sorulur.
+   * bakiyor → cevap bekleniyor; kabul → hoca doğru buldu (karar "dogru"ya
+   * çıkar); ret → hoca da yanlış buldu; hata → hocaya ulaşılamadı.
+   */
+  judge?: "bakiyor" | "kabul" | "ret" | "hata";
+  /** Hocanın NEDEN açıklaması (ya da ulaşılamama sebebi). */
+  why?: string;
 }
 
 /** Kartın paylaştığı gösterim ayarları. */

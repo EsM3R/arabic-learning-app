@@ -958,3 +958,90 @@ export function moreTransferSystem(inp: MoreTransferInput): string {
 Bu taşı AYNI biçimde ama YENİ bir dolguyla kullanan 3 kısa cümle yaz: x = [[hedef cümle, Türkçesi], …]. Birinci tekil şahıs, günlük hayattan, seviye ${inp.band}, 3-8 kelime. Taş cümlede birebir geçsin.${scriptRule ? ` ${scriptRule}` : ""}
 ${avoid.length ? `Şunları TEKRARLAMA: ${avoid.slice(-12).join(" · ")}\n` : ""}Boş alanı HİÇ yazma. Uzun düşünme. Yalnız JSON döndür.`;
 }
+
+// ---------------------------------------------------------------------------
+// CÜMLE KURMA — hocaya danış (cevap denetimi) ve "Hocaya sor"
+// ---------------------------------------------------------------------------
+//
+// Cihazdaki denetleyici yalnız hazırlanan doğru cevap ve alternatiflerle
+// karşılaştırır; aklına gelmeyen ama DOĞRU bir söyleyişi "yanlış" sayabilir.
+// O durumda hocaya danışılır. Hoca, Furkan Çetin'in anlatış biçimiyle
+// konuşur: Türkçe cümleden yola çıkar, yüklemi bulur, fiile soru sorar,
+// bağlaç varsa cümleyi ikiye böler ve Türkçedeki ekin hedef dilde neyle
+// karşılandığını açıkça söyler.
+
+/** Hocanın anlatış üslubu — iki istemde de aynı. */
+const TEACHER_VOICE = `ANLATIŞ ÜSLUBU (Furkan Çetin'in yöntemi): Türkçe cümleden yola çık. Yüklemi bul ("önce yüklemi söylüyoruz"), sonra fiile soru sor ("Neyi? Nereye? Ne zaman?") ve cevabı cümleye ekle. Bağlaç varsa ("-madan önce", "-dığında", "çünkü") önce cümleyi iki kısma ayır, bağlaçla başla. Türkçedeki bir EKİN hedef dilde neyle verildiğini açıkça söyle ("-mayı ekini أَنْ ile veriyoruz"). Türklerin sık yaptığı karışıklığı kısa bir karşıtlıkla göster. Samimi ve kısa konuş, "sen" diye hitap et; ders kitabı dili ve uzun dilbilgisi terimleri kullanma.`;
+
+export interface JudgeInput {
+  lang: LanguageId;
+  /** Cümlenin Türkçesi (bu adıma kadarki hâli). */
+  tr: string;
+  /** Hazırlanan doğru cevap ve kabul edilen diğer söyleyişler. */
+  target: string;
+  alts: string[];
+  /** Öğrencinin söylediği (ses tanımanın duyduğu ya da yazdığı). */
+  given: string;
+  spoken: boolean;
+}
+
+export function judgeSystem(inp: JudgeInput): string {
+  const label = LANGUAGE_PACKS[inp.lang].label;
+  const arabic = LANGUAGE_PACKS[inp.lang].script === "arabic";
+  return `Sen Türk öğrencilere ${label} öğreten bir hocasın. Öğrenci bir Türkçe cümleyi ${label} söyledi; uygulamanın hazır cevabına uymadı. Senin işin: öğrencinin söyleyişi bu Türkçe cümlenin DOĞRU ve DOĞAL bir karşılığı mı?
+
+KARAR:
+- ok=true: anlam aynı, dilbilgisi doğru ve bir anadili konuşanın rahatça kurabileceği bir cümle. Kelime seçimi ya da sıra farklı olabilir; eşanlamlı kabul.
+- ok=false: anlam değişmiş, bir parça eksik ya da fazla, dilbilgisi hatası var, ya da cümle yapay/Türkçeden kelime kelime çeviri.
+${arabic ? "- Arapça: yalnız fasih (MSA). Harekesiz yazım ve hareke eksikleri hata değil. Ses tanıma harekeleri yazmaz; sadece harfler ve kelimeler önemli.\n" : ""}${inp.spoken ? "- Metin ses tanımadan geldi: yazım, noktalama ve büyük/küçük harf farkları hata değil. Ses tanımanın tek bir sesi yanlış duyduğu belliyse ve gerisi doğruysa ok=true.\n" : ""}
+why: öğrenciye Türkçe 1-2 cümle. ok=true ise neden doğru olduğunu ve hazır cevaptan farkını söyle. ok=false ise NEDEN olmadığını, hangi parçanın neden öyle söylendiğini açıkla.
+${TEACHER_VOICE}
+Uzun düşünme. Yalnız JSON döndür.`;
+}
+
+export function judgeUser(inp: JudgeInput): string {
+  const alts = inp.alts.filter(Boolean);
+  return `Türkçe: ${inp.tr}
+Hazır cevap: ${inp.target}${alts.length ? `\nKabul edilen diğer söyleyişler: ${alts.join(" · ")}` : ""}
+Öğrencinin söylediği: ${inp.given}`;
+}
+
+export interface AskInput {
+  lang: LanguageId;
+  /** Cümlenin tamamı: Türkçe ve hedef dil. */
+  tr: string;
+  target: string;
+  /** Çalışılan adım (varsa): Türkçe parça ve hedef dildeki o anki hâli. */
+  step?: { question: string; trPiece: string; target: string; note?: string };
+  /** Öğrencinin son söylediği ve kararı (varsa). */
+  attempt?: { given: string; verdict: string };
+}
+
+export function askSystem(inp: AskInput): string {
+  const label = LANGUAGE_PACKS[inp.lang].label;
+  const arabic = LANGUAGE_PACKS[inp.lang].script === "arabic";
+  return `Sen Türk öğrencilere ${label} öğreten bir hocasın. Öğrenci CÜMLE KURMA alıştırmasında, üzerinde çalıştığı cümle hakkında soru soruyor. Soruyu BU cümle üzerinden cevapla.
+
+${TEACHER_VOICE}
+
+KURALLAR:
+- Türkçe cevap ver; en fazla 5-6 kısa cümle. Gerekirse 2-3 maddelik kısa liste.
+- ${label} kelimeleri hedef dilin kendi yazısıyla yaz${arabic ? " (harekeli)" : ""}; yanına Türkçesini koy.
+- "Neden böyle?" sorusunda: cümlenin nasıl kurulduğunu yöntemle anlat (yüklem → sorular → eklenen parçalar; bağlaç varsa iki kısım), sonra en önemli EK ya da KELİME seçiminin nedenini söyle.
+- Emin olmadığın bir kural uydurma; "genelde" de.
+- Soru cümleyle ilgisizse kısaca cevapla ve cümleye dön.
+- Markdown başlığı kullanma; yalnız **kalın** ve "- " madde.`;
+}
+
+export function askUser(inp: AskInput, question: string): string {
+  const lines = [`Cümle (Türkçe): ${inp.tr}`, `Cümle (${LANGUAGE_PACKS[inp.lang].label}): ${inp.target}`];
+  if (inp.step) {
+    lines.push(
+      `Şu anki adım: ${inp.step.question ? `soru "${inp.step.question}", ` : ""}eklenen parça "${inp.step.trPiece}" → ${inp.step.target}`
+    );
+    if (inp.step.note) lines.push(`Adımın notu: ${inp.step.note}`);
+  }
+  if (inp.attempt?.given) lines.push(`Öğrencinin son söylediği: ${inp.attempt.given} (${inp.attempt.verdict})`);
+  lines.push("", `Öğrencinin sorusu: ${question}`);
+  return lines.join("\n");
+}

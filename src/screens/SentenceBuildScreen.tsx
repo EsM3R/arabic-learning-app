@@ -41,7 +41,7 @@ import type {
 import { methodFor, systemById } from "../buildmethod";
 import { continueSet, resumePending, startSet } from "../buildpipeline";
 import type { PipelineHooks } from "../buildpipeline";
-import { generateMoreTransfer, generateProbe } from "../claude";
+import { askBuildTeacher, generateMoreTransfer, generateProbe, judgeBuildAnswer } from "../claude";
 import { getActivePack } from "../languages";
 import { isRtl } from "../scripts";
 import {
@@ -106,6 +106,7 @@ import type { PracticeKind } from "./build/PracticeCard";
 import PreparingCard from "./build/PreparingCard";
 import ReadCard from "./build/ReadCard";
 import RecapCard from "./build/RecapCard";
+import AskTeacher from "./build/AskTeacher";
 import RecallChips from "./build/RecallChips";
 import type { RecallItem } from "./build/RecallChips";
 import {
@@ -306,6 +307,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   const loadingToken = useRef(0);
   /** Her kart/deneme sıfırlamasında artar: eski kartın gecikmeli "geç"i yeni kartı atlatmasın. */
   const cardGen = useRef(0);
+  /** Hocaya danışma sırası: "Bir daha söyle"/"sayma" sonrası gelen eski karar yok sayılır. */
+  const judgeSeq = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -449,6 +452,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   const resetAttempt = () => {
     clearTimers();
     cardGen.current += 1;
+    judgeSeq.current += 1;
     pending.current = null;
     setAttempt(null);
     setFirstDone(false);
@@ -1122,11 +1126,17 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
       return;
     }
     if (!target) return;
-    const r = checkAnswer(target, alts, spoken ? text : text[0], ctx);
+    const r0 = checkAnswer(target, alts, spoken ? text : text[0], ctx);
     // Boş ya da yalnız noktalama: deneme sayılmaz, hiçbir şey değişmez.
-    if (!r) return;
+    if (!r0) return;
+    const cd = card;
+    const judgeable = r0.verdict === "yanlis" && !r0.trapId && (cd.t === "step" || cd.t === "oneshot" || cd.t === "reorder");
+
+    /** Kararı karta ve kayda işler; hoca kabul ederse "doğru" kararla yeniden çağrılır. */
+    const apply = (r: CheckResult, pd: Pending, more: Partial<Attempt> = {}, quiet = false) => {
+    const card = cd;
     const ok = r.verdict !== "yanlis";
-    const a = toAttempt(r, spoken);
+    const a = { ...toAttempt(r, spoken), ...more };
     setAttempt(a);
     setFirstDone(true);
     if (!ok) setMissed(true);
@@ -1191,7 +1201,38 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     // Doğru cümleyi duymak kalıbı kulağa da yerleştirir. Tek seferde yanlışsa
     // doğrusu söylenmez: adımlar onu birlikte kuracak.
     if (card.t === "oneshot" && !ok) return;
+    if (quiet) return;
     speakAfter(r.expected, ui.fastFlow && r.verdict === "dogru" && !hasReading(card, r));
+    };
+
+    apply(r0, pd, judgeable ? { judge: "bakiyor" } : {});
+    if (!judgeable) return;
+
+    // Hocaya danış: denetleyici yalnız hazır cevapla karşılaştırır; aklına
+    // gelmeyen ama doğru bir söyleyişi hoca kabul eder, yanlışsa NEDENİNİ söyler.
+    const token = cardGen.current;
+    const seq = ++judgeSeq.current;
+    const stale = () => !alive.current || cardGen.current !== token || judgeSeq.current !== seq;
+    const tr = cd.t === "step" ? s.steps[cd.i].trSoFar || s.tr : s.tr;
+    void judgeBuildAnswer(profile, { lang, tr, target, alts, given: spoken ? r0.heard : text[0] ?? "", spoken })
+      .then((res) => {
+        if (stale()) return;
+        if (!res.ok) {
+          setAttempt((x) => (x ? { ...x, judge: "ret", why: res.why } : x));
+          return;
+        }
+        // Kabul: deneme hiç yanlış olmamış gibi, doğru kararla yeniden işlenir.
+        const undo = pd.undo!;
+        setMissed(undo.missed);
+        const pd2: Pending = { events: [], score: { ok: 0, total: 0 }, tally: {}, stats: spoken ? ["spoken"] : [], undo };
+        const heard = spoken ? r0.heard : text[0] ?? "";
+        apply({ ...r0, verdict: "dogru", reason: "alt", credit: 1, feedback: "", expected: heard || r0.expected, trapId: undefined }, pd2, { judge: "kabul", why: res.why }, true);
+      })
+      .catch((e: unknown) => {
+        if (stale()) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        setAttempt((x) => (x ? { ...x, judge: "hata", why: msg } : x));
+      });
   };
 
   /** "Bilmiyorum": doğrusu açılır, yanlış sayılır; sonraki deneme kopyadır. */
@@ -1229,6 +1270,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   /** Yanlışta aynı adım bir daha: önceki deneme yazılır, bundan sonrası kopya. */
   const retry = () => {
+    judgeSeq.current += 1;
     flush();
     clearTimers();
     stopSpeaking();
@@ -1239,6 +1281,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   /** "Ses tanıma yanlış duydu, sayma": denemenin kaydı iz bırakmadan silinir. */
   const voidAttempt = () => {
+    judgeSeq.current += 1;
     clearTimers();
     stopSpeaking();
     const undo = pending.current?.undo;
@@ -1740,6 +1783,21 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   })();
 
   const listen = () => speakTargetWith(attempt?.expected ?? "");
+  /** "Hocaya sor": bu cümle (ve varsa bu adım) üzerinden soru. */
+  const askAbout = (stepIdx?: number) => (question: string) => {
+    const st = stepIdx === undefined ? undefined : s.steps[stepIdx];
+    return askBuildTeacher(
+      profile,
+      {
+        lang,
+        tr: s.tr,
+        target: s.target,
+        step: st ? { question: st.question, trPiece: st.trPiece, target: st.target, note: st.note } : undefined,
+        attempt: attempt?.heard ? { given: attempt.heard, verdict: attempt.verdict } : undefined,
+      },
+      question
+    );
+  };
   const onVoid = attempt && attempt.spoken && !attempt.revealed && !voidUsed ? voidAttempt : undefined;
   const genderRow =
     methodFor(lang).gender &&
@@ -1848,6 +1906,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           translit={st.translit || undefined}
           onListen={listen}
           onVoid={onVoid}
+          onAsk={askAbout(i)}
           extra={i === 0 ? genderRow : null}
         />
       );
@@ -1923,6 +1982,14 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
             void saveBlocks(s.blocks.filter((b) => !b.recycled)).then(() => setSavedSentences((xs) => [...xs, si]))
           }
         />
+      );
+      body = (
+        <>
+          {body}
+          <View style={{ marginTop: 12 }}>
+            <AskTeacher key={`${set.id}-${si}`} onAsk={askAbout()} />
+          </View>
+        </>
       );
       footer = (
         <VoiceFooter

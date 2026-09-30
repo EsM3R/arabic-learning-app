@@ -26,6 +26,10 @@ import {
   curriculumSystem,
   debriefSystem,
   debriefUserMessage,
+  askSystem,
+  askUser,
+  judgeSystem,
+  judgeUser,
   moreTransferSystem,
   probeSystem,
   pronunciationSystem,
@@ -35,7 +39,7 @@ import {
   sentencePlanUser,
   readingTextUserMessage,
 } from "./prompts";
-import type { PlanPromptInput } from "./prompts";
+import type { AskInput, JudgeInput, PlanPromptInput } from "./prompts";
 import { normalizeDebrief } from "./conversation";
 import { deriveSwaps } from "./buildcheck";
 import { normalizeBuildSet, normalizeSentence, validatePlan } from "./sentencebuilding";
@@ -993,4 +997,61 @@ export async function generateMoreTransfer(
     throw new Error("Yeni örnek gelmedi (modelin cevabı şemaya uymamış). Tekrar denemek genelde çözer.");
   }
   return out;
+}
+
+export const JUDGE_SCHEMA = {
+  type: "object",
+  required: ["ok", "why"],
+  properties: { ok: { type: "boolean" }, why: { type: "string" } },
+  additionalProperties: false,
+} as const;
+
+export const JUDGE_SCHEMA_HINT = "{ok:boolean,why}";
+
+/**
+ * Hocaya danış: cihazdaki denetleyicinin "olmadı" dediği cevap gerçekten
+ * yanlış mı? Aklına gelmeyen doğru bir söyleyişi kabul ettirir; yanlışsa
+ * NEDEN yanlış olduğunu hocanın diliyle anlatır.
+ */
+export async function judgeBuildAnswer(profile: Profile, input: JudgeInput): Promise<{ ok: boolean; why: string }> {
+  await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const raw = await provider.structured<{ ok?: unknown; why?: unknown }>({
+    system: judgeSystem(input),
+    userMessage: judgeUser(input),
+    schema: JUDGE_SCHEMA as unknown as Record<string, unknown>,
+    schemaHint: JUDGE_SCHEMA_HINT,
+    model,
+    apiKey,
+  });
+  if (typeof raw?.ok !== "boolean") {
+    throw new Error("Hocanın cevabı anlaşılamadı (modelin cevabı şemaya uymamış).");
+  }
+  return { ok: raw.ok, why: typeof raw.why === "string" ? raw.why.trim() : "" };
+}
+
+export const ASK_SCHEMA = {
+  type: "object",
+  required: ["a"],
+  properties: { a: { type: "string" } },
+  additionalProperties: false,
+} as const;
+
+export const ASK_SCHEMA_HINT = "{a}";
+
+/** "Hocaya sor": çalışılan cümle hakkında serbest soru, hocanın üslubuyla cevap. */
+export async function askBuildTeacher(profile: Profile, input: AskInput, question: string): Promise<string> {
+  await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const raw = await provider.structured<{ a?: unknown }>({
+    system: askSystem(input),
+    userMessage: askUser(input, question),
+    schema: ASK_SCHEMA as unknown as Record<string, unknown>,
+    schemaHint: ASK_SCHEMA_HINT,
+    model,
+    apiKey,
+  });
+  const a = typeof raw?.a === "string" ? raw.a.trim() : "";
+  if (!a) throw new Error(EMPTY_TEXT);
+  return a;
 }

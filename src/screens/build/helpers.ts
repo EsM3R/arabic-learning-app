@@ -95,9 +95,9 @@ export function stepLabels(s: BuildSentence, i: number, lang: LanguageId): strin
   if (st.move === "linked") return ["Önceki cümleyi söyle"];
   const out: string[] = [];
   const last = i === s.steps.length - 1 && i > 0;
-  if (st.move === "connector") out.push("Bağlaçla başlıyorum");
+  if (st.move === "connector" || (i === 0 && s.blocks.some((b) => b.step === 0 && b.kind === "connector"))) out.push("Bağlaçla başlıyorum");
   else if (last) out.push("Şimdi cümlemizi toparlayalım");
-  else if (st.move === "anchor") out.push("Yüklemden başlıyoruz");
+  else if (st.move === "anchor") out.push(endsTurkish(s.tr, st.trPiece) ? "Yüklemden başlıyoruz" : "Bu parçayla başlıyoruz");
   const freq = new Set(methodFor(lang).freqAdverbs.flatMap((a) => canonicalTokens(a, lang)));
   const add = addedTokens(i > 0 ? s.steps[i - 1].target : "", st.target, lang);
   if (add.some((t) => freq.has(t))) {
@@ -112,6 +112,16 @@ export function stepLabels(s: BuildSentence, i: number, lang: LanguageId): strin
   // bozuk sandığı cümleyi düzeltmeye kalkmasın diye cevaptan ÖNCE söylenir.
   if (!last && /ara h[âa]l/i.test(st.note)) out.push("Ara hâl: henüz eksik");
   return out;
+}
+
+/**
+ * Türkçede yüklem sondadır: parça cümlenin SONUNDA değilse yüklem değildir
+ * ("Kahvaltıdan sonra evden çıkarım" → "Kahvaltıdan sonra" yüklem değil).
+ */
+function endsTurkish(tr: string, piece: string): boolean {
+  const norm = (x: string) => x.toLocaleLowerCase("tr").replace(/[.,!?;:…"'’]/g, " ").replace(/\s+/g, " ").trim();
+  const p = norm(piece);
+  return !p || norm(tr).endsWith(p);
 }
 
 /**

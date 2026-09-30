@@ -40,8 +40,12 @@ jest.mock("../src/buildpipeline", () => ({
   isGenerating: () => false,
 }));
 const mockMore = jest.fn();
+const mockJudge = jest.fn();
+const mockAsk = jest.fn();
 jest.mock("../src/claude", () => ({
   generateMoreTransfer: (...a: unknown[]) => mockMore(...a),
+  judgeBuildAnswer: (...a: unknown[]) => mockJudge(...a),
+  askBuildTeacher: (...a: unknown[]) => mockAsk(...a),
 }));
 
 declare const global: { __dictation: { opts: { onResult: (t: string, a: string[]) => void } | null } };
@@ -66,6 +70,9 @@ beforeEach(async () => {
   mockStartSet.mockReset();
   mockContinue.mockReset();
   mockMore.mockReset();
+  mockJudge.mockReset();
+  mockJudge.mockResolvedValue({ ok: false, why: "" });
+  mockAsk.mockReset();
   mockContinue.mockImplementation(async () => ({ set: null }));
   mockStartSet.mockImplementation(async (input: StartInput) => {
     if (input.confirm && !(await input.confirm("1 plan + 8 cümle", 8))) return null;
@@ -151,21 +158,25 @@ test("bağlaçsız cümle: okuma kartından doğrudan 1. adıma; cevaptan önce 
   expect(screen.queryByText(/Burada bir bağlacımız var/)).toBeNull();
 });
 
-test("Türkçe cevap satırı ve lamba denemeden ÖNCE; lamba yalnız Türkçe tetik", async () => {
+test("sıfır ön bilgi: adımın YENİ KALIBI ve nedeni denemeden ÖNCE gösterilir", async () => {
   await start();
   fireEvent.press(screen.getByText("Kurmaya başla"));
   await say(S0[0]);
   await next();
-  // 2. adım: "-mayı" ekinin yapısı (to wake up) HENÜZ gösterilmez.
+  // 2. adım: "-mayı" ekinin karşılığı (to wake up) ve nedeni önceden verilir;
+  // öğrenci hiç görmediği kalıbı tahmin etmek zorunda kalmaz.
   await waitFor(() => expect(screen.getByText("Neyi seviyorum?")).toBeTruthy());
   expect(screen.getByText("→ Uyanmayı seviyorum")).toBeTruthy();
-  expect(screen.getByText(/uyanmayı: ekine dikkat/)).toBeTruthy();
-  expect(screen.queryByText(/wake up/)).toBeNull();
+  expect(screen.getByText("YENİ KALIP")).toBeTruthy();
+  expect(screen.getByText("to wake up")).toBeTruthy();
+  expect(screen.getByText("Neden: -mayı → to")).toBeTruthy();
+  // Cümlenin geri kalanı (I like to wake up) söylenmez: onu öğrenci birleştirir.
+  expect(screen.queryByText("I like to wake up")).toBeNull();
   expect(screen.getByText("Şu ana kadar")).toBeTruthy();
   expect(screen.getByText("I like")).toBeTruthy(); // "…" yok
   await say(S0[1]);
   await waitFor(() => expect(screen.getByText("Doğru")).toBeTruthy());
-  // Cevaptan sonra: adımın notu, taşın notu ve alternatifi.
+  // Cevaptan sonra: adımın notu ve alternatif.
   expect(screen.getByText(/-mayı ekini to ile veririz/)).toBeTruthy();
   expect(screen.getByText(/Ayrıca: waking up/)).toBeTruthy();
 });
@@ -182,18 +193,58 @@ test("eklenen kelimeler vurgulanır; doğrusu SESLİ okunur", async () => {
   expect(require("expo-speech").speak).toHaveBeenCalledWith("I like to wake up", expect.anything());
 });
 
-test("taşın karşıtlığı o adımın cevabından SONRA gelir; son adım 'toparlayalım'", async () => {
+test("yeni taşın karşıtlığı (tuzak) o adımda önceden söylenir; son adım 'toparlayalım'", async () => {
   await start();
   fireEvent.press(screen.getByText("Kurmaya başla"));
-  for (const t of S0.slice(0, 3)) {
+  for (const t of S0.slice(0, 2)) {
     await say(t);
     await next();
   }
+  // 3. adımda "in the morning" henüz yeni değil: karşıtlığı görünmez.
+  await waitFor(() => expect(screen.getByText("Nasıl uyanmayı seviyorum?")).toBeTruthy());
+  expect(screen.queryByText(/on the morning değil/)).toBeNull();
+  await say(S0[2]);
+  await next();
   await waitFor(() => expect(screen.getByText("Ne zaman?")).toBeTruthy());
   expect(screen.getByText("Şimdi cümlemizi toparlayalım")).toBeTruthy();
-  expect(screen.queryByText(/on the morning değil/)).toBeNull();
-  await say(S0[3]);
-  await waitFor(() => expect(screen.getByText(/on the morning değil/)).toBeTruthy());
+  expect(screen.getByText(/on the morning değil/)).toBeTruthy();
+});
+
+test("hocaya danış: listede olmayan ama doğru söyleyişi hoca kabul eder ve nedenini söyler", async () => {
+  mockJudge.mockResolvedValueOnce({ ok: true, why: "I love da aynı anlamı verir." });
+  await start();
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  await say("I love");
+  await waitFor(() => expect(screen.getByText("Hoca baktı: senin söyleyişin de doğru")).toBeTruthy());
+  expect(screen.getByText("I love da aynı anlamı verir.")).toBeTruthy();
+  expect(screen.getByText("Doğru")).toBeTruthy();
+  const arg = mockJudge.mock.calls[0][1] as { target: string; given: string };
+  expect(arg.target).toBe("I like");
+  expect(arg.given).toBe("I love");
+});
+
+test("hocaya danış: hoca da yanlış bulursa NEDEN olmadığını açıklar", async () => {
+  mockJudge.mockResolvedValueOnce({ ok: false, why: "Burada geçmiş zaman değil, geniş zaman lazım." });
+  await start();
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  await say("I liked");
+  await waitFor(() => expect(screen.getByText("Hoca da baktı — neden olmadı:")).toBeTruthy());
+  expect(screen.getByText("Burada geçmiş zaman değil, geniş zaman lazım.")).toBeTruthy();
+  expect(screen.getByText("Bir daha söyle")).toBeTruthy();
+});
+
+test("Hocaya sor: 'Neden böyle kuruldu?' bu cümle üzerinden cevaplanır", async () => {
+  mockAsk.mockResolvedValueOnce("Önce yüklemi söylüyoruz: **seviyorum → I like**.");
+  await start();
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  await waitFor(() => expect(screen.getByLabelText("Hocaya sor")).toBeTruthy());
+  fireEvent.press(screen.getByLabelText("Hocaya sor"));
+  fireEvent.press(screen.getByText("Neden böyle kuruldu?"));
+  await waitFor(() => expect(screen.getByText(/Önce yüklemi söylüyoruz/)).toBeTruthy());
+  const [, input, q] = mockAsk.mock.calls[0] as [unknown, { tr: string; step?: { trPiece: string } }, string];
+  expect(q).toBe("Neden böyle kuruldu?");
+  expect(input.tr).toBe("Sabahları erken uyanmayı seviyorum.");
+  expect(input.step?.trPiece).toBeTruthy();
 });
 
 test("boş cevap: ne karar, ne puan, ne ilerleme", async () => {

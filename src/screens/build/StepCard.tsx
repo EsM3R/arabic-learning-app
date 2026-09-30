@@ -2,10 +2,15 @@
  * ADIM kartı — hocanın asıl hamlesi: soru → Türkçe cevap → (sen söyle).
  *
  * Denemeden ÖNCE görünen: sözlü işaret ("Bağlaçla başlıyorum"), soru
- * çipi, Türkçe cevap satırı (yeni parça kalın), tam zamanında lamba (YALNIZ
- * Türkçe tetik) ve A1–B1'de "Şu ana kadar". Hedef dildeki parça, not,
- * karşıtlık ve alternatifler denemeden SONRA gelir: önceden gösterilen cevap
- * söyletmez, okutur.
+ * çipi, Türkçe cevap satırı (yeni parça kalın), bu adımın YENİ KALIBI ve
+ * A1–B1'de "Şu ana kadar".
+ *
+ * Sıfır ön bilgi kuralı: öğrenci hiç görmediği bir kalıbı söyleyemez. Hoca
+ * da yeni parçayı ("-madan önce → before") ve NEDENİNİ söylemeden onu
+ * sordurmaz. Bu yüzden adımda ilk kez öğretilen taş — hedef karşılığı, neden
+ * öyle olduğu ve tuzağı — denemeden ÖNCE gösterilir; öğrenci cümlenin geri
+ * kalanını kendisi birleştirir. Daha önce öğrenilmiş (geri gelen) taşlar
+ * gösterilmez: onları hatırlaması beklenir.
  */
 import React from "react";
 import { View } from "react-native";
@@ -16,9 +21,11 @@ import type { LanguageId } from "../../languages";
 import type { BuildSentence } from "../../sentencebuilding";
 import { ltrLine } from "../../richtext";
 import AnswerDiff from "./AnswerDiff";
-import { altShown, answerLine, blocksAt, glossSegments, lampText, recycledAt, stepLabels } from "./helpers";
+import { altShown, answerLine, blocksAt, glossSegments, recycledAt, stepLabels } from "./helpers";
+import type { BuildBlock } from "../../sentencebuilding";
 import type { Attempt, ViewOpts } from "./types";
-import { ContrastBox, CueChip, Lamp, NoteRow, QuestionChip, useBuildStyles } from "./ui";
+import AskTeacher from "./AskTeacher";
+import { ContrastBox, CueChip, NoteRow, QuestionChip, useBuildStyles } from "./ui";
 import VerdictPanel from "./VerdictPanel";
 
 export default function StepCard({
@@ -34,6 +41,7 @@ export default function StepCard({
   translit,
   onListen,
   onVoid,
+  onAsk,
   extra,
 }: {
   sentence: BuildSentence;
@@ -52,6 +60,8 @@ export default function StepCard({
   translit?: string;
   onListen: () => void;
   onVoid?: () => void;
+  /** "Hocaya sor": bu cümle hakkında soru (verilmezse düğme yok). */
+  onAsk?: (question: string) => Promise<string>;
   /** Cinsiyet seçimi gibi cümle düzeyi eklentiler. */
   extra?: React.ReactNode;
 }) {
@@ -96,7 +106,7 @@ export default function StepCard({
               {line.after}
             </Txt>
             {fresh.map((b) => (
-              <Lamp key={b.key} text={lampText(b, lang)} />
+              <NewPattern key={b.key} block={b} lang={lang} view={view} />
             ))}
             {showSoFar && i > 0 && prevShown ? (
               <View style={{ gap: 2 }}>
@@ -134,18 +144,11 @@ export default function StepCard({
           translit={translit}
           onListen={onListen}
           onVoid={onVoid}
+          judge={attempt.judge}
+          why={attempt.why}
         >
           {/* Eksik parça geri bildirimi adım notunu zaten sonuna ekler; iki kez gösterme. */}
           {!!st.note && !attempt.feedback.includes(st.note) && <NoteRow text={st.note} />}
-          {fresh.map((b) => (
-            <View key={b.key} style={{ gap: 6 }}>
-              {!!b.note && <NoteRow text={`${b.tr} → ${view.show(b.target)}: ${b.note}`} icon="layers" />}
-              {/* Tuzağa düşüldüyse aynı metin zaten kararın geri bildiriminde. */}
-              {!!b.contrast && !attempt.feedback.includes(b.contrast) && (
-                <ContrastBox text={b.contrast} mini={(b.trapIds ?? []).map((id) => trapById(lang, id)?.mini).find(Boolean)} />
-              )}
-            </View>
-          ))}
           {missed &&
             recycled.map((b) =>
               b.recycled && (b.recycled.firstNote || b.recycled.firstContrast) ? (
@@ -171,6 +174,42 @@ export default function StepCard({
           {ok && last && <Gloss sentence={sentence} lang={lang} view={view} finalShown={finalShown} />}
         </VerdictPanel>
       )}
+      {onAsk && !linked ? (
+        <View style={{ marginTop: 12 }}>
+          <AskTeacher key={`${sentence.key}-${i}`} onAsk={onAsk} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Bu adımın yeni kalıbı — denemeden önce: "-dıktan sonra → بَعْدَ", neden
+ * öyle olduğu ve Türklerin düştüğü tuzak. Hoca da önce parçayı verir, sonra
+ * cümleyi söyletir.
+ */
+export function NewPattern({ block: b, lang, view }: { block: BuildBlock; lang: LanguageId; view: ViewOpts }) {
+  const { s, c } = useBuildStyles();
+  const trap = (b.trapIds ?? []).map((id) => trapById(lang, id)).find(Boolean);
+  const contrast = b.contrast || trap?.text || "";
+  const mini = trap?.mini;
+  return (
+    <View style={{ gap: 8, borderRadius: 14, borderWidth: 1, borderColor: c.goldDeep, padding: 12 }} accessibilityLabel={`Yeni kalıp: ${b.tr}`}>
+      <View style={s.row}>
+        <Icon name="bulb" size={16} color={c.gold} />
+        <Txt variant="caption" color={c.gold} style={{ fontWeight: "800", letterSpacing: 0.4 }}>
+          YENİ KALIP
+        </Txt>
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+        <Txt variant="callout" style={{ fontWeight: "700" }}>
+          {b.tr}
+        </Txt>
+        <Icon name="arrowRight" size={15} color={c.inkSoft} />
+        <TargetText size={view.rtl ? 22 : 17}>{view.show(b.target)}</TargetText>
+      </View>
+      {b.note ? <NoteRow text={`Neden: ${b.note}`} icon="info" /> : null}
+      {contrast ? <ContrastBox text={contrast} mini={mini} /> : null}
     </View>
   );
 }

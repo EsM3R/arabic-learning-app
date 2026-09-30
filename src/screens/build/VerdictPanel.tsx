@@ -4,10 +4,11 @@
  * öğrenci denedikten sonra görünür — hoca da önce sordurur, sonra anlatır.
  */
 import React from "react";
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import Icon from "../../components/Icon";
 import { PressableScale, Txt } from "../../components/kit";
 import type { StepVerdict } from "../../sentencebuilding";
+import type { Attempt } from "./types";
 import { ltrLine } from "../../richtext";
 import { useBuildStyles, useShowTarget } from "./ui";
 
@@ -21,6 +22,8 @@ export default function VerdictPanel({
   translit,
   onListen,
   onVoid,
+  judge,
+  why,
   children,
 }: {
   verdict: StepVerdict;
@@ -36,6 +39,9 @@ export default function VerdictPanel({
   onListen?: () => void;
   /** "Ses tanıma yanlış duydu, sayma" — adım başına bir kez. */
   onVoid?: () => void;
+  /** Hocaya danışmanın durumu ve açıklaması. */
+  judge?: Attempt["judge"];
+  why?: string;
   children?: React.ReactNode;
 }) {
   const { s, c } = useBuildStyles();
@@ -85,6 +91,7 @@ export default function VerdictPanel({
           {ltrLine(show(feedback))}
         </Txt>
       ) : null}
+      {judge ? <JudgeRow judge={judge} why={why} /> : null}
       {children}
       {onVoid ? (
         <PressableScale onPress={onVoid} accessibilityLabel="Ses tanıma yanlış duydu, sayma" haptic={false} style={{ alignSelf: "flex-start" }}>
@@ -95,6 +102,40 @@ export default function VerdictPanel({
             </Txt>
           </View>
         </PressableScale>
+      ) : null}
+    </View>
+  );
+}
+
+/** Hocaya danışmanın satırı: "Hoca bakıyor…" → hocanın kararı ve NEDENİ. */
+function JudgeRow({ judge, why }: { judge: NonNullable<Attempt["judge"]>; why?: string }) {
+  const { c } = useBuildStyles();
+  const show = useShowTarget();
+  if (judge === "bakiyor") {
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 12, padding: 10 }}>
+        <ActivityIndicator size="small" color={c.accent} />
+        <Txt variant="caption" color={c.inkSoft} style={{ flex: 1 }}>
+          Söyleyişin hazır listede yok ama doğru olabilir. Hocaya soruyorum…
+        </Txt>
+      </View>
+    );
+  }
+  const head =
+    judge === "kabul" ? "Hoca baktı: senin söyleyişin de doğru" : judge === "ret" ? "Hoca da baktı — neden olmadı:" : "Hocaya ulaşılamadı";
+  const ink = judge === "kabul" ? c.accentDark : judge === "ret" ? c.ink : c.inkSoft;
+  return (
+    <View style={{ gap: 4, backgroundColor: c.card, borderRadius: 12, padding: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Icon name={judge === "kabul" ? "check" : judge === "ret" ? "bulb" : "alert"} size={15} color={ink} strokeWidth={2.4} />
+        <Txt variant="caption" color={ink} style={{ fontWeight: "800", flex: 1 }}>
+          {head}
+        </Txt>
+      </View>
+      {why ? (
+        <Txt variant="callout" color={judge === "hata" ? c.inkSoft : c.ink}>
+          {ltrLine(show(why))}
+        </Txt>
       ) : null}
     </View>
   );
