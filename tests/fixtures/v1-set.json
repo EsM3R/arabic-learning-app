@@ -1,0 +1,51 @@
+{
+  "patternId": "zaman-baglac",
+  "themeId": "rutin",
+  "intro": "Günlük rutin — bağlaçlar",
+  "createdAt": "2026-09-01T08:00:00.000Z",
+  "sentences": [
+    {
+      "tr": "Sabahları erken uyanmayı seviyorum.",
+      "steps": [
+        { "question": "", "trPiece": "seviyorum", "trSoFar": "Seviyorum", "target": "I like", "alts": [], "translit": "", "note": "" },
+        { "question": "Neyi seviyorum?", "trPiece": "uyanmayı", "trSoFar": "Uyanmayı seviyorum", "target": "I like to wake up", "alts": ["I like waking up"], "translit": "", "note": "-mayı ekini to ile veririz." },
+        { "question": "Nasıl?", "trPiece": "erken", "trSoFar": "Erken uyanmayı seviyorum", "target": "I like to wake up early", "alts": [], "translit": "", "note": "" },
+        { "question": "Ne zaman?", "trPiece": "Sabahları", "trSoFar": "Sabahları erken uyanmayı seviyorum.", "target": "I like to wake up early in the morning.", "alts": [], "translit": "", "note": "" }
+      ],
+      "blocks": [{ "target": "in the morning", "tr": "sabahları", "note": "kalıp", "contrast": "", "alts": [] }],
+      "reorder": ""
+    },
+    {
+      "tr": "Kahvaltı yapmadan önce duş alırım.",
+      "steps": [
+        { "question": "", "trPiece": "yapmadan önce", "trSoFar": "yapmadan önce", "target": "Before", "alts": [], "translit": "", "note": "" },
+        { "question": "Kim kahvaltı yapacak?", "trPiece": "Kahvaltı", "trSoFar": "Kahvaltı yapmadan önce", "target": "Before I have breakfast", "alts": [], "translit": "", "note": "" },
+        { "question": "Ne yaparım?", "trPiece": "duş alırım", "trSoFar": "Kahvaltı yapmadan önce duş alırım.", "target": "Before I have breakfast, I take a shower.", "alts": ["Before I have breakfast, I have a shower."], "translit": "", "note": "" }
+      ],
+      "blocks": [
+        { "target": "before", "tr": "-madan önce", "note": "iki eylemi bağlar", "contrast": "ago sadece 'önce' demek: three days ago", "alts": [] },
+        { "target": "take a shower", "tr": "duş almak", "note": "", "contrast": "", "alts": ["have a shower"] }
+      ],
+      "reorder": "I take a shower before I have breakfast."
+    },
+    {
+      "tr": "Bazen işe metroyla giderim ama sıklıkla otobüsü tercih ederim.",
+      "steps": [
+        { "question": "", "trPiece": "Bazen giderim", "trSoFar": "Bazen giderim", "target": "I sometimes go", "alts": [], "translit": "", "note": "" },
+        { "question": "Nereye?", "trPiece": "işe", "trSoFar": "Bazen işe giderim", "target": "I sometimes go to work", "alts": [], "translit": "", "note": "" },
+        { "question": "Nasıl?", "trPiece": "metroyla", "trSoFar": "Bazen işe metroyla giderim ama sıklıkla otobüsü tercih ederim.", "target": "I sometimes go to work by metro, but I often prefer the bus.", "alts": [], "translit": "", "note": "" }
+      ],
+      "blocks": [{ "target": "by metro", "tr": "metroyla", "note": "", "contrast": "with değil", "alts": [] }],
+      "reorder": "But I often prefer the bus, I sometimes go to work by metro."
+    },
+    {
+      "tr": "Uyumadan önce mutlaka dişlerimi fırçalarım.",
+      "steps": [
+        { "question": "", "trPiece": "Uyumadan önce", "trSoFar": "Uyumadan önce", "target": "Before I sleep", "alts": [], "translit": "", "note": "" },
+        { "question": "Ne yaparım?", "trPiece": "dişlerimi fırçalarım", "trSoFar": "Uyumadan önce mutlaka dişlerimi fırçalarım.", "target": "Before I sleep, I always brush my teeth.", "alts": [], "translit": "", "note": "" }
+      ],
+      "blocks": [{ "target": "before", "tr": "-madan önce", "note": "iki eylemi bağlar", "contrast": "ago değil", "alts": [] }],
+      "reorder": "I always brush my teeth before I sleep."
+    }
+  ]
+}

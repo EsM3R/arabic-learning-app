@@ -35,7 +35,7 @@ import {
   THEMES,
 } from "../sentencebuilding";
 import type {
-  BuildSet,
+  BuildSetV1 as BuildSet,
   BuildStep,
   Pattern,
   ProgressMap,

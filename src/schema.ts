@@ -14,11 +14,14 @@
  *    üstüne yazar ve veri sessizce bozulur. Damga olmadan bunu FARK ETMEK
  *    bile mümkün değil.
  *
- * Bugün göç listesi boş; makinenin kendisi ve geri-sürüm koruması asıl değer.
+ * İlk göç (2): Cümle Kurma v3 — setler, ilerleme, taş hafızası, cümle
+ * tekrarı, tarihçe ve arayüz durumu yeni anahtarlara yazılır (bkz.
+ * src/buildmastery.ts, migrateBuildEntries). Eski anahtarlar silinmez.
  */
+import { migrateBuildEntries } from "./buildmastery.ts";
 
 /** Bu derlemenin yazdığı şema sürümü. Biçim değiştikçe artar. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** Sürümün saklandığı depo anahtarı (dil-bağımsız). */
 export const SCHEMA_KEY = "schema.version";
@@ -37,7 +40,15 @@ export interface Migration {
  * silme yapma — yeni anahtarı yaz, eskisini bırak. Yarım kalan bir göçün
  * ardından uygulama açıldığında veri hâlâ okunabilir olmalı.
  */
-export const MIGRATIONS: Migration[] = [];
+export const MIGRATIONS: Migration[] = [
+  {
+    to: 2,
+    note: "cümle kurma v3",
+    // Saf: yalnız yeni anahtar ekler (buildSets2, buildProgress2, buildBlocks,
+    // buildMemory, buildHistory, buildUi); v1 kayıtları yerinde kalır.
+    apply: (entries) => migrateBuildEntries(entries),
+  },
+];
 
 export type SchemaStatus = "bos" | "guncel" | "goc-gerekli" | "gelecekten";
 

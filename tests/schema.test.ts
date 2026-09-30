@@ -95,3 +95,35 @@ test("geri sürüm uyarısı ne olduğunu ve ne yapılacağını söyler", () =>
   assert.match(FUTURE_SCHEMA_WARNING, /kaydedilmeyecek/);
   assert.match(FUTURE_SCHEMA_WARNING, /güncel/i);
 });
+
+test("göç 2 (cümle kurma v3): v1'den zincir yeni anahtarları yazar, eskileri silmez", () => {
+  const before = {
+    "buildSets.v1.en": JSON.stringify([
+      {
+        patternId: "istek",
+        themeId: "rutin",
+        intro: "x",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        sentences: [
+          {
+            tr: "Eve gitmek istiyorum.",
+            steps: [
+              { question: "", trPiece: "istiyorum", trSoFar: "İstiyorum", target: "I want", alts: [], translit: "", note: "" },
+              { question: "Neyi?", trPiece: "Eve gitmek", trSoFar: "Eve gitmek istiyorum.", target: "I want to go home.", alts: [], translit: "", note: "" },
+            ],
+            blocks: [],
+            reorder: "",
+          },
+        ],
+      },
+    ]),
+    "vocab.v1": "[]",
+  };
+  const r = runMigrations(before, 1);
+  assert.equal(r.version, SCHEMA_VERSION);
+  assert.deepEqual(r.applied, ["cümle kurma v3"]);
+  assert.equal(r.entries["buildSets.v1.en"], before["buildSets.v1.en"]);
+  assert.equal(r.entries["vocab.v1"], "[]");
+  assert.equal(JSON.parse(r.entries["buildSets2.v1.en"])[0].v, 2);
+  assert.equal(JSON.parse(r.entries["buildMemory.v1.en"]).length, 1);
+});

@@ -1,0 +1,14 @@
+{
+  "steps": [
+    { "q": "Kim seviyor?", "p": "seviyorum", "t": "أُحِبُّ", "n": "-(ı)yorum → أُـ öneki (ben); أَنَا gerekmez. Alışkanlık → muzari." },
+    { "q": "Neyi seviyorum?", "p": "uyanmayı", "t": "أُحِبُّ أَنْ أَسْتَيْقِظَ", "n": "-mayı ekini أَنْ + fiil ile veririz; fiil fetha alır." },
+    { "q": "Nasıl uyanmayı seviyorum?", "p": "erken", "t": "أُحِبُّ أَنْ أَسْتَيْقِظَ مُبَكِّرًا" },
+    { "q": "Ne zaman?", "p": "Sabahları", "t": "أُحِبُّ أَنْ أَسْتَيْقِظَ مُبَكِّرًا فِي الصَّبَاحِ", "n": "Kalıp: فِي الصَّبَاحِ, hep böyle." }
+  ],
+  "blocks": [
+    { "t": "أَنْ أَسْتَيْقِظَ", "tr": "uyanmayı", "k": "suffix", "s": 1, "n": "-mayı → أَنْ + mansub; uyanan da ben: ikinci fiil de çekimlenir.", "a": ["الاِسْتِيقَاظَ"] },
+    { "t": "مُبَكِّرًا", "tr": "erken", "k": "adverb", "s": 2, "pair": { "t": "مُتَأَخِّرًا", "tr": "geç" } },
+    { "t": "فِي الصَّبَاحِ", "tr": "sabahları", "k": "chunk", "s": 3, "a": ["صَبَاحًا"] }
+  ],
+  "tw": ["uḥibbu", "an", "astayqiẓa", "mubakkiran", "fi", "ṣ-ṣabāḥ"]
+}

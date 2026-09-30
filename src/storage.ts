@@ -1,6 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { LessonQuality } from "./lessonquality";
 import { BackupFile, mergeDeviceSecrets } from "./backup";
+import {
+  BUILD_KEYS,
+  DEFAULT_BUILD_UI,
+  mergeProgress,
+  mergeSets,
+  seedBlocks,
+  seedHistory,
+  seedMemory,
+  seedUi,
+} from "./buildmastery";
+import type { BlockProgress, BuildHistory, BuildUi, ProgressMap2, SentenceMemory } from "./buildmastery";
+import type { BuildSet } from "./sentencebuilding";
 import type { FluencySession } from "./fluency";
 import { FUSHA_MIGRATION_KEY } from "./fusha";
 import { runMigrations, SCHEMA_KEY, SCHEMA_VERSION, schemaStatus } from "./schema";
@@ -141,6 +153,66 @@ export async function saveBuildProgress(map: unknown): Promise<void> {
 }
 export const loadBuildSets = <T>() => loadList<T>(langKey("buildSets"));
 export const saveBuildSets = <T>(list: T[]) => saveList(langKey("buildSets"), list);
+
+/**
+ * CÜMLE KURMA v3 deposu (dil başına). Okurken TEMBEL YÜKSELTME: şema göçü
+ * hiç çalışmamış olsa da (damgasız eski kurulum, eski yedekten dönüş) v1
+ * kayıtları v2'ye çevrilerek okunur. Okuma hiçbir şey yazmaz ve eski
+ * anahtarlar hiç silinmez; geçiş döneminde eski ekranın yazdığı v1 setleri
+ * de kimliğe göre birleştirilir (bkz. src/buildmastery.ts).
+ */
+async function loadJson<T>(key: string): Promise<T | null> {
+  const raw = await AsyncStorage.getItem(key);
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function saveJson(key: string, value: unknown): Promise<void> {
+  await AsyncStorage.setItem(key, JSON.stringify(value));
+}
+
+export async function loadBuildSets2(): Promise<BuildSet[]> {
+  const v2 = await loadJson<unknown[]>(langKey(BUILD_KEYS.sets2));
+  const v1 = await loadJson<unknown[]>(langKey(BUILD_KEYS.sets1));
+  return mergeSets(Array.isArray(v2) ? v2 : [], Array.isArray(v1) ? v1 : [], getActiveLanguageId());
+}
+export const saveBuildSets2 = (list: BuildSet[]) => saveJson(langKey(BUILD_KEYS.sets2), list);
+
+export async function loadBuildProgress2(): Promise<ProgressMap2> {
+  const v2 = await loadJson<Record<string, unknown>>(langKey(BUILD_KEYS.progress2));
+  const v1 = await loadJson<Record<string, unknown>>(langKey(BUILD_KEYS.progress1));
+  return mergeProgress(v2, v1);
+}
+export const saveBuildProgress2 = (map: ProgressMap2) => saveJson(langKey(BUILD_KEYS.progress2), map);
+
+export async function loadBuildBlocks(): Promise<Record<string, BlockProgress>> {
+  const v = await loadJson<Record<string, BlockProgress>>(langKey(BUILD_KEYS.blocks));
+  return v && typeof v === "object" ? v : seedBlocks(await loadBuildSets2());
+}
+export const saveBuildBlocks = (map: Record<string, BlockProgress>) => saveJson(langKey(BUILD_KEYS.blocks), map);
+
+export async function loadBuildMemory(): Promise<SentenceMemory[]> {
+  const v = await loadJson<SentenceMemory[]>(langKey(BUILD_KEYS.memory));
+  return Array.isArray(v) ? v : seedMemory(await loadBuildSets2());
+}
+export const saveBuildMemory = (list: SentenceMemory[]) => saveJson(langKey(BUILD_KEYS.memory), list);
+
+export async function loadBuildHistory(): Promise<Record<string, BuildHistory>> {
+  const v = await loadJson<Record<string, BuildHistory>>(langKey(BUILD_KEYS.history));
+  return v && typeof v === "object" ? v : seedHistory(await loadBuildSets2());
+}
+export const saveBuildHistory = (map: Record<string, BuildHistory>) => saveJson(langKey(BUILD_KEYS.history), map);
+
+export async function loadBuildUi(): Promise<BuildUi> {
+  const v = await loadJson<Partial<BuildUi>>(langKey(BUILD_KEYS.ui));
+  if (!v || typeof v !== "object") return seedUi(await loadBuildSets2());
+  return { ...DEFAULT_BUILD_UI, ...v, connSeen: { ...(v.connSeen ?? {}) } };
+}
+export const saveBuildUi = (ui: BuildUi) => saveJson(langKey(BUILD_KEYS.ui), ui);
 
 /** Shadowing öz-notları (SRS değil; kuyruk sıralamasını etkiler). */
 export async function loadShadowNotes<T>(): Promise<T> {

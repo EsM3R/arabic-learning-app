@@ -32,7 +32,7 @@ import {
 } from "./prompts";
 import { normalizeDebrief } from "./conversation";
 import { normalizeBuildSet } from "./sentencebuilding";
-import type { BuildSet, Pattern, Theme } from "./sentencebuilding";
+import type { BuildSetV1 as BuildSet, Pattern, Theme } from "./sentencebuilding";
 import type { Debrief, Scenario } from "./conversation";
 import {
   buildReadingRequest,
