@@ -552,9 +552,125 @@ export function expandSwaps(target: string, swaps: Swap[], lang: LanguageId, cho
   return forms;
 }
 
+// ---------------------------------------------------------------------------
+// Üslup etiketleri (C1+) ve günlük dil
+// ---------------------------------------------------------------------------
+
+export type SwapLabel = NonNullable<Swap["label"]>;
+
+/** Kararda ve özette gösterilen üslup etiketleri; "dişil" bir üslup değil, seçimdir. */
+const REGISTER_LABELS: SwapLabel[] = ["resmî", "günlük", "edebî"];
+
+/**
+ * Modelin yazdığı etiketi kanonik biçime çevirir: "Resmi", "gunluk",
+ * "edebî" → resmî/günlük/edebî. Tanınmayan etiket yok sayılır (swap
+ * etiketsiz kalır, kabul yine sürer).
+ */
+export function normalizeSwapLabel(v: unknown): SwapLabel | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v
+    .trim()
+    .toLocaleLowerCase("tr")
+    .replace(/[îı]/g, "i")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s");
+  if (t === "resmi") return "resmî";
+  if (t === "gunluk") return "günlük";
+  if (t === "edebi") return "edebî";
+  if (t === "disil") return "dişil";
+  return undefined;
+}
+
+const LABEL_TAIL = /\s*(?:[([]\s*(resm[iîİ]|g[üu]nl[üu]k|edeb[iîİ])\s*[)\]]|[,|/—–]\s*(resm[iîİ]|g[üu]nl[üu]k|edeb[iîİ]))\s*$/i;
+
+/**
+ * C1+ blok alternatifi etiketiyle gelir. Şema dizi elemanını metin
+ * tuttuğundan model etiketi metnin sonuna yazar ("have a shower (günlük)",
+ * "… | resmî"); şemasız sağlayıcı [biçim, etiket] ya da {t, label} de
+ * dönebilir. Hepsi {metin, etiket}'e çevrilir; etiket metinden SİLİNİR ki
+ * kabul kümesine "(günlük)" kelimesi girmesin.
+ */
+export function parseLabelledAlt(raw: unknown): { text: string; label?: SwapLabel } | null {
+  if (typeof raw === "string") {
+    let s = raw.trim();
+    // İstem "[biçim, etiket]" der; metin alanına bu yazılırsa dış köşeli ayraç atılır.
+    const br = s.match(/^\[(.+)\]$/);
+    if (br) {
+      try {
+        const j: unknown = JSON.parse(s);
+        if (Array.isArray(j)) return parseLabelledAlt(j);
+      } catch {
+        // JSON değil: [have a shower, günlük] gibi düz yazı.
+      }
+      if (LABEL_TAIL.test(br[1])) s = br[1].trim();
+    }
+    const m = s.match(LABEL_TAIL);
+    if (m && m.index !== undefined && m.index > 0) {
+      const text = s.slice(0, m.index).trim();
+      const label = normalizeSwapLabel(m[1] ?? m[2]);
+      return text ? { text, ...(label ? { label } : {}) } : null;
+    }
+    return s ? { text: s } : null;
+  }
+  if (Array.isArray(raw)) {
+    const text = typeof raw[0] === "string" ? raw[0].trim() : "";
+    if (!text) return null;
+    const label = normalizeSwapLabel(raw[1]);
+    return { text, ...(label ? { label } : {}) };
+  }
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const t = o.t ?? o.text;
+    const text = typeof t === "string" ? t.trim() : "";
+    if (!text) return null;
+    const label = normalizeSwapLabel(o.label ?? o.l);
+    return { text, ...(label ? { label } : {}) };
+  }
+  return null;
+}
+
+/**
+ * Kullanılan swap'ların üslup etiketi ("resmî", "günlük · edebî"); yoksa "".
+ * Kararda "Doğru, bu da olur (resmî)" diye görünür: öğrenci söylediğinin
+ * doğru ama başka bir üslupta olduğunu bilsin.
+ */
+export function registerOf(used: Swap[]): string {
+  const labels: string[] = [];
+  for (const u of used) {
+    if (u.label && REGISTER_LABELS.includes(u.label) && !labels.includes(u.label)) labels.push(u.label);
+  }
+  return labels.join(" · ");
+}
+
+/**
+ * acceptDialect anahtarı DENETİM anında uygulanır: ayar değişince eski
+ * setler de hemen uyar. Açıkken dilin günlük karşılıkları (أُشَغِّلُ →
+ * أَفْتَحُ, أُرِيدُ → بَدِّي) hedefte geçiyorsa eklenir; kapalıyken daha önce
+ * üretimde eklenmiş olanlar çıkarılır (yalnız fushâ). Modelin kendi
+ * "günlük" etiketli üslup eşdeğerlerine dokunulmaz.
+ */
+export function withDialect(swaps: Swap[], target: string, lang: LanguageId, on: boolean): Swap[] {
+  const pairs = methodFor(lang).dialectSwaps ?? [];
+  if (!pairs.length) return swaps;
+  const dialectKeys = new Set(pairs.map(([f, g]) => swapKey({ from: cleanWords(f), to: cleanWords(g) }, lang)));
+  const rest = swaps.filter((s) => !dialectKeys.has(swapKey(s, lang)));
+  if (!on) return rest;
+  const toks = canonicalTokens(target, lang);
+  const have = new Set(rest.map((s) => swapKey(s, lang)));
+  const out = [...rest];
+  for (const [f, g] of pairs) {
+    const sw: Swap = { from: cleanWords(f), to: cleanWords(g), label: "günlük" };
+    const k = swapKey(sw, lang);
+    if (have.has(k) || findRun(toks, canonicalTokens(f, lang)) < 0) continue;
+    have.add(k);
+    out.push(sw);
+  }
+  return out;
+}
+
 export interface SwapSources {
-  /** Yapı taşları ve alternatifleri (a): span düzeyinde. */
-  blocks?: { target: string; alts?: string[] }[];
+  /** Yapı taşları ve alternatifleri (a): span düzeyinde; labels a ile aynı sırada (C1+ üslup). */
+  blocks?: { target: string; alts?: string[]; labels?: (SwapLabel | undefined)[] }[];
   /** Modelin sw çiftleri: [kalıptaki, alternatif, etiket?]. */
   sw?: (Swap | [string, string] | [string, string, string])[];
   /** Arapçada erkek/kadın biçim çiftleri. */
@@ -613,11 +729,14 @@ export function deriveSwaps(finalTarget: string, src: SwapSources, lang: Languag
     out.push(sw);
   };
   for (const b of src.blocks ?? []) {
-    for (const alt of (b.alts ?? []).slice(0, 2)) add({ from: cleanWords(b.target), to: cleanWords(alt) });
+    (b.alts ?? []).slice(0, 2).forEach((alt, i) => {
+      const label = b.labels?.[i];
+      add({ from: cleanWords(b.target), to: cleanWords(alt), ...(label ? { label } : {}) });
+    });
   }
   for (const x of src.sw ?? []) {
     if (Array.isArray(x)) {
-      const label = x[2] === "resmî" || x[2] === "günlük" || x[2] === "edebî" || x[2] === "dişil" ? x[2] : undefined;
+      const label = normalizeSwapLabel(x[2]);
       add({ from: cleanWords(x[0]), to: cleanWords(x[1]), ...(label ? { label } : {}) });
     } else if (x && Array.isArray(x.from) && Array.isArray(x.to)) {
       add(x);
@@ -848,7 +967,15 @@ function scoreOne(given: string, idx: number, forms: AcceptedForm[], ctx: CheckC
       ...over,
     };
   };
-  const altNote = (f: AcceptedForm) => (f !== base || f.used.length ? `Doğru, bu da olur. Kalıptaki: ${base.text}` : "");
+  // C1+ üslup etiketi (resmî/günlük/edebî) kararın içinde: aynı anlam, başka kayıt.
+  // Öğrencinin kendi önceki seçimi yeniden "bu da olur" diye anılmaz: o artık onun biçimi.
+  const chosen = new Set((ctx.choices ?? []).map((c) => swapKey(c, lang)));
+  const altNote = (f: AcceptedForm) => {
+    const fresh = f.used.filter((u) => !chosen.has(swapKey(u, lang)));
+    if (f === base && !fresh.length) return "";
+    const reg = registerOf(fresh);
+    return `Doğru, bu da olur${reg ? ` (${reg})` : ""}. Kalıptaki: ${base.text}`;
+  };
 
   // 1. Birebir (ya da kabul edilen alternatif).
   const key = g0.join(" ");

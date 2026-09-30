@@ -1,38 +1,56 @@
 /**
  * CÜMLE KURMA — saf mantık (cihaz modülü yok; tests/sentencebuilding.test.ts).
  *
- * Kullanıcının getirdiği yöntem (Furkan Çetin'in videosunun transkriptinden):
+ * Yöntem Furkan Çetin'in videosundan (A2 İngilizce, "günlük rutinim"),
+ * sapmalar etiketli ([V] videoda, [E] uzantı, [D] bilinçli sapma):
  *
- * 1. Cümleler TEK TEK değil, BİR HİKÂYE olarak gelir — "günlük rutinim":
- *    uyanırım → duş alırım → evden çıkarım → işe giderim → eve gelirim →
- *    televizyon açarım → yatarım. Birbirine bağlı, gerçek hayattan.
- * 2. Her cümle ANA YÜKLEMDEN başlayıp dışarı doğru kurulur:
- *    "Sabahları erken uyanmayı seviyorum" → I like → I like to wake up →
- *    I like to wake up early → I like to wake up early in the morning.
- * 3. Her cümle 1-2 YAPI TAŞI öğretir: bağlaç (before, after, when, because,
- *    however), zaman ifadesi (in the morning, at around 7 pm), kalıp
- *    (take a shower, turn on the TV, leave home, go to bed, by bus).
- * 4. KARIŞTIRILANLAR açıkça ayrılır: ago/before, later/after, with/by,
- *    open/turn on — Türk öğrencinin tam düştüğü yerler.
- * 5. ALTERNATİFLER gösterilir: take/have a shower, sometimes/from time to
- *    time, often/frequently, around/about, like doing/like to do.
- * 6. Bağlacın YERİ değişebilir: "Before I have breakfast, I take a shower"
- *    = "I take a shower before I have breakfast". İkisi de söyletilir.
- * 7. SARMAL: son cümleler önceki yapı taşlarını yeniden birleştirir —
- *    "bunu da öğrendik, artık rahatlıkla çevirebiliriz".
+ * 1. HİKÂYE [V]. Set tek bir hikâyedir, cümleler rol taşır: kolay açılış →
+ *    kurma → en yüklü ZİRVE → hafif ÇUKUR → "çünkü" ile UZATMA → öğrenileni
+ *    birleştiren SENTEZ ("Bunları öğrendik, artık rahatlıkla çevirebiliriz").
+ *    Plan önce gelir (validatePlan, arcRoles), cümleler sonra tek tek.
+ * 2. OKU → BAĞLACI BUL → YÜKLEMDEN BAŞLA [V]. Türkçe cümle bütün okunur,
+ *    bağlaç bulunup cümle ikiye ayrılır; her kısım Türkçenin SONUNDAKİ
+ *    yüklemden kurulur ("I like"), sonra fiile Türkçe sorular sorulur
+ *    (Kim? Neyi? Nereye? Nasıl? Ne zaman?) ve sorular HEDEF DİLİN yuva
+ *    sırasıyla gelir. Öğrenci her adımda o ana kadarki cümlenin TAMAMINI
+ *    sesli söyler [E, D1] — hocanın "toparla"sı.
+ * 3. ZAMANLAMA KURALI. Cümleden ÖNCE yalnız iki şey gösterilir: bağlaç kartı
+ *    (kısımlar + tuzak, yalnız ilk seferde) ve "Bunu öğrendik" hatırlatması
+ *    (yalnız Türkçe). Geri kalan her açıklama — by/with, turn on/open,
+ *    AM/PM, ek notu, alternatifler — TAM O ADIMDA ve cevaptan SONRA gelir;
+ *    adımdan önce yalnız Türkçe tetik lambası yanar, hedef dil asla. Önceden
+ *    gösterilen cevap söyletmez, okutur.
+ * 4. ÜÇ BAĞLAÇ TÜRÜ (ConnKind) hocanın üç ayrı davranışıdır:
+ *    - sub    (-madan önce, -dıktan sonra, -dığımda): bağlaçla başlanır,
+ *             yan cümle biter ("Birinci kısmımız oldu"), ana cümle kendi
+ *             yükleminden; sonra bağlaç ortaya alınır (reorder).
+ *    - coord  (ama, ancak): önce birinci kısım biter, bağlaç eklenir, ikinci
+ *             kısım kendi yükleminden; yer DEĞİŞMEZ.
+ *    - causal (çünkü): önceki cümle aynen söylenir, çünkü ile devam edilir;
+ *             yer değişmez.
+ * 5. TUZAKLAR ve SİSTEMLER koddadır (buildmethod.ts): ago/before, with/by,
+ *    open/turn on, saat sistemi… Metin, karşıtlık ve algılama dile özeldir;
+ *    model yalnız kısa bir hatırlatma görür, yazmaz.
+ * 6. DİLE ÖZEL YÖNTEM TABLOLARI (METHOD[lang]): yuva ve soru sırası, zarf
+ *    yeri, bağlaçlar, sıralamanın biçimi (serbest / de devrik / fa daha az
+ *    doğal), gürültü sayılan artikeller, asla "yakın" sayılmayan ekler,
+ *    sesteşler, tuzaklar ve sistem dersleri. Arapçaya İngilizce tuzak
+ *    kopyalanmaz: أَنْ'in unutulması, araçta مَعَ/بِـ, خَرَجَ مِنْ, saatte sıra
+ *    sayısı ayrı yazılmıştır. Denetim harekeye bakmaz.
+ * 7. ALTERNATİFLER cümle düzeyinde swap olarak tutulur: bir adımda söylenen
+ *    eşdeğer (have a shower) sonraki adımlarda, sıralamada ve tekrarda da
+ *    doğrudur. C1+'da her eşdeğer üslup etiketi taşır (resmî / günlük /
+ *    edebî); Arapçada günlük dil yalnız ayar açıkken kabul edilir.
+ * 8. SOLMA ve TEK SEFERDE [E, D2]: A1–A2 tam adımlar; B1'de oturmuş taşların
+ *    adımları atlanır; B2+ ve her sentez önce tek seferde denenir, başarınca
+ *    "Hocanın kuruşu" adımları gösterir.
+ * 9. [D3] Hiçbir adımda bozuk bir ara cümle söyletilmez ("I like wake up");
+ *    videodaki birebir sıra isteyen için "Videodaki sıra" ayarı vardır.
  *
- * Videodan tek fark: videoda öğretmen çevirir, öğrenci izler. Burada öğrenci
- * ÇEVİRİR ve SESLİ SÖYLER — izlemek konuşturmaz. Her adımda cümlenin TAMAMI
- * yeniden söylenir; parçalar tekrarla otomatikleşir.
- *
- * Kalıp merdiveni omurga olarak kalıyor: her set bir kalıba ODAKLANIR ama o
- * kalıbı bir temanın içinde, hikâye cümleleriyle çalıştırır.
- *
- * v2 (bu dosyanın ikinci yarısı): set artık önce PLANLANIR (roller: açılış,
- * kurma, zirve, çukur, uzatma, sentez), sonra cümleler tek tek üretilip
- * cihazda toparlanır (normalizeSentence) ve ekranda bir KART SIRASINA
- * çevrilir (compileSentence). Modelin yazmadığı her şey — Türkçe "şu ana
- * kadar", tuzak metni, geri çağırma soruları, okunuş hizası — burada türetilir.
+ * Bu dosya: tipler, kalıp merdiveni (A1→C2) ve temalar, plan doğrulama,
+ * cümle normalleştirme (normalizeSentence: modelin yazmadığı "şu ana kadar",
+ * tuzak metni, geri çağırma soruları, okunuş hizası burada türetilir), kart
+ * derleyici (compileSentence), solma ve v1→v3 göçü.
  */
 import {
   addedTokens,
@@ -43,6 +61,7 @@ import {
   findConnector,
   langForScript,
   locateTrPiece,
+  parseLabelledAlt,
   scriptOf,
 } from "./buildcheck.ts";
 import { methodFor, systemById, trapById } from "./buildmethod.ts";
@@ -1280,6 +1299,8 @@ interface RawBlock {
   n: string;
   c: string;
   a: string[];
+  /** a ile aynı sırada C1+ üslup etiketleri (etiketsizse undefined). */
+  al: (Swap["label"] | undefined)[];
   pair?: { target: string; tr: string };
   x?: { target: string; tr: string };
 }
@@ -1536,6 +1557,12 @@ export function normalizeSentence(
     if (!key || seenKeys.has(key)) continue;
     seenKeys.add(key);
     const s = typeof x.s === "number" && Number.isInteger(x.s) && x.s >= 0 && x.s < rawSteps.length ? x.s : null;
+    // Alternatif C1+'da üslup etiketiyle gelir ("have a shower (günlük)"):
+    // etiket metinden ayrılır, swap'a taşınır; gösterilen alternatif temiz kalır.
+    const alts = arr(x.a ?? x.alts)
+      .map(parseLabelledAlt)
+      .filter((v): v is NonNullable<ReturnType<typeof parseLabelledAlt>> => !!v)
+      .slice(0, 2);
     const b: RawBlock = {
       t,
       tr: btr,
@@ -1543,7 +1570,8 @@ export function normalizeSentence(
       s,
       n: str(x.n ?? x.note),
       c: str(x.c ?? x.contrast),
-      a: arr(x.a ?? x.alts).map(str).filter(Boolean).slice(0, 2),
+      a: alts.map((v) => v.text),
+      al: alts.map((v) => v.label),
     };
     const pair = pairOf(x.pair);
     const tx = pairOf(x.x ?? x.transfer);
@@ -1637,7 +1665,7 @@ export function normalizeSentence(
     .map((x) => x.slice(0, 3) as [string, string] | [string, string, string]);
   let swaps = deriveSwaps(
     finalT,
-    { blocks: rawBlocks.map((b) => ({ target: b.t, alts: b.a })), sw: swRaw, dialect: !!stores.acceptDialect },
+    { blocks: rawBlocks.map((b) => ({ target: b.t, alts: b.a, labels: b.al })), sw: swRaw, dialect: !!stores.acceptDialect },
     lang
   );
   // Bağlantılı cümlede önceki cümlenin eşdeğerleri de geçerli (boş yer kaldıkça).

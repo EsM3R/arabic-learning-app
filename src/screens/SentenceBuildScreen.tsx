@@ -3,7 +3,7 @@ import { Alert, KeyboardAvoidingView, View } from "react-native";
 import Header from "../components/Header";
 import { Button, Chip, IconButton, Screen } from "../components/kit";
 import { isBudgetError } from "../budget";
-import { checkAnswer } from "../buildcheck";
+import { checkAnswer, withDialect } from "../buildcheck";
 import type { CheckCtx, CheckResult } from "../buildcheck";
 import {
   advanceRetell,
@@ -81,6 +81,8 @@ import type { Profile } from "../types";
 import { useDictation } from "../useDictation";
 import BuildHome from "./build/BuildHome";
 import type { SetAction } from "./build/BuildHome";
+import BuildSettings from "./build/BuildSettings";
+import type { BuildSettingKey } from "./build/BuildSettings";
 import ConnectorCard from "./build/ConnectorCard";
 import DoneView from "./build/DoneView";
 import type { SessionTally } from "./build/DoneView";
@@ -202,18 +204,32 @@ const EMPTY_TALLY: SessionTally = { ok: 0, total: 0, unscaffolded: 0, transfer: 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
- * CÜMLE KURMA — Türkçe cümleyi hedef dile hocanın yöntemiyle kurmak.
+ * CÜMLE KURMA — Türkçe cümleyi hedef dile Furkan Hoca'nın yöntemiyle,
+ * SESLİ kurmak. Yöntemin kendisi sentencebuilding.ts başlığında; bu ekran
+ * onu bir KART SIRASI denetleyicisi olarak oynatır.
  *
- * Ekran bir KART SIRASI denetleyicisidir: her cümle compileSentence ile
- * kartlara çevrilir (oku → öğrendik → bağlaç → [tek seferde → hocanın
- * kuruşu] → adımlar → sıralama → pratik → özet) ve öğrenci her adımda o
- * ana kadarki cümlenin TAMAMINI sesli söyler. Açıklamalar cevaptan sonra
- * gelir; önceden gösterilen tek şey bağlaç kartı ve Türkçe tetik lambası.
+ * Kart sırası (compileSentence): oku → [öğrendik] → [bağlaç] → [tek seferde
+ * → hocanın kuruşu] → adımlar (araya sistem dersi ve iki seçenekli
+ * hatırlama) → [bağlacın yeri] → [pratik] → özet. Öğrenci her adımda o ana
+ * kadarki cümlenin TAMAMINI söyler.
+ *
+ * ZAMANLAMA KURALI: cümleden önce yalnız bağlaç kartı ve "Bunu öğrendik"
+ * çipleri (Türkçe) gelir. Diğer her şey tam zamanında: adımdan önce yalnız
+ * Türkçe tetik lambası; hedef parça, not, karşıtlık, alternatif CEVAPTAN
+ * SONRA. Bağlaç türü kuruluşu belirler: yan cümle (sub) bağlaçla başlar ve
+ * sonra ortaya alınır; sıralı (coord) önce birinci kısmı bitirir; bağlanan
+ * (causal) önceki cümleyi söyletip çünkü ile sürer. Dile özel her şey
+ * (tuzak, sistem, yuva sırası, gürültü, sesteş) METHOD[lang] tablosundan.
  *
  * Üretim plan + cümle cümle (buildpipeline): öğrenci ilk cümleye başlarken
  * sonrakiler arka planda hazırlanır. Denetim tamamen cihazda (buildcheck).
  * Sayım kuralları: yalnız ilk deneme; yanlıştan ya da "Bilmiyorum"dan
  * sonraki tekrar hiçbir şey saymaz; yanlış duyulmuş deneme silinebilir.
+ *
+ * Ayarlar (ana ekranda, BuildUi'de): hızlı akış (açık), hareke gösterimi,
+ * videodaki sıra (kapalı, D3) ve Arapçada günlük dil (kapalı: yalnız fushâ).
+ * Günlük dil denetim anında uygulanır; video sırası yeni cümlelerin
+ * üretimine gider. C1+'da eşdeğerler üslup etiketiyle kararda ve özette görünür.
  */
 export default function SentenceBuildScreen({ profile, onBack }: Props) {
   const { c } = useBuildStyles();
@@ -346,7 +362,12 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     () => ({ rtl, harakat, show: (t: string) => (harakat ? t : stripHarakat(t)) }),
     [rtl, harakat]
   );
-  const vt = (t: string) => (sentence ? learnerVariant(t, sentence.swaps, lang, choices) : t);
+  /**
+   * Günlük dil anahtarı denetim anında uygulanır (üretimde değil): ayar
+   * değişince kayıtlı setler ve tekrarlar da hemen uyar; kapalıyken yalnız fushâ.
+   */
+  const dia = (swaps: Swap[], target: string) => withDialect(swaps, target, lang, !!ui.acceptDialect);
+  const vt = (t: string) => (sentence ? learnerVariant(t, dia(sentence.swaps, sentence.target), lang, choices) : t);
   const focus = useMemo(() => nextFocus(progress, band, new Date(), ui.focusOverride), [progress, band, ui.focusOverride]);
   const focusMain = focus.patterns[0];
 
@@ -381,6 +402,15 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     stores.current = { ...stores.current, ui: next };
     setUi(next);
     void saveBuildUi(next);
+  };
+
+  /** Ayarlar bölümünün anahtarları; hepsi BuildUi'de, cihazda kalır. */
+  const toggleSetting = (k: BuildSettingKey) => {
+    const cur = stores.current.ui;
+    if (k === "harakat") saveUi({ ...cur, showHarakat: cur.showHarakat === false });
+    else if (k === "fastFlow") saveUi({ ...cur, fastFlow: !cur.fastFlow });
+    else if (k === "videoOrder") saveUi({ ...cur, videoOrder: !cur.videoOrder });
+    else saveUi({ ...cur, acceptDialect: !cur.acceptDialect });
   };
 
   /** Bekleyen denemeyi yazar: kayıt, puan, istatistik. */
@@ -668,7 +698,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
       tr: x.tr,
       cue: titleOf(x.pid),
       target: x.target,
-      swaps: x.swaps,
+      swaps: dia(x.swaps, x.target),
       counted: true,
       pid: x.pid,
       tense: patternById(x.pid)?.tense,
@@ -712,7 +742,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
         tr: m.tr,
         cue: m.patternIds.map(titleOf).join(" + "),
         target: m.target,
-        swaps: m.swaps,
+        swaps: dia(m.swaps, m.target),
         alts: m.alts ?? srcSen?.steps[srcSen.steps.length - 1]?.alts ?? [],
         tense: m.tense ?? src?.tense,
         translit: m.translit,
@@ -754,7 +784,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           tr: showTr ? x.tr : stage,
           cue: `Eski hikâye: ${th?.title ?? old.themeId} · ${stage}`,
           target: x.target,
-          swaps: x.swaps,
+          swaps: dia(x.swaps, x.target),
           alts: x.steps[x.steps.length - 1]?.alts ?? [],
           tense: old.tense,
           counted: true,
@@ -957,7 +987,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
       lang,
       script: pack.script,
       spoken,
-      swaps: s.swaps,
+      swaps: dia(s.swaps, s.target),
       choices,
       chunks: s.blocks.filter((b) => b.kind === "chunk").map((b) => b.target),
       tense: set?.tense,
@@ -1297,7 +1327,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
         lang,
         script: pack.script,
         spoken,
-        swaps: s.swaps,
+        swaps: dia(s.swaps, s.target),
         tense: set.tense,
       });
       if (!r) return;
@@ -1466,10 +1496,16 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           }))}
           sets={sets}
           nextEpisode={nextEpisode}
-          fastFlow={ui.fastFlow}
+          settings={
+            <BuildSettings
+              value={{ fastFlow: ui.fastFlow, harakat, videoOrder: !!ui.videoOrder, acceptDialect: !!ui.acceptDialect }}
+              arabicScript={rtl}
+              dialect={(methodFor(lang).dialectSwaps ?? []).length > 0}
+              onToggle={toggleSetting}
+            />
+          }
           reviewDue={due}
           onReview={() => void startReview()}
-          onToggleFast={() => saveUi({ ...stores.current.ui, fastFlow: !ui.fastFlow })}
           onTheme={openTheme}
           onSet={onSetAction}
           placement={
@@ -1861,6 +1897,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           finalShown={vt(s.target)}
           reorderShown={s.reorder ? vt(s.reorder) : ""}
           recall={recallItems}
+          swaps={dia(s.swaps, s.target)}
+          lang={lang}
           view={view}
           saved={savedSentences.includes(si)}
           onListen={() => speakTargetWith(vt(s.target))}

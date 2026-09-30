@@ -20,7 +20,11 @@ import {
   findConnector,
   locateTrPiece,
   MAX_FORMS,
+  normalizeSwapLabel,
+  parseLabelledAlt,
+  registerOf,
   spanSwap,
+  withDialect,
 } from "../src/buildcheck.ts";
 import type { CheckCtx } from "../src/buildcheck.ts";
 import type { Swap } from "../src/sentencebuilding.ts";
@@ -403,4 +407,60 @@ test("bağlaç tablosundan hedefe göre kayıt: harekesiz de bulunur", () => {
   assert.equal(findConnector("en", "Before")?.kind, "sub");
   assert.equal(findConnector("en", "because")?.kind, "causal");
   assert.equal(findConnector("en", "yok"), null);
+});
+
+// --- üslup etiketleri ve günlük dil (Faz 6) ----------------------------------------
+
+test("C1+ alternatif etiketi metinden ayrılır: parantez, köşeli, dizi, nesne", () => {
+  assert.deepEqual(parseLabelledAlt("have a shower (günlük)"), { text: "have a shower", label: "günlük" });
+  assert.deepEqual(parseLabelledAlt("[have a shower, gunluk]"), { text: "have a shower", label: "günlük" });
+  assert.deepEqual(parseLabelledAlt('["it is requested", "resmi"]'), { text: "it is requested", label: "resmî" });
+  assert.deepEqual(parseLabelledAlt(["no sooner had I", "edebî"]), { text: "no sooner had I", label: "edebî" });
+  assert.deepEqual(parseLabelledAlt({ t: "frequently", label: "Resmî" }), { text: "frequently", label: "resmî" });
+  // Etiketsiz ve yalnız etiket: metin korunur / boş alternatif atılır.
+  assert.deepEqual(parseLabelledAlt("from time to time"), { text: "from time to time" });
+  assert.equal(parseLabelledAlt("(resmî)")?.text, "(resmî)");
+  assert.equal(parseLabelledAlt(""), null);
+  assert.equal(normalizeSwapLabel("uydurma"), undefined);
+  assert.equal(normalizeSwapLabel("dişil"), "dişil");
+  assert.equal(normalizeSwapLabel("DİŞİL"), "dişil");
+  assert.equal(normalizeSwapLabel("günlük"), "günlük");
+});
+
+test("C1+: etiketli eşdeğer kararda üslubuyla anılır; kendi seçimi yeniden anılmaz", () => {
+  const final = "I would like to ask for the report.";
+  const swaps = deriveSwaps(final, { blocks: [{ target: "would like to ask for", alts: ["kindly request"], labels: ["resmî"] }] }, "en");
+  assert.equal(swaps[0]?.label, "resmî");
+  const r = checkAnswer(final, [], "I kindly request the report", en({ swaps }))!;
+  assert.equal(r.verdict, "dogru");
+  assert.match(r.feedback, /^Doğru, bu da olur \(resmî\)\. Kalıptaki: /);
+  assert.equal(registerOf(r.used), "resmî");
+  // Aynı biçim sonraki adımda: artık öğrencinin biçimi, not tekrarlanmaz.
+  const again = checkAnswer(final, [], "I kindly request the report", en({ swaps, choices: r.used }))!;
+  assert.equal(again.verdict, "dogru");
+  assert.equal(again.feedback, "");
+  // Etiketsiz eşdeğer: etiket parantezi yok.
+  const plain = deriveSwaps("I often go.", { sw: [["often", "frequently"]] }, "en");
+  assert.equal(checkAnswer("I often go.", [], "I frequently go", en({ swaps: plain }))?.feedback, "Doğru, bu da olur. Kalıptaki: I often go.");
+  assert.equal(registerOf([{ from: ["a"], to: ["b"], label: "dişil" }]), "");
+});
+
+test("acceptDialect denetimde uygulanır: açıkken günlük kabul, kapalıyken yalnız fushâ", () => {
+  const t = "أُشَغِّلُ التِّلْفَازَ";
+  const on = withDialect([], t, "ar", true);
+  assert.equal(on.length, 1);
+  assert.equal(on[0].label, "günlük");
+  const r = checkAnswer(t, [], "افتح التلفاز", ar({ swaps: on }))!;
+  assert.equal(r.verdict, "dogru");
+  assert.match(r.feedback, /bu da olur \(günlük\)/);
+  // Üretimde eklenmiş günlük swap ayar kapatılınca düşer; tuzak geri gelir.
+  const off = withDialect(on, t, "ar", false);
+  assert.equal(off.length, 0);
+  assert.equal(checkAnswer(t, [], "افتح التلفاز", ar({ swaps: off }))?.trapId, "ar-shaghghala");
+  // Hedefte geçmeyen günlük karşılık eklenmez; modelin kendi etiketli eşdeğeri kalır.
+  const own: Swap[] = [{ from: ["التِّلْفَازَ"], to: ["التِّلْفِزْيُونَ"], label: "günlük" }];
+  assert.deepEqual(withDialect(own, "أَذْهَبُ", "ar", true), own);
+  assert.deepEqual(withDialect(own, t, "ar", false), own);
+  // Günlük karşılığı olmayan dil: dokunulmaz.
+  assert.deepEqual(withDialect([], "I go", "en", true), []);
 });

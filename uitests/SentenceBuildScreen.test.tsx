@@ -643,3 +643,79 @@ test("Arapça: 'erkek mi kadın mı' seçimi gösterilen biçimi değiştirir, i
   await waitFor(() => expect(screen.getByText("تذهب")).toBeTruthy());
   await waitFor(async () => expect((await loadBuildUi()).showHarakat).toBe(false));
 });
+
+// --- Ayarlar (Faz 6) ------------------------------------------------------------------
+
+test("ayarlar: ana ekranda katlanır; hızlı akış ve video sırası kaydedilir, Arapçaya özel satırlar İngilizcede yok", async () => {
+  render(<SentenceBuildScreen profile={profile} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText("Ayarlar")).toBeTruthy());
+  expect(screen.getByText(/Hızlı akış kapalı · video sırası kapalı/)).toBeTruthy();
+  expect(screen.queryByText("Videodaki sıra")).toBeNull();
+  fireEvent.press(screen.getByLabelText("Cümle Kurma ayarları"));
+  await waitFor(() => expect(screen.getByText("Videodaki sıra")).toBeTruthy());
+  expect(screen.queryByText("Harekeleri göster")).toBeNull();
+  expect(screen.queryByText("Günlük Arapçayı da kabul et")).toBeNull();
+  fireEvent.press(screen.getByLabelText("Videodaki sıra"));
+  await waitFor(async () => expect((await loadBuildUi()).videoOrder).toBe(true));
+  fireEvent.press(screen.getByLabelText("Hızlı akış"));
+  await waitFor(async () => expect((await loadBuildUi()).fastFlow).toBe(true));
+  await waitFor(() => expect(screen.getByText(/Hızlı akış açık · video sırası açık/)).toBeTruthy());
+});
+
+/** Arapça tek cümle: "Televizyonu açarım." — fushâ أُشَغِّلُ, günlük أَفْتَحُ. */
+function arabicTvSet(): BuildSet {
+  const plan = validatePlan(
+    { intro: "Ailem", s: [{ tr: "Televizyonu açarım.", r: "open", new: ["أُشَغِّلُ"], focus: true, fn: true }, { tr: "b" }, { tr: "c" }, { tr: "d" }, { tr: "e" }, { tr: "f" }] },
+    6,
+    { lang: "ar", band: "A2" }
+  ).plan;
+  const s0 = normalizeSentence(
+    {
+      steps: [
+        { q: "Ne yaparım?", p: "açarım", t: "أُشَغِّلُ" },
+        { q: "Neyi açarım?", p: "Televizyonu", t: "أُشَغِّلُ التِّلْفَازَ" },
+      ],
+      blocks: [{ t: "أُشَغِّلُ", tr: "açmak (cihaz)", k: "lexical", s: 0 }],
+      tw: ["ushaghghilu", "t-tilfāza"],
+    },
+    plan,
+    0,
+    [],
+    "ar",
+    { band: "A2" }
+  );
+  return {
+    v: 2, id: "ar-tv", patternId: "olmak", themeId: "aile", lang: "ar", level: "A2", tense: "habit", episode: 1,
+    intro: "Ailem", plan: { ...plan, sentences: [plan.sentences[0]] }, sentences: [s0], createdAt: "2026-09-29T00:00:00.000Z",
+  };
+}
+
+test("Arapça: günlük dil ayarı denetimde uygulanır — açıkken أَفْتَحُ 'bu da olur (günlük)', özette etiketli", async () => {
+  setActiveLanguage("ar");
+  nextSet = arabicTvSet();
+  render(<SentenceBuildScreen profile={profile} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText("Ayarlar")).toBeTruthy());
+  expect(screen.getByText(/yalnız fushâ/)).toBeTruthy();
+  fireEvent.press(screen.getByLabelText("Cümle Kurma ayarları"));
+  await waitFor(() => expect(screen.getByText("Harekeleri göster")).toBeTruthy());
+  fireEvent.press(screen.getByLabelText("Günlük Arapçayı da kabul et"));
+  await waitFor(async () => expect((await loadBuildUi()).acceptDialect).toBe(true));
+  fireEvent.press(screen.getByText("Ailem"));
+  await waitFor(() => expect(alerts.length).toBeGreaterThan(0));
+  await pressAlert(/Evet/);
+  await waitFor(() => expect(screen.getByText("Başlayalım")).toBeTruthy());
+  fireEvent.press(screen.getByText("Başlayalım"));
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  await waitFor(() => expect(screen.getByText("Ne yaparım?")).toBeTruthy());
+  await say("افتح");
+  await waitFor(() => expect(screen.getByText(/Doğru, bu da olur \(günlük\)/)).toBeTruthy());
+  await next();
+  // Öğrencinin seçimi sürer: ikinci adım da günlük hâliyle doğru, not tekrarlanmaz.
+  await say("افتح التلفاز");
+  await waitFor(() => expect(screen.getByText("Doğru")).toBeTruthy());
+  expect(screen.queryByText(/bu da olur/)).toBeNull();
+  await next();
+  await waitFor(() => expect(screen.getByText("CÜMLE KURULDU")).toBeTruthy());
+  expect(screen.getByText("BAŞKA SÖYLEYİŞLER")).toBeTruthy();
+  expect(screen.getByText("günlük")).toBeTruthy();
+});

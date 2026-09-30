@@ -1,8 +1,9 @@
 /**
  * Cümle Kurma ANA EKRANI (tasarım §3 Home): "Tekrar zamanı (n)",
  * yerleştirme teklifi, sıradaki kalıp (öğren / doğrula / karma) ve oturma
- * kontrol listesi, kalıp merdiveni, uygunluğa göre sıralı hikâyeler ve
- * kayıtlı setler (devam / tek seferde / pratik).
+ * kontrol listesi, kalıp merdiveni, ayarlar (hızlı akış, hareke, video
+ * sırası, günlük dil), uygunluğa göre sıralı hikâyeler ve kayıtlı setler
+ * (devam / tek seferde / pratik).
  */
 import React from "react";
 import { ScrollView, View } from "react-native";
@@ -53,10 +54,9 @@ export default function BuildHome({
   themes,
   sets,
   nextEpisode,
-  fastFlow,
+  settings,
   reviewDue,
   onReview,
-  onToggleFast,
   onTheme,
   onSet,
   placement,
@@ -74,11 +74,11 @@ export default function BuildHome({
   themes: { theme: Theme; fit: boolean; saved: boolean }[];
   sets: BuildSet[];
   nextEpisode: (s: BuildSet) => number;
-  fastFlow: boolean;
+  /** Katlanır ayarlar bölümü (BuildSettings); merdivenle hikâyeler arasında. */
+  settings?: React.ReactNode;
   /** Vadesi gelen tekrar sayısı; onReview yoksa bölüm hiç görünmez. */
   reviewDue: number;
   onReview?: () => void;
-  onToggleFast: () => void;
   onTheme: (t: Theme) => void;
   onSet: (s: BuildSet, a: SetAction) => void;
   /** Konuşma seviyesi A2+ ve ilerleme yok: yerleştirme teklifi. */
@@ -207,14 +207,7 @@ export default function BuildHome({
       </PressableScale>
       <Button size="sm" variant="ghost" icon="chart" label="Kalıp merdiveni: istediğini seç ya da sına ve geç" onPress={onLadder} style={{ marginBottom: 14, alignSelf: "flex-start" }} />
 
-      <PressableScale onPress={onToggleFast} accessibilityLabel="Hızlı akış" haptic={false} style={{ marginBottom: 22 }}>
-        <View style={[s.row, { paddingVertical: 4 }]}>
-          <Icon name="zap" size={16} color={fastFlow ? c.accentDark : c.inkFaint} />
-          <Txt variant="caption" color={c.inkSoft} style={{ flex: 1 }}>
-            {`Hızlı akış: ${fastFlow ? "açık" : "kapalı"} — doğru cevaptan sonra okunacak yeni bir şey yoksa kendiliğinden geçer.`}
-          </Txt>
-        </View>
-      </PressableScale>
+      {settings ?? <View style={{ height: 8 }} />}
 
       <SectionLabel title="Hikâye seç" />
       <ListGroup>

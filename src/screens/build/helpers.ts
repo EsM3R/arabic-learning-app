@@ -42,6 +42,45 @@ export function learnerVariant(target: string, swaps: Swap[], lang: LanguageId, 
 }
 
 // ---------------------------------------------------------------------------
+// Üslup etiketleri (C1+)
+// ---------------------------------------------------------------------------
+
+const REGISTER = new Set<Swap["label"]>(["resmî", "günlük", "edebî"]);
+const canon = (words: string[] | string, lang: LanguageId) =>
+  canonicalTokens(Array.isArray(words) ? words.join(" ") : words, lang).join(" ");
+
+/**
+ * Blok alternatifinin gösterimi: C1+'da etiketi yanında ("have a shower ·
+ * günlük"). Etiket blokta değil cümlenin swap'ında durur (kabul kümesi
+ * oradan kurulur); burada aynı çift aranıp etiketi okunur.
+ */
+export function altShown(b: BuildBlock, alt: string, swaps: Swap[], lang: LanguageId): string {
+  const f = canon(b.target, lang);
+  const t = canon(alt, lang);
+  const sw = swaps.find((x) => REGISTER.has(x.label) && canon(x.from, lang) === f && canon(x.to, lang) === t);
+  return sw?.label ? `${alt} (${sw.label})` : alt;
+}
+
+/**
+ * Özet kartındaki "başka söyleyişler": taş alternatifi olmayan cümle geneli
+ * eşdeğerler (", but" → ". However,", SVO söyleyişi, günlük dil), etiketiyle.
+ * Cinsiyet çifti burada yok — o bir üslup değil, cümlenin başında seçilir.
+ */
+export function extraSwaps(s: BuildSentence, swaps: Swap[], lang: LanguageId): { from: string; to: string; label?: string }[] {
+  const fromBlocks = new Set(s.blocks.flatMap((b) => b.alts.map((a) => `${canon(b.target, lang)}→${canon(a, lang)}`)));
+  const out: { from: string; to: string; label?: string }[] = [];
+  const seen = new Set<string>();
+  for (const x of swaps) {
+    if (x.label === "dişil") continue;
+    const k = `${canon(x.from, lang)}→${canon(x.to, lang)}`;
+    if (fromBlocks.has(k) || seen.has(k)) continue;
+    seen.add(k);
+    out.push({ from: x.from.join(" "), to: x.to.join(" "), ...(x.label && REGISTER.has(x.label) ? { label: x.label } : {}) });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Adım kartı
 // ---------------------------------------------------------------------------
 
@@ -69,6 +108,9 @@ export function stepLabels(s: BuildSentence, i: number, lang: LanguageId): strin
   } else if (st.inserted && !last && st.move !== "connector") {
     out.push("Araya ekliyoruz");
   }
+  // Videodaki sıra ayarı (D3): ek sonra gelir, bu adım bilerek eksik. Öğrenci
+  // bozuk sandığı cümleyi düzeltmeye kalkmasın diye cevaptan ÖNCE söylenir.
+  if (!last && /ara h[âa]l/i.test(st.note)) out.push("Ara hâl: henüz eksik");
   return out;
 }
 

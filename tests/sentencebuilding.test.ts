@@ -723,6 +723,21 @@ test("normalizeSentence: kısım biten adım işaretlenir; bağlaç kartı kıs�
   assert.equal(split.connector?.learnerSplit, true);
 });
 
+test("normalizeSentence: C1+ üslup etiketi swap'a taşınır, gösterilen alternatif temiz kalır", () => {
+  const s = buildAll(enPlan(), EN_RAW, "en", { band: "A2" });
+  const raw = JSON.parse(JSON.stringify(EN_RAW[1])) as { blocks: { a?: unknown[] }[]; sw?: unknown[] };
+  raw.blocks[2].a = ["have a shower (günlük)"];
+  raw.sw = [["I have breakfast", "I eat breakfast", "Gunluk"]];
+  const out = normalizeSentence(raw, enPlan(), 1, s.slice(0, 1), "en", { band: "C1" });
+  const shower = out.blocks.find((b) => b.target === "take a shower")!;
+  assert.deepEqual(shower.alts, ["have a shower"]);
+  const sw = out.swaps.find((x) => x.to.join(" ") === "have a shower");
+  assert.equal(sw?.label, "günlük");
+  assert.equal(out.swaps.find((x) => x.to.join(" ") === "I eat breakfast")?.label, "günlük");
+  // Etiket kabul kümesine girmez: öğrenci "(günlük)" demeden doğru.
+  assert.equal(checkStep(step(out.target), "Before I have breakfast, I have a shower", "latin", { lang: "en", swaps: out.swaps }), "dogru");
+});
+
 test("normalizeSentence: bağlantılı (çünkü) cümle önceki cümleyle başlar; tekrarlanan önek bir kez kalır", () => {
   const s = buildAll(enPlan(), EN_RAW, "en", { band: "A2" });
   const ext = s[6];

@@ -60,7 +60,7 @@ export default function PracticeTab({ m }: { m: HomeModel }) {
             icon="sentence"
             tone="gold"
             title="Cümle Kurma"
-            subtitle="Türkçe cümleyi parça parça kur — sıfırdan ileri düzeye"
+            subtitle="Hikâye cümlelerini yüklemden başlayıp sesli kur · A1 → C2"
             onPress={m.onOpenSentences}
           />
           <ListRow

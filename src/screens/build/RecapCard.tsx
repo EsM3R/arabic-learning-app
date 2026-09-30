@@ -1,14 +1,19 @@
 /**
  * ÖZET kartı — cümlenin tam hâli, bağlacın öteki yeri ve bu cümlede
- * öğrenilen taşlar (notu ve alternatifleriyle). Alternatiflerin kararlar
- * dışında listelendiği tek yer burası: öğrenirken değil, öğrendikten sonra.
+ * öğrenilen taşlar (notu ve alternatifleriyle) ve cümle geneli başka
+ * söyleyişler. Alternatiflerin kararlar dışında listelendiği tek yer burası:
+ * öğrenirken değil, öğrendikten sonra. C1+'da her alternatif üslup
+ * etiketiyle (resmî / günlük / edebî) gelir: aynı anlamın hangi kayıtta
+ * söylendiğini bilmek, o seviyenin asıl öğrettiği şeydir.
  */
 import React from "react";
 import { View } from "react-native";
 import Icon from "../../components/Icon";
-import { Button, ListGroup, Surface, TargetText, Txt } from "../../components/kit";
-import type { BuildSentence } from "../../sentencebuilding";
+import { Badge, Button, ListGroup, Surface, TargetText, Txt } from "../../components/kit";
+import type { LanguageId } from "../../languages";
+import type { BuildSentence, Swap } from "../../sentencebuilding";
 import { ltrLine } from "../../richtext";
+import { altShown, extraSwaps } from "./helpers";
 import type { RecallItem } from "./RecallChips";
 import type { ViewOpts } from "./types";
 import { useBuildStyles } from "./ui";
@@ -18,12 +23,17 @@ export default function RecapCard({
   finalShown,
   reorderShown,
   recall,
+  swaps,
+  lang,
   view,
   saved,
   onListen,
   onSave,
 }: {
   sentence: BuildSentence;
+  /** Cümlenin geçerli swap'ları (günlük dil ayarı uygulanmış). */
+  swaps: Swap[];
+  lang: LanguageId;
   finalShown: string;
   reorderShown: string;
   recall: RecallItem[];
@@ -35,6 +45,7 @@ export default function RecapCard({
   const { s, c } = useBuildStyles();
   const fresh = sentence.blocks.filter((b) => !b.recycled);
   const translit = sentence.steps[sentence.steps.length - 1]?.translit ?? "";
+  const others = extraSwaps(sentence, swaps, lang);
   return (
     <View style={{ gap: 18 }}>
       <Surface raised style={{ gap: 10 }}>
@@ -96,9 +107,33 @@ export default function RecapCard({
                 )}
                 {b.alts.length > 0 && (
                   <Txt variant="caption" color={c.inkSoft}>
-                    {ltrLine(`Ayrıca: ${b.alts.map(view.show).join(" · ")}`)}
+                    {ltrLine(`Ayrıca: ${b.alts.map((a) => view.show(altShown(b, a, swaps, lang))).join(" · ")}`)}
                   </Txt>
                 )}
+              </View>
+            ))}
+          </ListGroup>
+        </View>
+      )}
+
+      {others.length > 0 && (
+        <View>
+          <Txt variant="overline" color={c.inkSoft} style={{ marginBottom: 10 }}>
+            BAŞKA SÖYLEYİŞLER
+          </Txt>
+          <ListGroup>
+            {others.map((o) => (
+              <View key={`${o.from}→${o.to}`} style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 4 }}>
+                {/* Yön oku yok: Arapçada sağdan sola satırda ok ters okunurdu. */}
+                <View style={[s.row, { justifyContent: "space-between" }]}>
+                  <TargetText size={view.rtl ? 20 : 16} color={c.accentDark} style={{ flex: 1 }}>
+                    {view.show(o.to)}
+                  </TargetText>
+                  {o.label ? <Badge text={o.label} tone="gold" /> : null}
+                </View>
+                <Txt variant="caption" color={c.inkSoft}>
+                  {ltrLine(`kalıptaki: ${view.show(o.from)}`)}
+                </Txt>
               </View>
             ))}
           </ListGroup>

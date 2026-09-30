@@ -16,7 +16,7 @@ import type { LanguageId } from "../../languages";
 import type { BuildSentence } from "../../sentencebuilding";
 import { ltrLine } from "../../richtext";
 import AnswerDiff from "./AnswerDiff";
-import { answerLine, blocksAt, glossSegments, lampText, recycledAt, stepLabels } from "./helpers";
+import { altShown, answerLine, blocksAt, glossSegments, lampText, recycledAt, stepLabels } from "./helpers";
 import type { Attempt, ViewOpts } from "./types";
 import { ContrastBox, CueChip, Lamp, NoteRow, QuestionChip, useBuildStyles } from "./ui";
 import VerdictPanel from "./VerdictPanel";
@@ -65,7 +65,8 @@ export default function StepCard({
   const last = i === sentence.steps.length - 1 && sentence.steps.length > 1;
   const ok = !!attempt && attempt.verdict !== "yanlis" && !attempt.revealed;
   const missed = !!attempt && (attempt.verdict === "yanlis" || attempt.revealed);
-  const alts = fresh.flatMap((b) => b.alts);
+  // C1+: alternatif üslup etiketiyle ("… (resmî)").
+  const alts = fresh.flatMap((b) => b.alts.map((x) => altShown(b, x, sentence.swaps, lang)));
 
   return (
     <View>
@@ -73,7 +74,7 @@ export default function StepCard({
         {labels.length > 0 && (
           <View style={s.wrap}>
             {labels.map((l) => (
-              <CueChip key={l} text={l} icon={l.startsWith("Hemen vurgu") ? "zap" : linked ? "replay" : "sparkles"} />
+              <CueChip key={l} text={l} icon={l.startsWith("Hemen vurgu") ? "zap" : l.startsWith("Ara hâl") ? "info" : linked ? "replay" : "sparkles"} />
             ))}
           </View>
         )}
