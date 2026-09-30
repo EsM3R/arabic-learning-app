@@ -59,6 +59,16 @@ export async function getTargetVoiceIds(): Promise<string[]> {
   }
 }
 
+/**
+ * Cihaz TTS'inin ön hazırlığı. Okuma cihazda üretildiği için indirilecek bir
+ * ses dosyası yok; ama ilk çağrı motoru bağlar ve ses listesini çeker (bazı
+ * Android motorlarında saniyeler sürer). Bunu oturum başında yapmak, ilk
+ * cevaptan sonra doğrusunun gecikmeden duyulmasını sağlar. Sonuç önbellekte kalır.
+ */
+export function warmTargetSpeech(): void {
+  void getTargetVoiceIds();
+}
+
 /** speakTarget'in ses/hız/geri çağrı seçenekli hali (HVPT ve shadowing kullanır). */
 export function speakTargetWith(
   text: string,

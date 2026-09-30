@@ -130,6 +130,8 @@ export interface BuildUi {
   acceptDialect?: boolean;
   videoOrder?: boolean;
   fastFlow: boolean;
+  /** Arapçada harekeler görünsün mü (denetim harekeye hiç bakmaz; yalnız gösterim). */
+  showHarakat?: boolean;
 }
 
 export const DEFAULT_BUILD_UI: BuildUi = { connSeen: {}, reorderSeen: 0, fastFlow: true };

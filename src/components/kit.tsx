@@ -90,12 +90,13 @@ export function TargetText({
   style,
   highlight,
 }: {
-  children: string;
+  /** Düz metin; iç içe vurgu gerekiyorsa (ör. cevaptaki yeni kelimeler) satır içi parçalar. */
+  children: React.ReactNode;
   size?: number;
   color?: string;
   align?: "left" | "center" | "right";
   style?: StyleProp<TextStyle>;
-  /** Vurgulanacak kelime (karaoke). */
+  /** Vurgulanacak kelime (karaoke); yalnız düz metinde. */
   highlight?: string;
 }) {
   const c = useTheme();
@@ -104,7 +105,7 @@ export function TargetText({
   const base: TextStyle = rtl
     ? { ...arabicText(size), writingDirection: "rtl", textAlign: align ?? "right" }
     : { fontFamily: "Manrope", fontWeight: "700", fontSize: size, lineHeight: Math.round(size * 1.35), textAlign: align ?? "left" };
-  if (!highlight || !children.includes(highlight)) {
+  if (typeof children !== "string" || !highlight || !children.includes(highlight)) {
     return <Text style={[base, { color: color ?? c.ink }, style]}>{children}</Text>;
   }
   const i = children.indexOf(highlight);

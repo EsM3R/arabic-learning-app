@@ -105,6 +105,11 @@ const ICONS = {
   hand: [{ d: "M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8" }, { d: "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15" }],
   ear: [{ d: "M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 0 1-7 0" }, { d: "M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 0 1 0 4" }],
   logout: [{ d: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" }, { d: "m16 17 5-5-5-5" }, { d: "M21 12H9" }],
+  // Cümle Kurma: hikâyenin zirve ve sentez cümleleri (yol çizelgesi noktaları).
+  mountain: [{ d: "m8 3 4 8 5-5 5 15H2L8 3z" }],
+  star: [{ d: "M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2-6.2 3.2L7 14.2 2 9.3l6.9-1z" }],
+  // Bağlacı cümlede bulup ikiye ayırmak.
+  scissors: [{ circle: [6, 6, 3] }, { circle: [6, 18, 3] }, { d: "M20 4 8.1 15.9" }, { d: "M14.5 14.5 20 20" }, { d: "M8.1 8.1 12 12" }],
 } satisfies Record<string, Shape[]>;
 
 export type IconName = keyof typeof ICONS;

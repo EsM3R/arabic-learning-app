@@ -22,6 +22,8 @@ export interface Palette {
   deepAlt: string;
   onDeep: string;
   onDeepSoft: string;
+  /** Koyu sahnede ilerleme halkası/çubuğunun boş izi. */
+  onDeepTrack: string;
   /** Ana eylem rengi (birincil düğme, seçili sekme). */
   accent: string;
   accentDark: string;
@@ -61,6 +63,7 @@ export const lightPalette: Palette = {
   deepAlt: "#0F4C3F",
   onDeep: "#F4F1EA",
   onDeepSoft: "rgba(244,241,234,0.70)",
+  onDeepTrack: "rgba(244,241,234,0.14)",
   accent: "#0F4C3F",
   accentDark: "#0B3A31",
   accentSoft: "#E6EFEB",
@@ -97,6 +100,7 @@ export const darkPalette: Palette = {
   deepAlt: "#0F3A31",
   onDeep: "#EFEBE1",
   onDeepSoft: "rgba(239,235,225,0.66)",
+  onDeepTrack: "rgba(239,235,225,0.14)",
   accent: "#2F8F7A",
   accentDark: "#5DBBA5",
   accentSoft: "#173A31",

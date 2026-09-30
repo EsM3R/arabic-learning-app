@@ -56,10 +56,14 @@ test("metin ile zemin arasında okunur bir fark var (her iki modda)", () => {
 // Kaynak taraması: hiçbir ekran sabit palete çakılmasın
 // ---------------------------------------------------------------------------
 
+// Özyinelemeli: ekranlar alt klasörlere bölündükçe (src/screens/build,
+// src/screens/home) kural o klasörlerde sessizce düşmesin.
 function tsxFiles(dir: string): string[] {
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".tsx"))
-    .map((f) => join(dir, f));
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) return tsxFiles(p);
+    return e.name.endsWith(".tsx") ? [p] : [];
+  });
 }
 
 test("hiçbir ekran/bileşen sabit paleti kullanmıyor", () => {
