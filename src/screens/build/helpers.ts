@@ -316,21 +316,20 @@ export function stageIndex(i: number, n: number, stages: number): number {
 }
 
 /**
- * Bağlaç kararı için iki seçenek: [doğru, tuzak]. Tuzak koddaki çiftten
- * (before ↔ ago); bağlacın tuzağı yoksa aynı türden kardeş bağlaç
- * (before ↔ after). Hoca da "aklınıza X gelebilir" diye tam bunu sorar.
+ * Bağlaç kararı için iki seçenek: [doğru, tuzak]. Yalnız koddaki gerçek tuzak
+ * çiftinden (before ↔ ago) — hoca da "aklınıza X gelebilir" diye tam bunu
+ * sorar. Tuzağı olmayan bağlaçta seçim YOK (null): kardeş bağlaç çoğu zaman
+ * eş anlamlıdır (ama → but / however) ve doğru bir alternatifi "yanlış" diye
+ * işaretlemek hocanın "However'la da başlayabilirsiniz" dediğine ters düşer.
  */
-export function splitOptions(card: ConnectorCard, lang: LanguageId): { right: string; wrong: string } {
-  const m = methodFor(lang);
+export function splitOptions(card: ConnectorCard, lang: LanguageId): { right: string; wrong: string } | null {
   const trap = card.trapId ? trapById(lang, card.trapId) : undefined;
+  if (!trap?.pair) return null;
   const key = (s: string) => canonicalTokens(s, lang).join(" ");
-  if (trap?.pair) {
-    const wrong = key(trap.pair[0]) === key(card.target) ? trap.pair[1] : trap.pair[0];
-    if (key(wrong) !== key(card.target)) return { right: card.target, wrong };
-  }
-  const all = Object.values(m.connectors).filter((c) => key(c.target) !== key(card.target));
-  const sib = all.find((c) => c.kind === card.kind) ?? all[0];
-  return { right: card.target, wrong: sib?.target ?? "—" };
+  const wrong = key(trap.pair[0]) === key(card.target) ? trap.pair[1] : trap.pair[0];
+  // Çift bu bağlaca ait değilse (hedef iki tarafta da yoksa) seçim uydurulmaz.
+  if (key(wrong) === key(card.target) || !trap.pair.some((p) => key(p) === key(card.target))) return null;
+  return { right: card.target, wrong };
 }
 
 // ---------------------------------------------------------------------------

@@ -189,15 +189,25 @@ export async function loadBuildProgress2(): Promise<ProgressMap2> {
 }
 export const saveBuildProgress2 = (map: ProgressMap2) => saveJson(langKey(BUILD_KEYS.progress2), map);
 
+/**
+ * Tohum YALNIZ eski (v1'den yükseltilmiş) setlerden. Yeni hattın setlerinde
+ * henüz kurulmamış cümleler ve öğrenilmemiş taşlar/bağlaçlar da durur;
+ * onlardan tohumlamak tekrar zamanına hiç kurulmamış cümleler sokar, taşları
+ * "üretildi", bağlaçları "görüldü" sayardı.
+ */
+async function legacySets(): Promise<BuildSet[]> {
+  return (await loadBuildSets2()).filter((s) => s.origin === "v1");
+}
+
 export async function loadBuildBlocks(): Promise<Record<string, BlockProgress>> {
   const v = await loadJson<Record<string, BlockProgress>>(langKey(BUILD_KEYS.blocks));
-  return v && typeof v === "object" ? v : seedBlocks(await loadBuildSets2());
+  return v && typeof v === "object" ? v : seedBlocks(await legacySets());
 }
 export const saveBuildBlocks = (map: Record<string, BlockProgress>) => saveJson(langKey(BUILD_KEYS.blocks), map);
 
 export async function loadBuildMemory(): Promise<SentenceMemory[]> {
   const v = await loadJson<SentenceMemory[]>(langKey(BUILD_KEYS.memory));
-  return Array.isArray(v) ? v : seedMemory(await loadBuildSets2());
+  return Array.isArray(v) ? v : seedMemory(await legacySets());
 }
 export const saveBuildMemory = (list: SentenceMemory[]) => saveJson(langKey(BUILD_KEYS.memory), list);
 
@@ -209,7 +219,7 @@ export const saveBuildHistory = (map: Record<string, BuildHistory>) => saveJson(
 
 export async function loadBuildUi(): Promise<BuildUi> {
   const v = await loadJson<Partial<BuildUi>>(langKey(BUILD_KEYS.ui));
-  if (!v || typeof v !== "object") return seedUi(await loadBuildSets2());
+  if (!v || typeof v !== "object") return seedUi(await legacySets());
   return { ...DEFAULT_BUILD_UI, ...v, connSeen: { ...(v.connSeen ?? {}) } };
 }
 export const saveBuildUi = (ui: BuildUi) => saveJson(langKey(BUILD_KEYS.ui), ui);

@@ -80,7 +80,7 @@ export default function StepCard({
         )}
         {linked ? (
           <Txt variant="callout" color={c.inkSoft}>
-            Bir önceki cümleyi olduğu gibi söyle; sonra çünkü ile devam edeceğiz.
+            {`Bir önceki cümleyi olduğu gibi söyle; sonra ${sentence.connector?.tr ?? "bağlaç"} ile devam edeceğiz.`}
           </Txt>
         ) : (
           <>
@@ -135,7 +135,8 @@ export default function StepCard({
           onListen={onListen}
           onVoid={onVoid}
         >
-          {!!st.note && st.note !== attempt.feedback && <NoteRow text={st.note} />}
+          {/* Eksik parça geri bildirimi adım notunu zaten sonuna ekler; iki kez gösterme. */}
+          {!!st.note && !attempt.feedback.includes(st.note) && <NoteRow text={st.note} />}
           {fresh.map((b) => (
             <View key={b.key} style={{ gap: 6 }}>
               {!!b.note && <NoteRow text={`${b.tr} → ${view.show(b.target)}: ${b.note}`} icon="layers" />}

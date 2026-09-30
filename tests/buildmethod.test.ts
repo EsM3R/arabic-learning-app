@@ -67,9 +67,9 @@ test("Arapça geri çağırma seçenekleri asla ago ya da AM/PM değildir", () =
   assert.deepEqual(trapById("ar", "ar-ordinal")?.pair, ["السَّابِعَة", "سَبْعَة"]);
 });
 
-test("Arapça tuzak listesi Türklere özgü sekiz tuzak; İngilizce tuzak kimliği yok", () => {
+test("Arapça tuzak listesi Türklere özgü dokuz tuzak; İngilizce tuzak kimliği yok", () => {
   const ids = METHOD.ar.traps.map((t) => t.id).sort();
-  assert.deepEqual(ids, ["ar-an", "ar-idha-law", "ar-khuruj", "ar-lahiqan", "ar-lakin", "ar-maa-bi", "ar-ordinal", "ar-shaghghala"]);
+  assert.deepEqual(ids, ["ar-an", "ar-an-verb", "ar-idha-law", "ar-khuruj", "ar-lahiqan", "ar-lakin", "ar-maa-bi", "ar-ordinal", "ar-shaghghala"]);
   for (const id of LANGS.filter((l) => l !== "en")) {
     for (const t of METHOD[id].traps) assert.ok(!t.id.startsWith("en-"), `${id}: ${t.id}`);
   }

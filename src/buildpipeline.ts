@@ -27,11 +27,14 @@ import { generateBuildPlan, generateBuildSentence, guardBudget, isModelOutputErr
 import { historyKey, TRKEYS_CAP } from "./buildmastery";
 import type { BlockProgress, BuildHistory, BuildUi } from "./buildmastery";
 import { getActiveLanguageId } from "./languages";
-import { BANDS, bandIndex, blockKey, placeholderSentence, setSize, toBand, trKey } from "./sentencebuilding";
+import type { LanguageId } from "./languages";
+import { canonicalTokens } from "./buildcheck";
+import { BANDS, bandIndex, blockKey, placeholderSentence, setSize, toBand, trapIdsFor, trKey } from "./sentencebuilding";
 import type { Band, BuildSentence, BuildSet, NormalizeStores, Pattern, Theme } from "./sentencebuilding";
 import {
   loadBuildBlocks,
   loadBuildHistory,
+  loadBuildProgress2,
   loadBuildSets2,
   loadBuildUi,
   saveBuildHistory,
@@ -238,6 +241,22 @@ export interface RunResult {
 }
 
 const running = new Map<string, Promise<RunResult>>();
+/**
+ * Sürmekte olan üretimin dinleyicileri. Ekran geri çıkıp yeniden açılınca
+ * yeni ekran aynı üretime KATILIR; kancalar yalnız ilk çağırana bağlı kalsaydı
+ * yeni ekran "hazırlanıyor" kartında sonsuza dek beklerdi.
+ */
+const listeners = new Map<string, Set<PipelineHooks>>();
+
+function notify(setId: string, fn: (h: PipelineHooks) => void): void {
+  for (const h of [...(listeners.get(setId) ?? [])]) {
+    try {
+      fn(h);
+    } catch {
+      // Bir ekranın kanca hatası üretimi ve öteki dinleyicileri durdurmasın.
+    }
+  }
+}
 
 /** Bu setin üretimi sürüyor mu (ekran "hazırlanıyor" kartı için). */
 export function isGenerating(setId: string): boolean {
@@ -252,6 +271,22 @@ export function whenIdle(setId: string): Promise<RunResult | null> {
 interface Stores {
   blocks: Record<string, BlockProgress>;
   ui: BuildUi;
+  /** Eski (durumu kaydedilmemiş) setler için kalıbın şimdiki durumu. */
+  patternStatus?: string;
+}
+
+/**
+ * Karşıtlığı daha önce (başka setlerde) gösterilmiş tuzaklar. Hoca bir
+ * karşıtlığı yalnız ilk seferde anlatır; sonra yalnız parafraz. Bu liste
+ * olmasa cihaz her yeni sette tuzak metnini taşa yeniden yazardı.
+ */
+export function shownTrapIds(blocks: Record<string, Pick<BlockProgress, "target" | "contrastShown">>, lang: LanguageId): string[] {
+  const out = new Set<string>();
+  for (const b of Object.values(blocks)) {
+    if (!b?.contrastShown || !b.target) continue;
+    for (const id of trapIdsFor(canonicalTokens(b.target, lang), lang)) out.add(id);
+  }
+  return [...out];
 }
 
 /** Tek cümle: normal dene → gerekirse KISA MOD → olmazsa "failed". */
@@ -261,8 +296,11 @@ async function produce(profile: Profile, set: BuildSet, k: number, stores: Store
     blocks: stores.blocks,
     connSeen: stores.ui.connSeen,
     acceptDialect: !!stores.ui.acceptDialect,
+    shownTrapIds: shownTrapIds(stores.blocks, set.lang),
   };
-  if (patternStatus) norm.patternStatus = patternStatus;
+  // Sürdürmede çağıran durumu bilmez: set kurulurken kaydedilen durum geçerli.
+  const ps = patternStatus ?? set.patternStatus ?? stores.patternStatus;
+  if (ps) norm.patternStatus = ps;
   const input = {
     set,
     k,
@@ -291,12 +329,22 @@ async function produce(profile: Profile, set: BuildSet, k: number, stores: Store
  */
 export function continueSet(profile: Profile, setId: string, opts: RunOptions = {}): Promise<RunResult> {
   const cur = running.get(setId);
-  if (cur) return cur;
+  if (cur) {
+    // Süren üretime katıl: bundan sonraki kayıtlar bu çağırana da gelir.
+    if (opts.hooks) listeners.get(setId)?.add(opts.hooks);
+    return cur;
+  }
+  const ls = new Set<PipelineHooks>();
+  if (opts.hooks) ls.add(opts.hooks);
+  listeners.set(setId, ls);
   const run = (async (): Promise<RunResult> => {
     let last: BuildSet | null = null;
     try {
-      const [blocks, ui] = await Promise.all([loadBuildBlocks(), loadBuildUi()]);
+      const [blocks, ui, progress, head] = await Promise.all([loadBuildBlocks(), loadBuildUi(), loadBuildProgress2(), findSet(setId)]);
       const stores: Stores = { blocks, ui };
+      if (head && !head.patternStatus) {
+        stores.patternStatus = head.patternId.startsWith("karma:") ? "mastered" : progress[head.patternId]?.status;
+      }
       // Tavan çalıştırma başına BİR kez (tasarım §2.1: "set başına tek bekçi").
       // Başlamış çalıştırma, tavan yolda dolsa da seti bitirir — aşım en çok
       // bir setin kalan cümleleri kadardır ve öğrenci seti onaylamıştı. Ama
@@ -310,22 +358,31 @@ export function continueSet(profile: Profile, setId: string, opts: RunOptions = 
         if (!set) return { set: null };
         last = set;
         const k = set.sentences.findIndex((s) => s.status === "pending");
-        if (k < 0) return { set };
+        if (k < 0) {
+          // Bekleyen yok (başka bir çalıştırma bitirmiş olabilir): ekran eski
+          // anlık görüntüde kalmasın, taze seti alsın.
+          notify(setId, (h) => h.onUpdate?.(set));
+          return { set };
+        }
         const s = await produce(profile, set, k, stores, opts.patternStatus);
         const saved = await updateSet(setId, (x) => {
           x.sentences[k] = s;
         });
         if (!saved) return { set: null };
         last = saved;
-        opts.hooks?.onUpdate?.(saved);
+        notify(setId, (h) => h.onUpdate?.(saved));
       }
     } catch (e) {
       // Arka planda kimse beklemiyor olabilir: hata reddedilen bir söz olarak
       // kaybolmasın, sonuçla ve onError ile bildirilsin.
-      if (last) opts.hooks?.onError?.(e, last);
+      const at = last;
+      if (at) notify(setId, (h) => h.onError?.(e, at));
       return { set: last, error: e };
     }
-  })().finally(() => running.delete(setId));
+  })().finally(() => {
+    running.delete(setId);
+    listeners.delete(setId);
+  });
   running.set(setId, run);
   return run;
 }
@@ -414,6 +471,7 @@ export async function startSet(input: StartSetInput): Promise<BuildSet | null> {
     sentences: res.plan.sentences.map((sp) => placeholderSentence(sp)),
     createdAt,
   };
+  if (input.patternStatus) set.patternStatus = input.patternStatus;
   await inStore(async () => {
     const fresh = await loadBuildSets2();
     await saveBuildSets2([set, ...fresh.filter((s) => s.id !== set.id)].slice(0, KEEP_SETS));

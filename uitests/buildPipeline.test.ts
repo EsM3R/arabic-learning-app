@@ -329,6 +329,40 @@ test("aynı set için ikinci devam çağrısı yeni üretim açmaz", async () =>
   expect(maxInFlight).toBe(1);
 });
 
+test("süren üretime sonradan katılan ekran da güncellemeleri alır; bekleyen yoksa taze set hemen gelir", async () => {
+  route(() => PLAN6);
+  const first = await startSet({ profile: profile(), focus: [olmak], theme: rutin });
+  // Ekran geri çıkıp yeniden açıldı: aynı üretime yeni kancalarla katılır.
+  const later = jest.fn();
+  const a = continueSet(profile(), first!.id, { hooks: { onUpdate: later } });
+  await a;
+  expect(later).toHaveBeenCalled();
+  const last = later.mock.calls[later.mock.calls.length - 1][0] as BuildSet;
+  expect(last.sentences.every((s) => s.status === "ready")).toBe(true);
+  // Üretim bitmişken açılan ekran: istek gitmez ama set kancaya gelir.
+  const after = jest.fn();
+  const n = sentenceCalls().length;
+  await continueSet(profile(), first!.id, { hooks: { onUpdate: after } });
+  expect(after).toHaveBeenCalledTimes(1);
+  expect(sentenceCalls()).toHaveLength(n);
+});
+
+test("kalıp durumu sete yazılır: sürdürülen üretim de cümleleri önce tek seferde kurar", async () => {
+  let down = true;
+  route(
+    () => PLAN6,
+    (k) => (k === 2 && down ? new Error("Ağ koptu") : good(k))
+  );
+  const first = await startSet({ profile: profile(), focus: [olmak], theme: rutin, patternStatus: "proving" });
+  await whenIdle(first!.id);
+  down = false;
+  // Açılışta sürdürme durumu bilmez; setteki kayıt geçerli.
+  await resumePending(profile());
+  const saved = (await loadBuildSets2()).find((s) => s.id === first!.id)!;
+  expect(saved.patternStatus).toBe("proving");
+  expect(saved.sentences.every((s) => s.status === "ready" && s.tryFirst)).toBe(true);
+});
+
 test("onay verilmezse hiçbir istek gitmez", async () => {
   route(() => PLAN6);
   const set = await startSet({ profile: profile(), focus: [olmak], theme: rutin, confirm: () => false });

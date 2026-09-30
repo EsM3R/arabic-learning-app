@@ -238,7 +238,16 @@ test("Arapça tuzak: قبل'den sonra أَنْ unutuldu → ar-an", () => {
   assert.equal(r.trapId, "ar-an");
   assert.match(r.feedback, /أَنْ/);
   assert.doesNotMatch(r.feedback, /\bago\b.*before\b.*tuzağı var/);
-  assert.equal(check("أُحِبُّ أَنْ أَسْتَيْقِظَ", "احب استيقظ", ar())?.trapId, "ar-an");
+  // -mayı hatası kendi tuzağını alır: henüz görülmemiş قَبْلَ'den söz edilmez.
+  const v = check("أُحِبُّ أَنْ أَسْتَيْقِظَ", "احب استيقظ", ar())!;
+  assert.equal(v.trapId, "ar-an-verb");
+  assert.doesNotMatch(v.feedback, /قَبْلَ/);
+  assert.doesNotMatch(v.feedback, /\bago\b/);
+});
+
+test("Arapça: قَبْلَ + masdar gerçek alternatif, أَنْ tuzağı sayılmaz", () => {
+  const r = check("قَبْلَ أَنْ أَتَنَاوَلَ الفُطُورَ، أَسْتَحِمُّ", "قبل تناول الفطور استحم", ar());
+  assert.notEqual(r?.trapId, "ar-an");
 });
 
 test("Arapça tuzak: خرجت البيت → ar-khuruj", () => {

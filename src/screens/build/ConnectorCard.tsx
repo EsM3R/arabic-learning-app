@@ -17,10 +17,15 @@ import { canSplit, connectorSpan, splitOptions, trWords } from "./helpers";
 import type { ViewOpts } from "./types";
 import { ContrastBox, CueChip, useBuildStyles } from "./ui";
 
-export function buildOrderLine(kind: Conn["kind"]): string {
-  if (kind === "sub") return "Bağlaçla başlıyorum";
-  if (kind === "coord") return "Önce birinci kısmı kuruyoruz";
-  if (kind === "causal") return "Önceki cümleyi söyleyip çünkü ile devam edeceğiz";
+/**
+ * Kurma sırası işareti. Bağlantılı cümlede (çünkü; uzatmada ama / bu yüzden)
+ * birinci kısım önceki cümlenin kendisidir ve cümlenin KENDİ bağlacı söylenir.
+ */
+export function buildOrderLine(card: Pick<Conn, "kind" | "tr">, linked = false): string {
+  const next = `Önceki cümleyi söyleyip ${card.tr || "bağlaç"} ile devam edeceğiz`;
+  if (card.kind === "sub") return "Bağlaçla başlıyorum";
+  if (card.kind === "coord") return linked ? next : "Önce birinci kısmı kuruyoruz";
+  if (card.kind === "causal") return next;
   return "";
 }
 
@@ -39,14 +44,20 @@ export default function ConnectorCard({
   tr,
   lang,
   view,
+  linked = false,
   onSplit,
 }: {
   card: Conn;
+  /** Önceki cümleye bağlanan cümle (sentence.linkPrev). */
+  linked?: boolean;
   tr: string;
   lang: LanguageId;
   view: ViewOpts;
-  /** Öğrenci bağlacı seçti (doğru mu). Yanlış seçim tuzak geri çağırma kaybıdır. */
-  onSplit: (ok: boolean) => void;
+  /**
+   * Öğrenci bağlacı buldu. ok: tuzak çiftinden doğru seçim mi (yanlış seçim
+   * tuzak geri çağırma kaybıdır); null: seçim sorulmadı, yalnız bölme yapıldı.
+   */
+  onSplit: (ok: boolean | null) => void;
 }) {
   const { s, c } = useBuildStyles();
   const span = connectorSpan(tr, card);
@@ -56,7 +67,7 @@ export default function ConnectorCard({
   const [picked, setPicked] = useState<boolean | null>(null);
   const opts = splitOptions(card, lang);
   // Seçenek sırası bağlaca göre değişsin (hep ilk seçenek doğru olmasın), ama testte kararlı kalsın.
-  const order = card.tr.length % 2 === 0 ? [opts.right, opts.wrong] : [opts.wrong, opts.right];
+  const order = !opts ? [] : card.tr.length % 2 === 0 ? [opts.right, opts.wrong] : [opts.wrong, opts.right];
   const trap = card.trapId ? trapById(lang, card.trapId) : undefined;
 
   if (stage === "find") {
@@ -74,8 +85,13 @@ export default function ConnectorCard({
                 key={k}
                 accessibilityLabel={`Kelime: ${w.text}`}
                 onPress={() => {
-                  if (hit) setStage("pick");
-                  else setWrongTap(true);
+                  if (!hit) setWrongTap(true);
+                  else if (opts) setStage("pick");
+                  else {
+                    // Gerçek tuzağı olmayan bağlaçta seçim sorulmaz: bölme yeterli.
+                    setStage("reveal");
+                    onSplit(null);
+                  }
                 }}
                 style={s.tapWord}
               >
@@ -107,7 +123,7 @@ export default function ConnectorCard({
               accessibilityLabel={`Seçenek: ${o}`}
               style={{ flex: 1 }}
               onPress={() => {
-                const ok = o === opts.right;
+                const ok = o === opts?.right;
                 setPicked(ok);
                 setStage("reveal");
                 onSplit(ok);
@@ -123,7 +139,7 @@ export default function ConnectorCard({
     <Surface raised style={{ gap: 12 }}>
       {picked !== null && (
         <Txt variant="caption" color={picked ? c.accentDark : c.danger} style={{ fontWeight: "800" }}>
-          {picked ? "Doğru seçtin." : `Olmadı: ${view.show(opts.wrong)} değil.`}
+          {picked ? "Doğru seçtin." : `Olmadı: ${view.show(opts?.wrong ?? "")} değil.`}
         </Txt>
       )}
       <Txt variant="title3" style={{ fontWeight: "500" }}>
@@ -153,7 +169,7 @@ export default function ConnectorCard({
         <Txt variant="callout">ile vereceğiz.</Txt>
       </View>
       {!!card.contrast && <ContrastBox text={card.contrast} mini={trap?.mini} />}
-      {buildOrderLine(card.kind) ? <CueChip text={buildOrderLine(card.kind)} icon="arrowRight" /> : null}
+      {buildOrderLine(card, linked) ? <CueChip text={buildOrderLine(card, linked)} icon="arrowRight" /> : null}
     </Surface>
   );
 }

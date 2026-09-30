@@ -38,6 +38,7 @@ import {
   placeholderSentence,
   rankThemes,
   setSize,
+  trapIdsFor,
   trKey,
   upgradeSetV1,
   validatePlan,
@@ -812,6 +813,76 @@ test("kod tuzağının metni taşa ilk seferde konur, ikinci taşta tekrar edilm
   assert.equal(busAr.contrast, "");
 });
 
+test("başka sette gösterilmiş tuzağın metni taşa yeniden yazılmaz (shownTrapIds)", () => {
+  const s = buildAll(enPlan(), EN_RAW, "en", { band: "A2", shownTrapIds: ["en-with-by"] });
+  const metro = s[3].blocks.find((b) => b.key === "by metro")!;
+  assert.deepEqual(metro.trapIds, ["en-with-by"]);
+  assert.equal(metro.contrast, "");
+});
+
+test("tuzak eşlemesi: daha özel tuzak kazanır (قَبْلَ أَنْ → yalnız -madan önce tuzağı)", () => {
+  assert.deepEqual(trapIdsFor(blockKey("قَبْلَ أَنْ", "ar").split(" "), "ar"), ["ar-an"]);
+  assert.deepEqual(trapIdsFor(blockKey("أَنْ أَسْتَيْقِظَ", "ar").split(" "), "ar"), ["ar-an-verb"]);
+});
+
+test("geri gelen (rec) taş cihazda kurulur: model blocks'a yazmasa da adı konur, ilk hâli saklanır", () => {
+  const s = buildAll(enPlan(), EN_RAW, "en", { band: "A2" });
+  // S5: plan "leave" geri getiriyor; taş S3'te "leave home" olarak öğretildi.
+  const leave = s[4].blocks.find((b) => b.recycled && b.key === "leave home")!;
+  assert.ok(leave, "leave geri gelen taş olarak kurulmalı");
+  assert.equal(leave.target, "leave");
+  assert.equal(leave.step, 0);
+  assert.equal(leave.recycled?.fromSentence, 2);
+  assert.equal(leave.note, "");
+  // Yeni taş listesine girmez (lamba yanmaz), öğrendik çipinde görünür.
+  assert.ok(!(s[4].steps[0].blockIds ?? []).includes("leave home"));
+  assert.ok(s[4].recallKeys.includes("leave home"));
+  // Son hâlde geçmeyen geri gelen taş kurulmaz.
+  const plan = enPlan();
+  plan.sentences[4] = { ...plan.sentences[4], rec: ["brush my teeth"] };
+  const s2 = buildAll(plan, EN_RAW, "en", { band: "A2" });
+  assert.ok(!s2[4].blocks.some((b) => b.recycled));
+});
+
+test("yan cümle bağlaçla başlar: bağlaç Kim? adımına katıldıysa ayrı ilk adım olur; ana cümleden kuruluş KISA MOD'a gider", () => {
+  const plan = enPlan();
+  const merged = normalizeSentence(
+    {
+      steps: [
+        { q: "Kim kahvaltı yapacak?", p: "yapmadan önce", t: "Before I have breakfast", e: 1 },
+        { q: "Ne yaparım?", p: "duş alırım", t: "Before I have breakfast, I take a shower." },
+      ],
+      blocks: [{ t: "have breakfast", tr: "kahvaltı yapmak", k: "chunk", s: 0 }],
+    },
+    plan,
+    1,
+    [],
+    "en",
+    { band: "A2" }
+  );
+  assert.equal(merged.status, "ready");
+  assert.equal(merged.steps.length, 3);
+  assert.equal(merged.steps[0].target, "Before");
+  assert.equal(merged.steps[0].move, "connector");
+  assert.equal(merged.steps[1].target, "Before I have breakfast");
+  // Modelin s alanı öne alınan adım kadar kayar.
+  assert.equal(merged.blocks.find((b) => b.key === "have breakfast")?.step, 1);
+  const mainFirst = normalizeSentence(
+    {
+      steps: [
+        { q: "Kim duş alır?", p: "duş alırım", t: "I take a shower" },
+        { p: "yapmadan önce", t: "Before I have breakfast, I take a shower." },
+      ],
+    },
+    plan,
+    1,
+    [],
+    "en",
+    { band: "A2" }
+  );
+  assert.equal(mainFirst.status, "failed");
+});
+
 test("sıralama: yan cümlede kalır; sıralı/bağlantılı, permütasyon olmayan ve 'because/لأن' başlangıcı temizlenir", () => {
   const s = buildAll(enPlan(), EN_RAW, "en", { band: "A2" });
   // Model göndermedi: İngilizcede cihaz kurar.
@@ -1029,7 +1100,7 @@ test("kart sırası: bağlaçsız / yan / sıralı / bağlantılı / sentez", ()
   assert.equal(peak[1], "connector");
   assert.ok(!peak.includes("reorder"));
   assert.deepEqual(kinds(compileSentence(set, 6)), ["read", "connector", "step0", "step1", "step2", "step3", "step4", "recap"]);
-  assert.deepEqual(kinds(compileSentence(set, 7)), ["read", "recall", "oneshot", "kurus", "step0", "retrieval", "step1", "recap"]);
+  assert.deepEqual(kinds(compileSentence(set, 7)), ["read", "recall", "retrieval", "oneshot", "kurus", "step0", "step1", "recap"]);
   const recall = compileSentence(set, 7)[1] as Extract<Card, { t: "recall" }>;
   assert.deepEqual(recall.keys, ["at around 7 pm"]);
   // İkinci sıralamada "ilk sefer" notu yok.

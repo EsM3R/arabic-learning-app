@@ -784,6 +784,12 @@ export interface BuildSet {
   sentences: BuildSentence[];
   createdAt: string;
   origin?: "v1";
+  /**
+   * Set kurulurken odak kalıbın durumu (karma: "mastered"). Kayıtta durur:
+   * uygulama kapanıp açılınca sürdürülen üretim de cümleleri önce tek seferde
+   * (tryFirst) kursun.
+   */
+  patternStatus?: string;
 }
 
 export type Card =
@@ -1262,6 +1268,10 @@ export interface KnownBlock {
   note?: string;
   contrast?: string;
   contrastShown?: boolean;
+  /** Geri gelen taşı cihazda kurmak için (planın rec listesinden). */
+  target?: string;
+  tr?: string;
+  kind?: BlockKind;
 }
 
 export interface NormalizeStores {
@@ -1413,12 +1423,15 @@ function autoReorderOf(steps: BuildStep[], finalT: string, lang: LanguageId): st
   return `${upperFirstTarget(c2.replace(/[\s,،;]+$/, ""), lang)} ${lowerFirstTarget(c1, lang)}${end}`;
 }
 
-function trapIdsFor(toks: string[], lang: LanguageId): string[] {
-  return methodFor(lang)
-    .traps.filter((tp) => {
-      const right = tp.right.flatMap((x) => canonicalTokens(x, lang));
-      return right.length > 0 && right.every((t) => toks.includes(t));
-    })
+/** Taşın tokenlarına düşen kayıtlı tuzaklar (daha özel olan kazanır). */
+export function trapIdsFor(toks: string[], lang: LanguageId): string[] {
+  const hits = methodFor(lang)
+    .traps.map((tp) => ({ id: tp.id, right: tp.right.flatMap((x) => canonicalTokens(x, lang)) }))
+    .filter((tp) => tp.right.length > 0 && tp.right.every((t) => toks.includes(t)));
+  // Daha özel tuzak kazanır: "قَبْلَ أَنْ" taşı -madan önce tuzağını alır, genel
+  // -mayı (yalnız أَنْ) tuzağını değil; yoksa taşa ilgisiz bir karşıtlık yazılır.
+  return hits
+    .filter((a) => !hits.some((b) => b !== a && b.right.length > a.right.length && a.right.every((t) => b.right.includes(t))))
     .map((tp) => tp.id);
 }
 
@@ -1467,7 +1480,8 @@ export function normalizeSentence(
   const prevTr = linked && prevS ? prevS.tr.replace(END_PUNCT, "") : "";
   const ownTr = linked && LINK_WORD.test(sp.tr) ? trLowerFirst(sp.tr) : sp.tr;
   const tr = linked ? `${prevTr}, ${ownTr}` : sp.tr;
-  const offset = linked ? 1 : 0;
+  // Ham adım i → steps[i + offset]: önek adımı (bağlantılı cümle, eklenen bağlaç adımı) kadar kayar.
+  let offset = linked ? 1 : 0;
 
   const joinLinked = (t: string): string => {
     if (!linked) return t;
@@ -1544,6 +1558,37 @@ export function normalizeSentence(
       learnerSplit: total >= 2,
     };
     if (trapId) connector.trapId = trapId;
+  }
+
+  // --- 4b. Yan cümle bağlaçla başlar (hocanın "Bağlaçla başlıyorum"u).
+  // Model bağlacı Kim? adımına kattıysa ("Before I have breakfast") bağlaç
+  // tek başına ilk adım olarak öne alınır. Ana cümleden başlayan kuruluş
+  // (son hâl bağlaçla başladığı hâlde) yöntem dışıdır: cümle KISA MOD'a gider.
+  let orderBad = false;
+  let prependedConn = false;
+  if (connector?.kind === "sub" && !linked && steps.length > 1) {
+    const ct = canonicalTokens(connector.target, lang);
+    const starts = (t: string) => {
+      const tk = canonicalTokens(t, lang);
+      return ct.length > 0 && tk.length >= ct.length && ct.every((x, j) => tk[j] === x);
+    };
+    const firstToks = canonicalTokens(steps[0].target, lang);
+    if (starts(steps[0].target)) {
+      if (firstToks.length > ct.length) {
+        steps.unshift({
+          question: "",
+          trPiece: connector.tr,
+          trSoFar: connector.tr,
+          target: upperFirstTarget(connector.target, lang),
+          alts: [],
+          translit: "",
+          note: "",
+          trSpan: null,
+        });
+        offset += 1;
+        prependedConn = true;
+      }
+    } else if (starts(steps[steps.length - 1].target)) orderBad = true;
   }
 
   // --- 5. Taşlar (en fazla 6) ve markRecycled.
@@ -1643,6 +1688,48 @@ export function normalizeSentence(
     return out;
   });
 
+  // Geri gelen (rec) taşlar cihazda kurulur: prompt modele onları blocks'a
+  // yazdırmaz. Taş son hâlde geçiyorsa "adı konur, sonra geri çağrılır" —
+  // tuzak sorusu, yanlıştan sonra ilk notu ve geri dönüş kredisi buna bağlı.
+  const finalToks = canonicalTokens(steps.length ? steps[steps.length - 1].target : "", lang);
+  const earlierInfo = (key: string): { target: string; tr: string; kind: BlockKind } | undefined => {
+    for (let j = 0; j < Math.min(k, built.length); j += 1) {
+      const hit = built[j].blocks.find((x) => x.key === key);
+      if (hit) return { target: hit.target, tr: hit.tr, kind: hit.kind };
+    }
+    const kb = stores.blocks?.[key];
+    return kb?.target && kb.tr ? { target: kb.target, tr: kb.tr, kind: kb.kind ?? "lexical" } : undefined;
+  };
+  const priorKeys = [...new Set([...built.slice(0, k).flatMap((s) => s.blocks.map((x) => x.key)), ...Object.keys(stores.blocks ?? {})])];
+  for (const rc of sp.rec) {
+    if (blocks.length >= 8) break;
+    const rk = blockKey(rc, lang);
+    if (!rk) continue;
+    const rt = rk.split(" ");
+    const key = priorKeys.includes(rk)
+      ? rk
+      : priorKeys.find((kk) => {
+          const kt = kk.split(" ");
+          return rt.every((t) => kt.includes(t)) || kt.every((t) => rt.includes(t));
+        });
+    if (!key || blocks.some((x) => x.key === key)) continue;
+    const info = earlierInfo(key);
+    const rec = earlierBlock(key);
+    if (!info || !rec || info.kind === "connector") continue;
+    // Plan taşın bir parçasını geri getirebilir ("leave" ← "leave home"):
+    // o zaman cümlede aranan ve gösterilen o parçadır, kredi yine eski taşa.
+    const partial = rk !== key && rt.every((t) => key.split(" ").includes(t));
+    const toks = partial ? rt : key.split(" ");
+    if (!toks.every((t) => finalToks.includes(t))) continue;
+    let step = stepAdded.findIndex((add, i) => i >= offset && toks.every((t) => add.includes(t)));
+    if (step < 0) step = steps.findIndex((st, i) => i >= offset && canonicalTokens(st.target, lang).join(" ").includes(toks.join(" ")));
+    if (step < 0) continue;
+    const out: BuildBlock = { target: partial ? rc : info.target, tr: info.tr, note: "", contrast: "", alts: [], kind: info.kind, step, key, recycled: rec };
+    const trapIds = trapIdsFor(toks, lang);
+    if (trapIds.length) out.trapIds = trapIds;
+    blocks.push(out);
+  }
+
   steps.forEach((st, i) => {
     const ids = blocks.filter((b) => b.step === i && !b.recycled).map((b) => b.key);
     if (ids.length) st.blockIds = ids;
@@ -1705,6 +1792,8 @@ export function normalizeSentence(
       if (x.tx) st.translit = x.tx;
       else if (map.size) st.translit = words(st.target).map((w) => map.get(bare(w)) ?? "…").join(" ");
     });
+    // Öne alınan bağlaç adımının okunuşu da son hâlin okunuşundan.
+    if (prependedConn && map.size) steps[0].translit = words(steps[0].target).map((w) => map.get(bare(w)) ?? "…").join(" ");
     const rtl = str(r.rtl);
     if (rtl) reorderTranslit = rtl;
     else if (reorder && map.size) {
@@ -1816,7 +1905,7 @@ export function normalizeSentence(
   for (const bl of blocks) if (bl.recycled) addRecall(bl.key);
 
   // --- 12. Yeniden deneme kuralı: 2'den az adım → KISA MOD (sentez tek adımla kalabilir).
-  const usable = !!sp.tr && (steps.length >= 2 || (steps.length === 1 && tryFirst && sp.role === "synthesis"));
+  const usable = !orderBad && !!sp.tr && (steps.length >= 2 || (steps.length === 1 && tryFirst && sp.role === "synthesis"));
 
   const out: BuildSentence = {
     tr,
@@ -1932,11 +2021,22 @@ export function compileSentence(set: BuildSet, si: number, ctx: CompileCtx = {})
   }
   const tryFirst =
     s.tryFirst || !!ctx.review || bandIndex(band) >= bandIndex("B2") || (band === "B1" && s.role === "extension");
+  const retDone = new Set<number>();
+  if (tryFirst && !ctx.review) {
+    // Sentezde hocanın sırası: hatırla → "AM mi PM mi?" → söyle. Sistem ve
+    // tuzak soruları tek seferden ÖNCE sorulur; adımların arasında kalsalar
+    // tek seferde doğru söyleyen öğrenci onları hiç görmezdi (adımlar atlanır).
+    // Tekrar oturumunda sorulmaz: tek seferlik kanıttan önce ipucu olurdu.
+    s.retrievals.forEach((r, ri) => {
+      if (r.src !== "system" && r.src !== "trap") return;
+      cards.push({ t: "retrieval", r });
+      retDone.add(ri);
+    });
+  }
   if (tryFirst) cards.push({ t: "oneshot" }, { t: "kurus" });
 
   const keep = fadeSteps(s, band, set.lang, ctx.masteredBlocks ?? []);
   let sysDone = !s.systemLesson;
-  const retDone = new Set<number>();
   for (const i of keep) {
     let sysHere = false;
     if (!sysDone && s.systemLesson && s.systemLesson.step <= i) {

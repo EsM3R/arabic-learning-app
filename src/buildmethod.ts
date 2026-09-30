@@ -348,10 +348,32 @@ const arVerb = (root: string) => new RegExp(`^(و|ف)?(ا|ي|ت|ن)?${root}(ت|�
 const AR_KHARAJA = arVerb("خرج");
 const AR_FATAHA = arVerb("فتح");
 const AR_SHAGHGHALA = arVerb("شغل");
-/** Ardından أَنْ gelmesi gereken kelimeler (normalize). */
-const AR_AN_HOSTS = new Set(
-  ["قَبْلَ", "بَعْدَ", "أُحِبُّ", "يُحِبُّ", "تُحِبُّ", "نُحِبُّ", "أُرِيدُ", "يُرِيدُ", "تُرِيدُ", "نُرِيدُ", "أُفَضِّلُ", "يُفَضِّلُ", "تُفَضِّلُ", "نُفَضِّلُ", "يَجِبُ", "أَسْتَطِيعُ"].map(ar)
+/**
+ * Ardından أَنْ gelmesi gereken kelimeler (normalize). İki ayrı tuzak: zaman
+ * bağlacı (-madan önce) ile -mayı fiilleri. Öğrenci -mayı hatası yaptığında
+ * henüz görmediği قَبْلَ'den söz etmemek için metinleri ayrı tutulur.
+ */
+const AR_AN_QABL = new Set(["قَبْلَ", "بَعْدَ"].map(ar));
+const AR_AN_VERBS = new Set(
+  ["أُحِبُّ", "يُحِبُّ", "تُحِبُّ", "نُحِبُّ", "أُرِيدُ", "يُرِيدُ", "تُرِيدُ", "نُرِيدُ", "أُفَضِّلُ", "يُفَضِّلُ", "تُفَضِّلُ", "نُفَضِّلُ", "يَجِبُ", "أَسْتَطِيعُ"].map(ar)
 );
+
+/**
+ * أَنْ unutuldu mu: beklenen "X أَنْ FİİL" iken öğrenci "X FİİL" dedi. Yalnız
+ * AYNI fiil araya أَنْ girmeden geldiyse tuzak sayılır; قَبْلَ تَنَاوُلِ gibi
+ * masdarlı gerçek alternatif (ت ile başlasa da) tuzağa düşmüş sayılmaz.
+ */
+function arMissingAn(hosts: Set<string>) {
+  return (g: string[], e: string[]): boolean => {
+    for (let i = 0; i < e.length - 2; i += 1) {
+      if (!hosts.has(e[i]) || e[i + 1] !== "ان") continue;
+      for (let j = 0; j < g.length - 1; j += 1) {
+        if (g[j] === e[i] && g[j + 1] === e[i + 2]) return true;
+      }
+    }
+    return false;
+  };
+}
 const AR_PRONOUNS = new Set(["أَنَا", "هُوَ", "هِيَ", "نَحْنُ", "أَنْتَ", "أَنْتِ", "أَنْتُمْ", "هُمْ"].map(ar));
 /** Saatte YANLIŞ olan asıl sayılar (normalize). */
 const AR_CARDINALS = new Set(
@@ -423,23 +445,25 @@ const AR: LangMethod = {
   proclitics: ["ب", "ل", "ك", "و", "ف"],
   traps: [
     {
+      // Kimlik "ar-an" kalır: bağlaç kartı ve kayıtlı taş ilerlemesi bu kimliği taşıyor.
       id: "ar-an",
-      tr: "-madan önce / -mayı",
-      wrong: [ar("قَبْلَ")],
+      tr: "-madan önce",
+      // wrong boş: قَبْلَ doğru cümlede de geçer; tespit yalnız detect ile.
+      wrong: [],
       right: [ar("قَبْلَ"), ar("أَنْ")],
-      detect: (g, e) => {
-        for (let i = 0; i < e.length - 1; i += 1) {
-          if (!AR_AN_HOSTS.has(e[i]) || e[i + 1] !== "ان") continue;
-          for (let j = 0; j < g.length - 1; j += 1) {
-            // Kelimeden sonra doğrudan çekimli fiil (ا/ي/ت/ن önekli) geldiyse أَنْ unutulmuş.
-            if (g[j] === e[i] && g[j + 1] !== "ان" && /^[ايتن]/.test(g[j + 1]) && !g[j + 1].startsWith("ال")) return true;
-          }
-        }
-        return false;
-      },
-      text: "قَبْلَ'den sonra fiil doğrudan gelmez; araya أَنْ girer, fiil fetha alır. Arapçada ago/before tuzağı yok: 5 dakika önce de قَبْلَ.",
-      mini: ["قَبْلَ أَنْ أَتَنَاوَلَ الفُطُورَ", "قَبْلَ خَمْسِ دَقَائِقَ"],
+      detect: arMissingAn(AR_AN_QABL),
+      text: "قَبْلَ'den sonra çekimli fiil doğrudan gelmez; araya أَنْ girer, fiil fetha alır. İsimle doğrudan gelir: قَبْلَ الفُطُورِ (masdarla da olur: قَبْلَ تَنَاوُلِ الفُطُورِ).",
+      mini: ["قَبْلَ أَنْ أَتَنَاوَلَ الفُطُورَ", "قَبْلَ الفُطُورِ"],
       pair: ["قَبْلَ أَنْ", "قَبْلَ"],
+    },
+    {
+      id: "ar-an-verb",
+      tr: "-mayı (sevmek, istemek)",
+      wrong: [],
+      right: [ar("أَنْ")],
+      detect: arMissingAn(AR_AN_VERBS),
+      text: "-mayı ekini أَنْ + fiil ile veririz; fiil fetha alır. Masdar da olur: أُحِبُّ الاسْتِيقَاظَ.",
+      mini: ["أُحِبُّ أَنْ أَسْتَيْقِظَ مُبَكِّرًا", "أُحِبُّ الاسْتِيقَاظَ مُبَكِّرًا"],
     },
     {
       id: "ar-maa-bi",
@@ -618,9 +642,9 @@ const AR: LangMethod = {
       "YUVA SIRASI: [bağlaç] + [sıklık zarfı] + FİİL + [nesne / أَنْ + fiil / masdar] + [إِلَى + yer] + [بِـ + araç | hâl] + [zaman]. Soru sırası: Kim? → Neyi? → Nereye? → Nasıl?/Neyle? → Ne zaman?",
       "KİM?: özne fiilin ekinde (أَـ ben, نَـ biz, تَـ sen/o(k), يَـ o; mazide ـتُ ben); أَنَا YAZMA. sen/o varsa erkek hâli t'de, kadın hâli sw'de (dişil).",
       "SIKLIK ZARFI: fiilden önce; sonda olursa sw.",
-      "EKLER: -mayı (أُحِبُّ/أُرِيدُ) → أَنْ + mansub KANONİK, masdar a'da · أُفَضِّلُ + masdar, أَنْ a'da · -madan önce → قَبْلَ أَنْ + mansub · -dıktan sonra → بَعْدَ أَنْ · ama → لَكِنْ + fiil / لَكِنَّنِي · çünkü → لِأَنَّ + zamir · -la araç → بِـ, birliktelik → مَعَ · çıkmak → خَرَجَ مِنْ.",
+      "EKLER: -mayı (أُحِبُّ/أُرِيدُ) → أَنْ + mansub, masdar a'da · أُفَضِّلُ + masdar, أَنْ a'da · -madan önce → قَبْلَ أَنْ + mansub (a: قَبْلَ + masdar) · -dıktan sonra → بَعْدَ أَنْ · ama → لَكِنْ / لَكِنَّنِي · çünkü → لِأَنَّ + zamir · araç → بِـ, birliktelik → مَعَ · çıkmak → خَرَجَ مِنْ.",
       "SAAT: السَّاعَةِ + DİŞİL SIRA SAYISI + صَبَاحًا/مَسَاءً; gibi → حَوَالَيْ.",
-      "BAĞLAÇ YERİ: -dığımda → عِنْدَمَا; yan cümle (قَبْلَ أَنْ/عِنْدَمَا) sona alınabilir; لَكِنْ/لِأَنَّ yer değiştirmez.",
+      "BAĞLAÇ YERİ: -dığımda → عِنْدَمَا; yan cümle sona alınabilir; لَكِنْ/لِأَنَّ yer değiştirmez.",
       "KAYITLI TUZAKLAR (c yazma): أَنْ eksik · araçta مَعَ · خَرَجَ مِنْ · TV için أُشَغِّلُ · saatte sıra sayısı · لَكِنَّ + zamir · إِذَا/لَوْ · لَاحِقًا. Başka dilin tuzağını taşıma.",
       "SİSTEM DERSLERİ: saat-sira, ikil, sayi-cinsiyet, olumsuzluk, irab, fiil-kaliplari.",
     ].join("\n"),

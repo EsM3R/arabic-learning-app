@@ -39,7 +39,7 @@ import type {
   SentenceMemory,
 } from "../buildmastery";
 import { methodFor, systemById } from "../buildmethod";
-import { continueSet, isGenerating, resumePending, startSet } from "../buildpipeline";
+import { continueSet, resumePending, startSet } from "../buildpipeline";
 import type { PipelineHooks } from "../buildpipeline";
 import { generateMoreTransfer, generateProbe } from "../claude";
 import { getActivePack } from "../languages";
@@ -298,6 +298,12 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   });
 
   const alive = useRef(true);
+  /**
+   * "Hazırlanıyor" beklemesinden geri çıkınca artar: bekleyen istek dönünce
+   * öğrenciyi ana sayfadan alıp yeni sete/oturuma fırlatmayalım. Set yine
+   * kayıtlı setlerde durur.
+   */
+  const loadingToken = useRef(0);
   /** Her kart/deneme sıfırlamasında artar: eski kartın gecikmeli "geç"i yeni kartı atlatmasın. */
   const cardGen = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -621,6 +627,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     });
 
   const startNew = async (focusList: Pattern[], theme: Theme) => {
+    const tok = loadingToken.current;
+    const left = () => !alive.current || tok !== loadingToken.current;
     try {
       const vocab = await loadVocab();
       const made = await startSet({
@@ -636,15 +644,17 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
         known: knownWords(vocab),
       });
       if (!alive.current) return;
+      if (made) setSets((list) => [made, ...list.filter((x) => x.id !== made.id)]);
+      if (left()) return;
       if (!made) {
         setPhase("home");
         return;
       }
-      setSets((list) => [made, ...list.filter((x) => x.id !== made.id)]);
       setHistory(await loadBuildHistory());
+      if (left()) return;
       begin(made, "learn");
     } catch (e) {
-      if (!alive.current) return;
+      if (left()) return;
       setPhase("home");
       Alert.alert(isBudgetError(e) ? "Harcama tavanı doldu" : "Set hazırlanamadı", errText(e));
     }
@@ -759,13 +769,14 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
       if (go) {
         setLoadingText("Tekrar cümleleri hazırlanıyor…");
         setPhase("loading");
+        const tok = loadingToken.current;
         try {
           items.push(...(await probeItems(pats, 2)));
         } catch (e) {
-          if (!alive.current) return;
+          if (!alive.current || tok !== loadingToken.current) return;
           Alert.alert(isBudgetError(e) ? "Harcama tavanı doldu" : "Cümleler gelmedi", errText(e));
         }
-        if (!alive.current) return;
+        if (!alive.current || tok !== loadingToken.current) return;
       }
     }
     const old = plan.retellSetId ? sets.find((x) => x.id === plan.retellSetId) : undefined;
@@ -822,9 +833,10 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     }
     setLoadingText(`${pack.teacherName} yoklama cümlelerini hazırlıyor…`);
     setPhase("loading");
+    const tok = loadingToken.current;
     try {
       const items = await probeItems(patterns, per);
-      if (!alive.current) return;
+      if (!alive.current || tok !== loadingToken.current) return;
       if (mode !== "placement") outcomes.current = {};
       openSession({
         mode,
@@ -837,7 +849,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
         patternId: mode === "testout" ? patterns[0].id : undefined,
       });
     } catch (e) {
-      if (!alive.current) return;
+      if (!alive.current || tok !== loadingToken.current) return;
       setPhase("home");
       Alert.alert(isBudgetError(e) ? "Harcama tavanı doldu" : "Yoklama hazırlanamadı", errText(e));
     }
@@ -968,7 +980,9 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
       enterSentence(set, si);
       return;
     }
-    if (!genError && !isGenerating(set.id)) {
+    // Süren üretim varsa ona katılır (kancalar bu ekrana da bağlanır), yoksa
+    // başlatır; bekleyen kalmadıysa taze set kancayla gelir ve kart açılır.
+    if (!genError) {
       void continueSet(profile, set.id, { hooks }).catch(() => undefined);
     }
     // enterSentence her çizimde yeniden kurulur; tetikleyici set/aşama değişimi.
@@ -1260,9 +1274,10 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     speakTargetWith(card.r.options[card.r.answer]);
   };
 
-  const onSplit = (ok: boolean) => {
+  const onSplit = (ok: boolean | null) => {
     setSplitDone(true);
-    if (!set || !sentence || card?.t !== "connector") return;
+    // Seçim sorulmadıysa (tuzaksız bağlaç) geri çağırma olayı da yok.
+    if (ok === null || !set || !sentence || card?.t !== "connector") return;
     if (credited(sentence.key) && mode === "learn") {
       const key = sentence.blocks.find((b) => b.kind === "connector")?.key;
       const e: BuildEvent = { k: "retrieval", ok: ok ? 1 : 0, first: true, spoken: false, sk: sentence.key, si, blockKeys: key ? [key] : [] };
@@ -1343,11 +1358,12 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
     if (!retell.all) speakTargetWith(got[list[0]]?.expected ?? "");
   };
 
-  const retellNext = () => {
+  /** skip: giriş kartındaki "Atla" — anlatımın tamamı geçilir. */
+  const retellNext = (skip = false) => {
     if (!set || !retell) return;
     stopSpeaking();
     setAnswer("");
-    const done = retell.all || retell.at + 1 >= retell.indices.length;
+    const done = skip || retell.all || retell.at + 1 >= retell.indices.length;
     if (!done) {
       setRetell({ ...retell, at: retell.at + 1 });
       return;
@@ -1414,6 +1430,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
 
   // ------------------------------------------------------------------ geri
   const goHome = () => {
+    loadingToken.current += 1;
     flush();
     clearTimers();
     stopSpeaking();
@@ -1637,7 +1654,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           <Button icon="mic" label="Tek tek anlat" onPress={() => setRetell({ ...retell, at: 0 })} />
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Button variant="secondary" size="md" label="Hepsini bir kerede" onPress={() => setRetell({ ...retell, at: 0, all: true })} style={{ flex: 1 }} />
-            <Button variant="ghost" size="md" label="Atla" onPress={retellNext} />
+            <Button variant="ghost" size="md" label="Atla" onPress={() => retellNext(true)} />
           </View>
         </View>
       ) : (
@@ -1645,8 +1662,8 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           {...footerBase}
           onSubmit={typed}
           listen={!answered}
-          dontKnow={{ label: "Geç", onPress: retellNext }}
-          primary={{ label: retell.all || retell.at + 1 >= retell.indices.length ? "Bitir" : "Sıradaki", icon: "arrowRight", onPress: retellNext }}
+          dontKnow={{ label: "Geç", onPress: () => retellNext() }}
+          primary={{ label: retell.all || retell.at + 1 >= retell.indices.length ? "Bitir" : "Sıradaki", icon: "arrowRight", onPress: () => retellNext() }}
         />
       );
     return provide(
@@ -1770,7 +1787,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
       break;
     }
     case "connector":
-      body = <ConnectorCard key={`${set.id}-${si}`} card={card.card} tr={s.tr} lang={lang} view={view} onSplit={onSplit} />;
+      body = <ConnectorCard key={`${set.id}-${si}`} card={card.card} tr={s.tr} lang={lang} view={view} linked={s.linkPrev} onSplit={onSplit} />;
       // Kilit kartla aynı karardan: bağlaç cümlede bulunamazsa bölme yok, kilit de yok.
       footer = <VoiceFooter {...footerBase} listen={false} primary={cont("Devam", canSplit(s.tr, card.card) && !splitDone)} />;
       break;

@@ -661,6 +661,17 @@ function exampleLangNote(lang: LanguageId): string | null {
   return `ÖRNEKLER: kurallardaki İngilizce örnekler yalnız YÖNTEMİ gösterir. Bütün hedef biçimleri (t, new, rec, a, pair, x, sw) ve notlardaki hedef karşılıkları ${label} yaz; İngilizce yazma.`;
 }
 
+/**
+ * Hedef dilde tek çözülmüş örnek. Kurallardaki örnekler İngilizce; Arapçada
+ * bağlaçla başlayan kuruluşu (قَبْلَ أَنْ → Kim kahvaltı yapacak?) görmeyen
+ * model bağlacı Kim? adımına katıyor ya da ana cümleden başlıyor. Dil bloğunun
+ * 1200 karakter sınırına sığmadığı için burada; set boyunca aynı kalır.
+ */
+function sentenceExample(lang: LanguageId): string | null {
+  if (lang !== "ar") return null;
+  return 'ÖRNEK: "Kahvaltı yapmadan önce duş alırım" → قَبْلَ أَنْ → Kim kahvaltı yapacak? قَبْلَ أَنْ أَتَنَاوَلَ الفُطُورَ (e:1) → Ne yaparım? قَبْلَ أَنْ أَتَنَاوَلَ الفُطُورَ، أَسْتَحِمُّ · a: قَبْلَ تَنَاوُلِ الفُطُورِ.';
+}
+
 export function sentencePlanSystem(inp: PlanPromptInput): string {
   const label = LANGUAGE_PACKS[inp.lang].label;
   const m = methodFor(inp.lang);
@@ -802,7 +813,7 @@ B. KURULUŞ SIRASI (planın conn alanına göre):
 C. ÇEKİRDEK: her kısım Türkçenin SONUNDAKİ yüklemden başlar: özne + (sıklık zarfı) + fiil. Özne Türkçe kişi ekinden gelir ("Kim?"). Hafif fiil birleşiği tek parçadır (kahvaltı yapmak = tek parça). Sıklık/kesinlik zarfı (bazen, sıklıkla, mutlaka) çekirdekle BİRLİKTE, dil bloğundaki yerine gelir. Öğrencinin zaten bildiği parça notsuz geçer.
 D. SORULAR: fiile Türkçe sorular sorarak büyüt. q = soru kelimesi + Türkçenin o ana kadarki hâli ("Nasıl uyanmayı seviyorum?"). Soruları HEDEF DİLİN YUVA SIRASIYLA sor (dil bloğu), Türkçe kelime sırasıyla DEĞİL.
 E. p = bu adımda eklenen Türkçe parça; tr içinde BİREBİR geçen alt dize (aynı harfler; ek adı değil, kelimenin kendisi: "yapmadan önce", "uyanmayı").
-F. Yeni parça sona ya da önceki kelimelerin ARASINA girebilir (often, always); önceki kelimeler aynı sırada kalır, yalnız hedef dilin zorladığı ek/hareke değişebilir. HER adım dilbilgisi bakımından tam bir cümle olmalı. Bir Türkçe ek hedefte bir yapıya dönüşüyorsa bu yapı, o ekin sorusunu cevaplayan adımda gelir ve not şöyle olur: "'uyanmayı'daki -mayı ekini to ile veririz".${ctx.videoOrder ? " (VİDEO SIRASI: sözcükleri önce kur, eki sonra ayrı bir adımda ekle; eksik ara adımın notu 'ara hâl, henüz eksik'.)" : ""}
+F. Yeni parça sona ya da önceki kelimelerin ARASINA girebilir (often, always); önceki kelimeler aynı sırada kalır, yalnız hedef dilin zorladığı ek/hareke değişebilir. HER adım dilbilgisi bakımından tam bir cümle olmalı; bağlaç adımı ve yan cümle adımları hariç ("Before", "Before I have breakfast"). Bir Türkçe ek hedefte bir yapıya dönüşüyorsa bu yapı, o ekin sorusunu cevaplayan adımda gelir ve not şöyle olur: "'uyanmayı'daki -mayı ekini to ile veririz".${ctx.videoOrder ? " (VİDEO SIRASI: sözcükleri önce kur, eki sonra ayrı bir adımda ekle; eksik ara adımın notu 'ara hâl, henüz eksik'.)" : ""}
 G. KALIP tek adımda bütün gelir, kelime kelime kurulmaz; not "kalıp: …, hep böyle". Saat, dil bloğundaki sırayla kurulur.
 H. Son adım cümlenin tam hâlidir (toparla).
 I. NOT KURALI: n YALNIZ şu durumlarda yazılır: Türkçe–hedef uyuşmazlığı, ekin zorladığı yapı, kalıp, parafraz, yer kuralı. Artikel, iyelik, uyum ve geniş zamanın kendisi için not YAZMA. En fazla bir kısa cümle.
@@ -812,7 +823,7 @@ L. reorder: YALNIZ conn = sub ise — iki kısmın yeri değişmiş TAM cümle; 
 M. sd: plan bu cümleye sistem dersi verdiyse, dersin gerektiği adımın sırası.
 N. ret: kayıtlı tuzak ya da sistem dışında, önceki cümlelerde öğretilmiş bir AYRIM burada geri geliyorsa iki seçenekli soru {s, q, o:[a,b], a, w: hikâyeden kısa gerekçe}. Sette en fazla 1; gerekmiyorsa yazma.
 O. ${translitRule}
-P. Adım sayısı: ${stepRange(ctx.band)}. KISA MOD'da en fazla 5 adım; pair/x/ret yazma; notlar en fazla 8 kelime.${exampleLangNote(ctx.lang) ? `\n${exampleLangNote(ctx.lang)}` : ""}
+P. Adım sayısı: ${stepRange(ctx.band)}. KISA MOD'da en fazla 5 adım; pair/x/ret yazma; notlar en fazla 8 kelime.${exampleLangNote(ctx.lang) ? `\n${exampleLangNote(ctx.lang)}` : ""}${sentenceExample(ctx.lang) ? `\n${sentenceExample(ctx.lang)}` : ""}
 Boş alanı HİÇ yazma. Uzun düşünme — yöntem hazır. Yalnız JSON döndür.
 
 ${methodFor(ctx.lang).promptBlock(ctx.band)}

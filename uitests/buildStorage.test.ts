@@ -72,3 +72,17 @@ test("kayıtlı arayüz durumu okunur; eksik alanlar varsayılanla dolar", async
   await AsyncStorage.setItem("buildUi.v1.en", "{bozuk");
   expect((await loadBuildUi()).fastFlow).toBe(true);
 });
+
+test("tembel tohum yalnız eski setlerden: yeni hattın kurulmamış cümleleri tekrara, taşları hafızaya girmez", async () => {
+  // Yeni hattın seti (origin yok): hazır ama hiç kurulmamış cümleler taşıyor.
+  const fresh = { ...upgradeSetV1(v1Set(), "en"), id: "yeni", createdAt: "2026-09-10T00:00:00.000Z" };
+  delete (fresh as { origin?: string }).origin;
+  await saveBuildSets2([fresh]);
+  expect(await loadBuildMemory()).toEqual([]);
+  expect(await loadBuildBlocks()).toEqual({});
+  expect((await loadBuildUi()).connSeen).toEqual({});
+  // Eski (v1'den gelen) set yine tohumlanır.
+  await saveBuildSets2([fresh, upgradeSetV1(v1Set(), "en")]);
+  expect(await loadBuildMemory()).toHaveLength(4);
+  expect((await loadBuildBlocks()).before.producedOk).toBe(1);
+});

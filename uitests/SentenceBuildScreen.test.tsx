@@ -405,6 +405,10 @@ test("son cümle tek seferde: doğruysa hocanın kuruşu → özet", async () =>
   expect(screen.getByText("Ve geldik son cümlemize")).toBeTruthy();
   fireEvent.press(screen.getByText("Kurmaya başla"));
   await next(); // öğrendik çipleri
+  // Hocanın sentez sırası: "AM mi PM mi?" tek seferden ÖNCE sorulur.
+  await waitFor(() => expect(screen.getByText("AM mi PM mi?")).toBeTruthy());
+  fireEvent.press(screen.getByLabelText("Seçenek: PM"));
+  await next();
   await waitFor(() => expect(screen.getByText("Önce kendin dene")).toBeTruthy());
   await say("I go to bed at around 10 PM.");
   await waitFor(() => expect(screen.getByText("Doğru")).toBeTruthy());
@@ -421,14 +425,6 @@ test("son cümle tek seferde olmazsa adımlar açılır; geri çağırmada yanl�
   await start(videoSet({ only: [7] }));
   fireEvent.press(screen.getByText("Kurmaya başla"));
   await next();
-  await say("I go to the bed");
-  await waitFor(() => expect(screen.getByText("Olmadı — adım adım kuralım")).toBeTruthy());
-  expect(screen.queryByText(/10 PM/)).toBeNull(); // doğrusu gösterilmez
-  await next(/Adım adım kur/);
-  await waitFor(() => expect(screen.getByText("Kim gider?")).toBeTruthy());
-  expect(screen.queryByText("Hocanın kuruşu")).toBeNull();
-  await say("I go to bed");
-  await next();
   await waitFor(() => expect(screen.getByText("AM mi PM mi?")).toBeTruthy());
   // Seçeneklere uymayan duyuş sessizce yutulmaz.
   await say("banana");
@@ -437,6 +433,16 @@ test("son cümle tek seferde olmazsa adımlar açılır; geri çağırmada yanl�
   await waitFor(() => expect(screen.getByText(/PM: işten çıktığımız/)).toBeTruthy());
   await next();
   await waitFor(async () => expect((await progress()).olmak.retrieval).toEqual([0]));
+  await say("I go to the bed");
+  await waitFor(() => expect(screen.getByText("Olmadı — adım adım kuralım")).toBeTruthy());
+  expect(screen.queryByText(/10 PM\./)).toBeNull(); // doğrusu gösterilmez
+  await next(/Adım adım kur/);
+  await waitFor(() => expect(screen.getByText("Kim gider?")).toBeTruthy());
+  expect(screen.queryByText("Hocanın kuruşu")).toBeNull();
+  await say("I go to bed");
+  await next();
+  // Geri çağırma tek seferden önce soruldu; adımların arasında yinelenmez.
+  expect(screen.queryByText("AM mi PM mi?")).toBeNull();
 });
 
 test("öğrendik çipleri yalnız Türkçe; 'Nasıldı?' söylenince denetlenir", async () => {
@@ -505,6 +511,84 @@ test("günümü anlat: her cümle tek seferde, yardımsız kanıt olarak yazıl�
   expect([...p.proofKeys].sort()).toEqual(["before i have breakfast i take a shower", "i like to wake up early in the morning"]);
   // Anlatım bitince 1 gün sonra "Tekrar zamanı"nda yeniden gelir.
   expect(Object.keys((await loadBuildUi()).retells ?? {})).toHaveLength(1);
+});
+
+test("günümü anlat: giriş kartındaki 'Atla' anlatımı geçer, set biter ve anlatım takvime girer", async () => {
+  await start(videoSet({ only: [0, 1] }));
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  for (const t of S0) {
+    await say(t);
+    await next();
+  }
+  await next(/^Geç$/);
+  await next(/Sıradaki cümle/);
+  await next(/Kurmaya başla/);
+  await next(); // bağlaç
+  for (const t of ["Before", "Before I have breakfast", "Before I have breakfast, I take a shower."]) {
+    await say(t);
+    await next();
+  }
+  await say("I take a shower before I have breakfast.");
+  await next();
+  await next(/Seti bitir/);
+  await waitFor(() => expect(screen.getByText("Tek tek anlat")).toBeTruthy());
+  fireEvent.press(screen.getByText("Atla"));
+  await waitFor(() => expect(screen.getByText(/cümle kurdun/)).toBeTruthy());
+  expect(Object.keys((await loadBuildUi()).retells ?? {})).toHaveLength(1);
+});
+
+test("adım notu yanlış kararda bir kez görünür (geri bildirim zaten içeriyor)", async () => {
+  await start(videoSet({ only: [0] }));
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  await say(S0[0]);
+  await next();
+  await say("I like wake up");
+  await waitFor(() => expect(screen.getByText(/Olmadı — doğrusu/)).toBeTruthy());
+  expect(screen.getAllByText(/-mayı ekini to ile veririz/)).toHaveLength(1);
+});
+
+test("tuzağı olmayan bağlaç (ama): öğrenci böler, 'However' gibi eş anlamlı yanlış seçenek sorulmaz", async () => {
+  const stores = { connSeen: { before: 1, after: 1 } };
+  await saveBuildUi({ ...DEFAULT_BUILD_UI, fastFlow: false, connSeen: { before: 1, after: 1 } });
+  await start(videoSet({ only: [3], stores, id: "p" }));
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  await waitFor(() => expect(screen.getByText("Bağlacı sen bul")).toBeTruthy());
+  fireEvent.press(screen.getByLabelText("Kelime: ama"));
+  await waitFor(() => expect(screen.getByText(/Burada bir bağlacımız var/)).toBeTruthy());
+  expect(screen.queryByLabelText(/^Seçenek:/)).toBeNull();
+  expect(screen.queryByText(/Olmadı:/)).toBeNull();
+  await next();
+  // Seçim sorulmadı: geri çağırma kaydı da yok.
+  expect((await progress()).olmak?.retrieval ?? []).toEqual([]);
+});
+
+test("set hazırlanırken geri çıkılırsa istek dönünce öğrenci sete fırlatılmaz", async () => {
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  mockStartSet.mockImplementationOnce(async (input: StartInput) => {
+    await input.confirm?.("", 8);
+    await gate;
+    const made = videoSet({ patternId: input.focus[0].id, themeId: input.theme.id });
+    await saveBuildSets2([made]);
+    input.hooks?.onUpdate?.(made);
+    return made;
+  });
+  render(<SentenceBuildScreen profile={profile} onBack={() => {}} />);
+  await waitFor(() => expect(screen.getByText("Günlük rutinim")).toBeTruthy());
+  fireEvent.press(screen.getByText("Günlük rutinim"));
+  await waitFor(() => expect(alerts.length).toBe(1));
+  await pressAlert(/Evet/);
+  fireEvent.press(screen.getByLabelText("Geri"));
+  await waitFor(() => expect(screen.getByText(/SIRADAKİ KALIP/)).toBeTruthy());
+  await act(async () => {
+    release();
+    await gate;
+  });
+  await waitFor(() => expect(screen.getByText("hazır")).toBeTruthy()); // kayıtlı setlerde durur
+  expect(screen.queryByText("Başlayalım")).toBeNull();
+  expect(screen.getByText(/SIRADAKİ KALIP/)).toBeTruthy();
 });
 
 test("eş cümle cihazda kurulur ve aktarım sayılır; 'Kendi cümlen' yalnız pratik; 'Başka örnek' yeni cümle getirir", async () => {
