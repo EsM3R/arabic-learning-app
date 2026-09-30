@@ -31,8 +31,18 @@ export interface DictationState {
 }
 
 export interface DictationOptions {
-  /** Konuşma bittiğinde (öğrenci bıraktığında) toplanan metin. */
-  onResult: (text: string) => void;
+  /**
+   * Konuşma bittiğinde (öğrenci bıraktığında) toplanan metin. alts, ses
+   * tanımanın n-best listesidir (alts[0] === text); maxAlternatives 1 iken
+   * tek elemanlıdır.
+   */
+  onResult: (text: string, alts: string[]) => void;
+  /**
+   * Ses tanımadan istenen alternatif sayısı (varsayılan 1). Cümle Kurma 3
+   * ister: "the" yutulmuş bir duyuşu listedeki öteki duyuş kurtarabilsin
+   * (tuzak kelimeyi değil — o kural buildcheck.ts'te).
+   */
+  maxAlternatives?: number;
   /** Hedef dil yerine başka bir dili dinlemek için. */
   lang?: string;
   /**
@@ -80,7 +90,10 @@ export function useDictation(opts: DictationOptions): DictationState {
    * "end" olayında yapılır — yani öğrenci düğmeyi bıraktığında.
    */
   const finals = useRef<string[]>([]);
+  /** Kesinleşen her parçanın alternatifleri (n-best), finals ile aynı sırada. */
+  const finalAlts = useRef<string[][]>([]);
   const interim = useRef("");
+  const interimAlts = useRef<string[]>([]);
   const delivered = useRef(false);
   const startedAt = useRef(0);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,7 +135,9 @@ export function useDictation(opts: DictationOptions): DictationState {
 
   const reset = () => {
     finals.current = [];
+    finalAlts.current = [];
     interim.current = "";
+    interimAlts.current = [];
     delivered.current = false;
   };
 
@@ -135,12 +150,35 @@ export function useDictation(opts: DictationOptions): DictationState {
     return parts.join(" ").replace(/\s+/g, " ").trim();
   };
 
+  /**
+   * n-best listesi: k. alternatif, her parçanın k. duyuşu (yoksa ilk duyuşu)
+   * birleştirilerek kurulur. İlk eleman her zaman teslim edilen metindir.
+   */
+  const alternatives = (text: string): string[] => {
+    const max = Math.max(1, opts.maxAlternatives ?? 1);
+    if (max === 1) return [text];
+    const segs = [...finalAlts.current];
+    const tail = interim.current.trim();
+    if (tail && !finals.current.some((p) => p.trim() === tail)) segs.push(interimAlts.current.length ? interimAlts.current : [tail]);
+    const out = [text];
+    for (let k = 1; k < max; k += 1) {
+      if (!segs.some((a) => a[k])) break;
+      const alt = segs
+        .map((a) => a[k] ?? a[0] ?? "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (alt && !out.includes(alt)) out.push(alt);
+    }
+    return out;
+  };
+
   const deliver = () => {
     if (delivered.current) return;
     const text = collected();
     if (!text) return;
     delivered.current = true;
-    opts.onResult(text);
+    opts.onResult(text, alternatives(text));
   };
 
   useSpeechRecognitionEvent("start", () => {
@@ -151,13 +189,19 @@ export function useDictation(opts: DictationOptions): DictationState {
 
   useSpeechRecognitionEvent("result", (ev) => {
     const text = ev.results?.[0]?.transcript ?? "";
+    const alts = (ev.results ?? []).map((r) => (r?.transcript ?? "").trim()).filter(Boolean);
     if (ev.isFinal) {
-      if (text.trim()) finals.current.push(text.trim());
+      if (text.trim()) {
+        finals.current.push(text.trim());
+        finalAlts.current.push(alts.length ? alts : [text.trim()]);
+      }
       interim.current = "";
+      interimAlts.current = [];
       // Sürekli kipte teslim ETME: öğrenci hâlâ konuşuyor olabilir.
       setPartial(collected());
     } else {
       interim.current = text;
+      interimAlts.current = alts;
       setPartial(collected());
     }
     // Eller serbest kip: parça geldi, sessizlik sayacı baştan.
@@ -200,7 +244,7 @@ export function useDictation(opts: DictationOptions): DictationState {
           interimResults: true,
           // Bırakana kadar dinle — duraksama "bitti" sayılmasın.
           continuous: true,
-          maxAlternatives: 1,
+          maxAlternatives: Math.max(1, opts.maxAlternatives ?? 1),
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));

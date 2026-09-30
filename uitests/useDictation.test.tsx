@@ -307,3 +307,48 @@ test("basılı-tut kipinde (autoStopMs yok) sessizlik sayacı hiç kurulmaz", as
   });
   expect(mockMod.stop).not.toHaveBeenCalled();
 });
+
+// --- n-best (Cümle Kurma) --------------------------------------------------------
+
+/** Birden çok duyuşlu (n-best) parça. */
+function resultAlts(transcripts: string[], isFinal: boolean) {
+  return { results: transcripts.map((transcript) => ({ transcript })), isFinal };
+}
+
+test("varsayılan: tek duyuş istenir, alts yalnız teslim edilen metindir", async () => {
+  const got: string[][] = [];
+  function HostOne() {
+    api = useDictation({ onResult: (_t, alts) => got.push(alts) });
+    return <Text>x</Text>;
+  }
+  render(<HostOne />);
+  await act(async () => {
+    api.start();
+  });
+  expect((mockMod.start.mock.calls[0][0] as { maxAlternatives: number }).maxAlternatives).toBe(1);
+  fire("start");
+  fire("result", resultAlts(["I turn on TV", "I turn on the TV"], true));
+  fire("end");
+  expect(got).toEqual([["I turn on TV"]]);
+});
+
+test("maxAlternatives 3: her parçanın k. duyuşu birleşir, ilk eleman teslim edilen metin", async () => {
+  const got: { text: string; alts: string[] }[] = [];
+  function HostNBest() {
+    api = useDictation({ onResult: (text, alts) => got.push({ text, alts }), maxAlternatives: 3 });
+    return <Text>x</Text>;
+  }
+  render(<HostNBest />);
+  await act(async () => {
+    api.start();
+  });
+  expect((mockMod.start.mock.calls[0][0] as { maxAlternatives: number }).maxAlternatives).toBe(3);
+  fire("start");
+  fire("result", resultAlts(["I turn on", "I turn on"], true));
+  fire("result", resultAlts(["TV", "the TV", "a TV"], true));
+  fire("end");
+  expect(got).toHaveLength(1);
+  expect(got[0].text).toBe("I turn on TV");
+  // İkinci parçanın 2. ve 3. duyuşu; ilk parçada 3. duyuş yoksa ilki kullanılır.
+  expect(got[0].alts).toEqual(["I turn on TV", "I turn on the TV", "I turn on a TV"]);
+});

@@ -194,7 +194,10 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   // ------------------------------------------------------------------ denetim
   const check = async (given: string, spoken = false) => {
     if (!set || !step || verdict) return;
-    const v = checkStep(step, given, pack.script);
+    // Dil ve önceki adım verilir: tuzaklar dile özgü, "bu adımda eklenen"
+    // kelime de önceki adımdan çıkarılır (o kelime eksikse yakın değil yanlış).
+    const prev = !isReorder && sentence && sti > 0 ? sentence.steps[sti - 1]?.target : undefined;
+    const v = checkStep(step, given, pack.script, { lang: pack.id, spoken, prev });
     setVerdict(v);
     setScore((sc) => ({ ok: sc.ok + (v === "yanlis" ? 0 : 1), total: sc.total + 1 }));
     // Doğru söyleneni duymak kalıbı kulağa da yerleştirir.

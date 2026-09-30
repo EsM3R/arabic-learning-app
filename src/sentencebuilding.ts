@@ -28,10 +28,33 @@
  * Kalıp merdiveni omurga olarak kalıyor: her set bir kalıba ODAKLANIR ama o
  * kalıbı bir temanın içinde, hikâye cümleleriyle çalıştırır.
  */
+import { canonicalTokens, checkAnswer, langForScript } from "./buildcheck.ts";
+import type { LanguageId } from "./languages.ts";
 import type { ScriptId } from "./scripts.ts";
-import { normalizeTarget } from "./textnorm.ts";
 
 export type Band = "A1" | "A2" | "B1" | "B2" | "C1";
+
+/**
+ * Bağlaç türü — hocanın üç ayrı davranışı: "-madan önce" gibi YAN cümle
+ * bağlacı (bağlaçla başlanır, sonra ortaya alınabilir), "ama" gibi SIRALI
+ * bağlaç (önce birinci kısım, yer değiştirmez), "çünkü" gibi önceki cümleye
+ * BAĞLANAN bağlaç (önceki cümle söylenip devam edilir).
+ */
+export type ConnKind = "sub" | "coord" | "causal" | "none";
+
+/** Setin tek zaman çerçevesi; "habit" iken -iyor'lu cevap geniş zamana çevrilir. */
+export type TenseFrame = "habit" | "now" | "past" | "future" | "mixed";
+
+/**
+ * Eşdeğer söyleyiş: kalıptaki parça (from) yerine öğrencinin söyleyebileceği
+ * alternatif (to). Bir adımda seçilen alternatif sonraki bütün adımlarda da
+ * geçerli kalsın diye cümle düzeyinde tutulur ("have a shower").
+ */
+export interface Swap {
+  from: string[];
+  to: string[];
+  label?: "resmî" | "günlük" | "edebî" | "dişil";
+}
 
 export interface Pattern {
   id: string;
@@ -281,68 +304,52 @@ export function reorderStep(sentence: BuildSentence): BuildStep | null {
 // Cevap denetimi
 // ---------------------------------------------------------------------------
 
-/** İngilizce kısaltmalar: "I'm" ile "I am" aynı cevaptır. */
-const EN_CONTRACTIONS: [RegExp, string][] = [
-  [/\bi'm\b/g, "i am"],
-  [/\b(you|we|they)'re\b/g, "$1 are"],
-  [/\b(he|she|it|that|there|what|where|who)'s\b/g, "$1 is"],
-  [/\b(i|you|we|they)'ve\b/g, "$1 have"],
-  [/\b(i|you|he|she|we|they|it)'ll\b/g, "$1 will"],
-  [/\b(i|you|he|she|we|they)'d\b/g, "$1 would"],
-  [/\bcan't\b/g, "cannot"],
-  [/\bcan not\b/g, "cannot"],
-  [/\bwon't\b/g, "will not"],
-  [/\bshan't\b/g, "shall not"],
-  [/\b(\w+)n't\b/g, "$1 not"],
-  [/\bgonna\b/g, "going to"],
-  [/\bwanna\b/g, "want to"],
-];
-
-/** Karşılaştırma için kayıplı biçim: büyük/küçük, noktalama, kısaltma farkı yok. */
-export function canonical(s: string, script: ScriptId): string {
-  let t = s.replace(/[’`]/g, "'");
-  if (script === "latin") {
-    t = t.toLowerCase();
-    for (const [re, rep] of EN_CONTRACTIONS) t = t.replace(re, rep);
-  }
-  return normalizeTarget(t, script);
+/**
+ * Karşılaştırma için kayıplı biçim: büyük/küçük, noktalama, kısaltma, saat
+ * yazımı, hareke farkı yok. Asıl iş src/buildcheck.ts'te (canonicalTokens);
+ * burada eski imza korunuyor ki cümle anahtarları aynı kalsın.
+ */
+export function canonical(s: string, script: ScriptId, lang?: LanguageId): string {
+  return canonicalTokens(s, lang ?? langForScript(script), script).join(" ");
 }
 
 export type StepVerdict = "dogru" | "yakin" | "yanlis";
 
-/** Kelime düzeyi düzenleme uzaklığı — "bir kelime eksik" ayrımı için. */
-function wordDistance(a: string[], b: string[]): number {
-  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
-  for (let j = 1; j <= b.length; j += 1) dp[0][j] = j;
-  for (let i = 1; i <= a.length; i += 1) {
-    for (let j = 1; j <= b.length; j += 1) {
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
-    }
-  }
-  return dp[a.length][b.length];
+export interface CheckStepOptions {
+  /** Hedef dil; verilmezse yazı sisteminden tahmin edilir (Latin → en). */
+  lang?: LanguageId;
+  /** Mikrofonla mı söylendi — sesteş kelime ve artikel yutma yalnız seste affedilir. */
+  spoken?: boolean;
+  /** Bir önceki adımın hedefi: bu adımda EKLENEN kelimeler ondan çıkarılır. */
+  prev?: string;
+  /** Cümle düzeyindeki eşdeğer söyleyişler. */
+  swaps?: Swap[];
+  /** Setin zaman çerçevesi ("habit" iken -iyor'lu cevap yanlış sayılır). */
+  tense?: TenseFrame;
 }
 
 /**
- * Öğrencinin cevabı ile beklenen: "dogru" (birebir ya da kabul edilen
- * alternatif), "yakin" (uzun cümlede tek kelime farkı — ses tanıma hatası ya
- * da küçük bir kayma olabilir; öğrenciye doğrusu gösterilir ama cezalanmaz),
- * "yanlis".
+ * Eski ekranın denetimi — artık checkAnswer'ın ince bir sarmalayıcısı.
+ * "Uzun cümlede tek kelime farkı yakın" kuralı KALDIRILDI: hocanın uyardığı
+ * tuzak kelime (with/by, ago/before), bağlaç ya da bu adımda eklenen kelime
+ * tek kelime olsa da yanlıştır; yalnız artikel gibi ses tanıma gürültüsü
+ * "yakın" sayılır (bkz. buildcheck.ts, 8 kurallı öncelik tablosu).
  */
-export function checkStep(step: BuildStep, given: string, script: ScriptId): StepVerdict {
-  const g = canonical(given, script);
-  if (!g) return "yanlis";
-  const accepted = [step.target, ...step.alts].map((x) => canonical(x, script)).filter(Boolean);
-  if (accepted.includes(g)) return "dogru";
-  const gw = g.split(" ");
-  for (const a of accepted) {
-    const aw = a.split(" ");
-    if (aw.length >= 6 && wordDistance(aw, gw) === 1) return "yakin";
-  }
-  return "yanlis";
+export function checkStep(
+  step: BuildStep,
+  given: string,
+  script: ScriptId,
+  opts: CheckStepOptions = {}
+): StepVerdict {
+  const r = checkAnswer(step.target, step.alts, given, {
+    lang: opts.lang ?? langForScript(script),
+    script,
+    spoken: opts.spoken,
+    prev: opts.prev,
+    swaps: opts.swaps,
+    tense: opts.tense,
+  });
+  return r ? r.verdict : "yanlis";
 }
 
 // ---------------------------------------------------------------------------

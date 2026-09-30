@@ -77,9 +77,32 @@ test("kabul edilen ALTERNATİF de doğrudur", () => {
   assert.equal(checkStep(s, "I wanted to go to the cinema last night", "latin"), "dogru");
 });
 
-test("uzun cümlede TEK kelime farkı 'yakın' — ceza yok ama doğrusu gösterilir", () => {
+test("yutulan ARTİKEL 'yakın' — ses tanıma gürültüsü, ceza yok ama doğrusu gösterilir", () => {
   const s = step("I wanted to go to the cinema with my friend.");
   assert.equal(checkStep(s, "I wanted to go to cinema with my friend", "latin"), "yakin");
+});
+
+test("eski '6+ kelimede tek fark = yakın' kuralı YOK: artikel dışı tek kelime farkı yanlıştır", () => {
+  // Hocanın uyardığı fark tek kelimedir (with/by, ago/before); uzun cümlede
+  // bile "yakın" sayılırsa yanlış kalıp oturur.
+  const s = step("I wanted to go to the cinema with my friend.");
+  assert.equal(checkStep(s, "I wanted to go to the cinema with my brother", "latin"), "yanlis");
+  const bus = step("I sometimes go to work by metro with my friend.");
+  assert.equal(checkStep(bus, "I sometimes go to work with metro with my friend", "latin"), "yanlis");
+});
+
+test("checkStep ince sarmalayıcı: dil, ses ve önceki adım checkAnswer'a geçer", () => {
+  // Seste sesteş (buy → by) affedilir, yazıda affedilmez.
+  const s = step("I go to work by bus");
+  assert.equal(checkStep(s, "I go to work buy bus", "latin", { lang: "en", spoken: true }), "dogru");
+  assert.equal(checkStep(s, "I go to work buy bus", "latin", { lang: "en" }), "yanlis");
+  // Bu adımda eklenen kelime (early) düşerse yanlış.
+  const e = step("I like to wake up early");
+  assert.equal(checkStep(e, "I like to wake up", "latin", { prev: "I like to wake up" }), "yanlis");
+  // Arapçada İngilizce tuzak yok; dile özgü tuzak var (araçta مَعَ).
+  const ar = step("أَذْهَبُ إِلَى العَمَلِ بِالمِتْرُو");
+  assert.equal(checkStep(ar, "اذهب الى العمل مع المترو", "arabic", { lang: "ar" }), "yanlis");
+  assert.equal(checkStep(ar, "اذهب الى العمل بال مترو", "arabic"), "dogru");
 });
 
 test("kısa cümlede tek kelime farkı yakın SAYILMAZ — kalıp o kelimedir", () => {
