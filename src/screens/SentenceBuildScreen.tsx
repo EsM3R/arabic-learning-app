@@ -41,7 +41,7 @@ import type {
 import { methodFor, systemById } from "../buildmethod";
 import { continueSet, resumePending, startSet } from "../buildpipeline";
 import type { PipelineHooks } from "../buildpipeline";
-import { askBuildTeacher, generateMoreTransfer, generateProbe, judgeBuildAnswer } from "../claude";
+import { askBuildTeacher, evaluateStory, generateMoreTransfer, generateProbe, judgeBuildAnswer } from "../claude";
 import { getActivePack } from "../languages";
 import { isRtl } from "../scripts";
 import {
@@ -107,6 +107,7 @@ import PreparingCard from "./build/PreparingCard";
 import ReadCard from "./build/ReadCard";
 import RecapCard from "./build/RecapCard";
 import AskTeacher from "./build/AskTeacher";
+import StoryTellView from "./build/StoryTellView";
 import RecallChips from "./build/RecallChips";
 import type { RecallItem } from "./build/RecallChips";
 import {
@@ -138,7 +139,7 @@ interface Props {
   onBack: () => void;
 }
 
-type Phase = "home" | "loading" | "intro" | "card" | "preparing" | "retell" | "done" | "session" | "ladder";
+type Phase = "home" | "loading" | "intro" | "card" | "preparing" | "retell" | "done" | "session" | "ladder" | "story";
 /** learn: sayılır · review: tek seferde (yalnız vadesi gelmişse sayılır) · practice: sayılmaz. */
 type Mode = "learn" | "review" | "practice";
 
@@ -1424,10 +1425,16 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
   const onHeard = (text: string, alts: string[]) => {
     setAnswer(text);
     const list = alts.length ? alts : [text];
+    if (phase === "story") {
+      storyHeard.current?.(text);
+      return;
+    }
     if (phase === "session") sessionHeard.current?.(list, true);
     else if (phase === "retell") submitRetell(list, true);
     else submit(list, true);
   };
+  /** "1 dakikada anlat" açıkken duyulan metin oraya gider. */
+  const storyHeard = useRef<((text: string) => void) | null>(null);
   const onHeardRef = useRef(onHeard);
   onHeardRef.current = onHeard;
   // n-best: ses tanımanın öteki duyuşları, yutulan artikeli kurtarabilsin (tuzağı değil).
@@ -1668,6 +1675,7 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
           nextEpisode={nextEpisode(set)}
           onNext={() => onSetAction(set, "next")}
           onRetell={() => startRetell(ready, "Günümü anlat", null)}
+          onStory={ready.length >= 2 ? () => setPhase("story") : undefined}
           onOneShot={() => begin(set, "review")}
           onPractice={() => begin(set, "practice")}
           onSaveBlocks={() =>
@@ -1677,6 +1685,31 @@ export default function SentenceBuildScreen({ profile, onBack }: Props) {
             })
           }
           onHome={goHome}
+        />
+      </Screen>
+    );
+  }
+
+  if (phase === "story") {
+    const story = set.sentences.filter((x) => x.status === "ready").map((x) => ({ tr: x.tr, target: vt(x.target) }));
+    return provide(
+      <Screen header={header("1 dakikada anlat")}>
+        <StoryTellView
+          key={set.id}
+          sentences={story}
+          view={view}
+          script={pack.script}
+          hideCues={BANDS.indexOf(set.level) >= BANDS.indexOf("B2")}
+          dictation={dictation}
+          bindHeard={(fn) => {
+            storyHeard.current = fn;
+          }}
+          onEvaluate={(transcript, seconds) => {
+            void recordStats(["spoken"]);
+            return evaluateStory(profile, { lang, band: set.level, sentences: story, transcript, seconds });
+          }}
+          onListen={(t) => speakTargetWith(t)}
+          onDone={() => setPhase("done")}
         />
       </Screen>
     );

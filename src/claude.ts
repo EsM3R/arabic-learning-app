@@ -30,6 +30,8 @@ import {
   askUser,
   judgeSystem,
   judgeUser,
+  storyEvalSystem,
+  storyEvalUser,
   moreTransferSystem,
   probeSystem,
   pronunciationSystem,
@@ -39,7 +41,7 @@ import {
   sentencePlanUser,
   readingTextUserMessage,
 } from "./prompts";
-import type { AskInput, JudgeInput, PlanPromptInput } from "./prompts";
+import type { AskInput, JudgeInput, PlanPromptInput, StoryEvalInput } from "./prompts";
 import { normalizeDebrief } from "./conversation";
 import { deriveSwaps } from "./buildcheck";
 import { normalizeBuildSet, normalizeSentence, validatePlan } from "./sentencebuilding";
@@ -1082,4 +1084,77 @@ export async function askBuildTeacher(profile: Profile, input: AskInput, questio
   if (!a) a = await once();
   if (!a) throw new Error(EMPTY_TEXT);
   return a;
+}
+
+export const STORY_SCHEMA = {
+  type: "object",
+  required: ["score", "covered", "links", "fixes", "praise", "next"],
+  properties: {
+    score: { type: "number" },
+    covered: { type: "array", items: { type: "number" } },
+    links: { type: "array", items: { type: "string" } },
+    fixes: { type: "array", items: { type: "array", items: { type: "string" } } },
+    praise: { type: "string" },
+    next: { type: "string" },
+  },
+  additionalProperties: false,
+} as const;
+
+export const STORY_SCHEMA_HINT = '{"score":0-100,"covered":[0,2],"links":["and"],"fixes":[["söylenen","doğrusu","neden"]],"praise":"","next":""}';
+
+export interface StoryFix {
+  said: string;
+  better: string;
+  why: string;
+}
+
+export interface StoryReport {
+  score: number;
+  covered: number[];
+  links: string[];
+  fixes: StoryFix[];
+  praise: string;
+  next: string;
+}
+
+/** Hocanın anlatım raporunu güvenli biçime getirir (saf; test altında). */
+export function normalizeStoryReport(raw: unknown, total: number): StoryReport {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const n = Number(o.score);
+  const covered = [...new Set(arr(o.covered).map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < total))].sort((a, b) => a - b);
+  const fixes: StoryFix[] = [];
+  for (const f of arr(o.fixes)) {
+    const x = Array.isArray(f) ? f.map(str) : [];
+    const g = f && typeof f === "object" && !Array.isArray(f) ? (f as Record<string, unknown>) : null;
+    const said = g ? str(g.said) : x[0] ?? "";
+    const better = g ? str(g.better) : x[1] ?? "";
+    const why = g ? str(g.why) : x[2] ?? "";
+    if (better && said !== better) fixes.push({ said, better, why });
+    if (fixes.length >= 4) break;
+  }
+  return {
+    score: Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0,
+    covered,
+    links: [...new Set(arr(o.links).map(str).filter(Boolean))].slice(0, 8),
+    fixes,
+    praise: str(o.praise),
+    next: str(o.next),
+  };
+}
+
+/** "1 dakikada anlat": hikâyenin tek seferde anlatımını hoca değerlendirir. */
+export async function evaluateStory(profile: Profile, input: StoryEvalInput): Promise<StoryReport> {
+  await guardBudget(profile);
+  const { provider, model, apiKey } = requireKey(profile);
+  const raw = await provider.structured<unknown>({
+    system: storyEvalSystem(input),
+    userMessage: storyEvalUser(input),
+    schema: STORY_SCHEMA as unknown as Record<string, unknown>,
+    schemaHint: STORY_SCHEMA_HINT,
+    model,
+    apiKey,
+  });
+  return normalizeStoryReport(raw, input.sentences.length);
 }

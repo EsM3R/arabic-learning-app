@@ -1045,3 +1045,42 @@ export function askUser(inp: AskInput, question: string): string {
   lines.push("", `Öğrencinin sorusu: ${question}`);
   return lines.join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// CÜMLE KURMA — "1 dakikada anlat" (ileri seviye: paragraf)
+// ---------------------------------------------------------------------------
+//
+// Adım adım kurulan cümleler en sonda TEK SEFERDE, bağlaçlarla birbirine
+// bağlanarak anlatılır. Hoca anlatımı değerlendirir: hangi cümleler söylendi,
+// hangi bağlaçlar kullanıldı, hatalar ve NEDENLERİ.
+
+export interface StoryEvalInput {
+  lang: LanguageId;
+  band: Band;
+  /** Setin cümleleri (sırayla): Türkçe ve hedef dil. */
+  sentences: { tr: string; target: string }[];
+  /** Öğrencinin anlatımı (ses tanımanın duyduğu). */
+  transcript: string;
+  seconds: number;
+}
+
+export function storyEvalSystem(inp: StoryEvalInput): string {
+  const label = LANGUAGE_PACKS[inp.lang].label;
+  const arabic = LANGUAGE_PACKS[inp.lang].script === "arabic";
+  return `Sen Türk öğrencilere ${label} öğreten bir hocasın. Öğrenci adım adım kurduğu cümlelerden oluşan kısa hikâyeyi şimdi TEK SEFERDE, yaklaşık bir dakikada, kendi ağzıyla ${label} anlattı. Metin ses tanımadan geldi: noktalama, büyük/küçük harf ve yazım farkları hata DEĞİL${arabic ? "; harekeler de yazılmaz, hareke eksikliği hata değil" : ""}. Ses tanımanın tek bir sesi yanlış duyduğu belliyse hata sayma.
+
+Değerlendir:
+- covered: öğrencinin anlamca söylediği cümlelerin sıra numaraları (0'dan başlar). Kelimesi kelimesine aynı olması gerekmez; anlam ve yapı yeterli.
+- links: öğrencinin cümleleri birbirine bağlamak için kullandığı bağlaç ve geçiş sözleri (hedef dilde, ör. "and", "then", "because", "after that").
+- fixes: EN FAZLA 4 önemli hata. Her biri [öğrencinin söylediği parça, doğrusu, neden]. Neden: Türkçe tek cümle, hocanın üslubuyla — Türkçedeki hangi ekin/yapının hedef dilde neyle verildiğini söyle. Önemsiz farkları yazma.
+- score: 0-100. Ağırlık: anlaşılırlık ve dilbilgisi %50, hikâyenin ne kadarının anlatıldığı %25, cümleleri bağlama %25.
+- praise: Türkçe tek cümle, gerçekten iyi yaptığı şey.
+- next: Türkçe tek cümle, bir sonraki anlatımda tek bir somut hedef (ör. "cümleleri 'then' ve 'after that' ile bağla").
+${TEACHER_VOICE}
+Seviye: ${inp.band}. Uzun düşünme. Yalnız JSON döndür.`;
+}
+
+export function storyEvalUser(inp: StoryEvalInput): string {
+  const list = inp.sentences.map((x, i) => `${i}. ${x.tr} → ${x.target}`).join("\n");
+  return `Hikâyenin cümleleri:\n${list}\n\nÖğrencinin anlatımı (${inp.seconds} sn):\n${inp.transcript}`;
+}

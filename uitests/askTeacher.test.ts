@@ -46,3 +46,18 @@ test("boş cevapta bir kez daha dener", async () => {
   await expect(askBuildTeacher(profile, input, "Neden?")).resolves.toBe("İkinci denemede geldi.");
   expect(mockStructured).toHaveBeenCalledTimes(2);
 });
+
+test("anlatım raporu güvenli biçime getirilir", () => {
+  const { normalizeStoryReport } = require("../src/claude");
+  const r = normalizeStoryReport(
+    { score: 140, covered: [0, 0, 5, 1, "x"], links: ["and", "and", ""], fixes: [["a", "b", "neden"], ["same", "same", ""], { said: "c", better: "d", why: "w" }] },
+    3
+  );
+  expect(r.score).toBe(100);
+  expect(r.covered).toEqual([0, 1]);
+  expect(r.links).toEqual(["and"]);
+  expect(r.fixes).toEqual([
+    { said: "a", better: "b", why: "neden" },
+    { said: "c", better: "d", why: "w" },
+  ]);
+});

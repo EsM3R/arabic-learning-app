@@ -42,10 +42,12 @@ jest.mock("../src/buildpipeline", () => ({
 const mockMore = jest.fn();
 const mockJudge = jest.fn();
 const mockAsk = jest.fn();
+const mockStory = jest.fn();
 jest.mock("../src/claude", () => ({
   generateMoreTransfer: (...a: unknown[]) => mockMore(...a),
   judgeBuildAnswer: (...a: unknown[]) => mockJudge(...a),
   askBuildTeacher: (...a: unknown[]) => mockAsk(...a),
+  evaluateStory: (...a: unknown[]) => mockStory(...a),
 }));
 
 declare const global: { __dictation: { opts: { onResult: (t: string, a: string[]) => void } | null } };
@@ -73,6 +75,7 @@ beforeEach(async () => {
   mockJudge.mockReset();
   mockJudge.mockResolvedValue({ ok: false, why: "" });
   mockAsk.mockReset();
+  mockStory.mockReset();
   mockContinue.mockImplementation(async () => ({ set: null }));
   mockStartSet.mockImplementation(async (input: StartInput) => {
     if (input.confirm && !(await input.confirm("1 plan + 8 cümle", 8))) return null;
@@ -586,6 +589,49 @@ test("günümü anlat: giriş kartındaki 'Atla' anlatımı geçer, set biter ve
   fireEvent.press(screen.getByText("Atla"));
   await waitFor(() => expect(screen.getByText(/cümle kurdun/)).toBeTruthy());
   expect(Object.keys((await loadBuildUi()).retells ?? {})).toHaveLength(1);
+});
+
+test("1 dakikada anlat: hikâye tek seferde anlatılır, hoca düzeltmeleri NEDENİYLE raporlar", async () => {
+  mockStory.mockResolvedValueOnce({
+    score: 72,
+    covered: [0, 1],
+    links: ["and", "before"],
+    fixes: [{ said: "I like wake up", better: "I like to wake up", why: "-mayı ekini to ile veririz." }],
+    praise: "İki cümleyi before ile bağladın.",
+    next: "Bir dahakine 'then' ile devam et.",
+  });
+  await start(videoSet({ only: [0, 1] }));
+  fireEvent.press(screen.getByText("Kurmaya başla"));
+  for (const t of S0) {
+    await say(t);
+    await next();
+  }
+  await next(/^Geç$/);
+  await next(/Sıradaki cümle/);
+  await next(/Kurmaya başla/);
+  await next(); // bağlaç
+  for (const t of ["Before", "Before I have breakfast", "Before I have breakfast, I take a shower."]) {
+    await say(t);
+    await next();
+  }
+  await say("I take a shower before I have breakfast.");
+  await next();
+  await next(/Seti bitir/);
+  await waitFor(() => expect(screen.getByText("Tek tek anlat")).toBeTruthy());
+  fireEvent.press(screen.getByText("Atla"));
+  await next(/1 dakikada anlat/);
+  fireEvent.press(screen.getByText("Başla (60 sn)"));
+  await say("I like wake up early in the morning and before I have breakfast I take a shower");
+  fireEvent.press(screen.getByText("Bitirdim"));
+  await waitFor(() => expect(screen.getByText("2 / 2 cümleyi anlattın")).toBeTruthy(), { timeout: 3000 });
+  expect(screen.getByText("I like to wake up")).toBeTruthy();
+  expect(screen.getByText("-mayı ekini to ile veririz.")).toBeTruthy();
+  expect(screen.getByText("İki cümleyi before ile bağladın.")).toBeTruthy();
+  const arg = mockStory.mock.calls[0][1] as { transcript: string; sentences: { tr: string }[] };
+  expect(arg.transcript).toMatch(/before I have breakfast/);
+  expect(arg.sentences).toHaveLength(2);
+  fireEvent.press(screen.getByText("Bitti"));
+  await waitFor(() => expect(screen.getByText(/cümle kurdun/)).toBeTruthy());
 });
 
 test("adım notu yanlış kararda bir kez görünür (geri bildirim zaten içeriyor)", async () => {

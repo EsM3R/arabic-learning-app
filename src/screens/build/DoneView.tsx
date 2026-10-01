@@ -30,6 +30,7 @@ export default function DoneView({
   nextEpisode,
   onNext,
   onRetell,
+  onStory,
   onOneShot,
   onPractice,
   onSaveBlocks,
@@ -45,6 +46,8 @@ export default function DoneView({
   nextEpisode: number;
   onNext: () => void;
   onRetell: () => void;
+  /** "1 dakikada anlat": bütün hikâye tek seferde, hoca raporlar. */
+  onStory?: () => void;
   onOneShot: () => void;
   onPractice: () => void;
   onSaveBlocks: () => void;
@@ -97,6 +100,7 @@ export default function DoneView({
       <View style={{ gap: 10 }}>
         <Button icon="plus" label={`Devam (Bölüm ${nextEpisode})`} onPress={onNext} />
         <Button variant="secondary" size="md" icon="message" label="Günümü anlat" onPress={onRetell} />
+        {onStory ? <Button variant="secondary" size="md" icon="timer" label="1 dakikada anlat" onPress={onStory} /> : null}
         <Button variant="secondary" size="md" icon="target" label="Tek seferde tekrar" onPress={onOneShot} />
         <Button variant="secondary" size="md" icon="replay" label="Pratik et (sayılmaz)" onPress={onPractice} />
         <Button
