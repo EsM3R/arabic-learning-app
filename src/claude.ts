@@ -1037,21 +1037,49 @@ export const ASK_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export const ASK_SCHEMA_HINT = "{a}";
+export const ASK_SCHEMA_HINT = '{"a":"öğrenciye Türkçe cevabın tamamı (tek metin)"}';
+
+/**
+ * Modelin cevabından metni çıkarır. Şemayı uygulamayan sağlayıcı (DeepSeek)
+ * bazen alanı başka adla yazar ({"cevap": …}, {"answer": …}) ya da metni
+ * iç içe koyar; o yüzden "a" yoksa en uzun metin alanı alınır.
+ */
+export function pickAnswerText(raw: unknown): string {
+  if (typeof raw === "string") return raw.trim();
+  if (!raw || typeof raw !== "object") return "";
+  const o = raw as Record<string, unknown>;
+  if (typeof o.a === "string" && o.a.trim()) return o.a.trim();
+  let best = "";
+  for (const v of Object.values(o)) {
+    const t = typeof v === "string" ? v.trim() : Array.isArray(v) ? v.filter((x) => typeof x === "string").join("\n").trim() : pickAnswerText(v);
+    if (t.length > best.length) best = t;
+  }
+  return best;
+}
 
 /** "Hocaya sor": çalışılan cümle hakkında serbest soru, hocanın üslubuyla cevap. */
 export async function askBuildTeacher(profile: Profile, input: AskInput, question: string): Promise<string> {
   await guardBudget(profile);
   const { provider, model, apiKey } = requireKey(profile);
-  const raw = await provider.structured<{ a?: unknown }>({
-    system: askSystem(input),
-    userMessage: askUser(input, question),
-    schema: ASK_SCHEMA as unknown as Record<string, unknown>,
-    schemaHint: ASK_SCHEMA_HINT,
-    model,
-    apiKey,
-  });
-  const a = typeof raw?.a === "string" ? raw.a.trim() : "";
+  const once = async () =>
+    pickAnswerText(
+      await provider.structured<unknown>({
+        system: askSystem(input),
+        userMessage: askUser(input, question),
+        schema: ASK_SCHEMA as unknown as Record<string, unknown>,
+        schemaHint: ASK_SCHEMA_HINT,
+        model,
+        apiKey,
+      })
+    );
+  // Boş cevap genelde geçici: bir kez daha denenir, öğrenci hata görmez.
+  let a = "";
+  try {
+    a = await once();
+  } catch (e) {
+    if (!(e instanceof Error) || e.message !== EMPTY_TEXT) throw e;
+  }
+  if (!a) a = await once();
   if (!a) throw new Error(EMPTY_TEXT);
   return a;
 }
